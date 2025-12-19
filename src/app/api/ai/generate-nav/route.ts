@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: '画像がありません。' }, { status: 400 });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         // 1. Process images (Stitching for context)
         const buffers = await Promise.all(sections.map(async (s: any) => {

@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     try {
         const { text, role, dsl } = await request.json();
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const prompt = `
             あなたは広告代理店のシニアディレクター兼、法務チェック担当者です。

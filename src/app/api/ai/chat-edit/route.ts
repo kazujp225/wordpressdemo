@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     try {
         const { message, currentText, role, dsl } = await request.json();
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const prompt = `
             あなたはLP専門の敏腕ディレクターです。

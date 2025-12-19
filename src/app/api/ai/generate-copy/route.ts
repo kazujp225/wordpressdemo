@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
         const { productInfo, taste, sections } = await request.json();
 
         // Use the stable model identifier to resolve 404 errors (v1beta requires specific versions sometimes)
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         if (!sections || sections.length === 0) {
             return NextResponse.json({ error: '画像がありません。' }, { status: 400 });
