@@ -137,9 +137,9 @@ export async function POST(request: NextRequest) {
                 }
             ]);
         } catch (genError: any) {
-            console.warn('Gemini 2.0 Flash failed, retrying with 1.5-flash...', genError.message);
-            // Fallback to 1.5-flash which might have separate quota
-            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            console.warn('Gemini 2.0 Flash failed, retrying with gemini-1.5-flash-latest...', genError.message);
+            // Fallback to 1.5-flash-latest which might have separate quota
+            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
             result = await fallbackModel.generateContent([
                 prompt,
                 {
