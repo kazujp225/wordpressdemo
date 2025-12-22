@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from '@/components/admin/SortableItem';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Share2, Loader2 } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Share2, Loader2, Wand2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
@@ -50,6 +50,13 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [reviewingSectionId, setReviewingSectionId] = useState<string | null>(null);
     const [chattingSectionId, setChattingSectionId] = useState<string | null>(null);
     const [reviewResults, setReviewResults] = useState<Record<string, any>>({});
+
+    // 画像編集用の状態
+    const [showEditImageModal, setShowEditImageModal] = useState(false);
+    const [editImageSectionId, setEditImageSectionId] = useState<string | null>(null);
+    const [editImagePrompt, setEditImagePrompt] = useState('');
+    const [isEditingImage, setIsEditingImage] = useState(false);
+    const [editingSectionIds, setEditingSectionIds] = useState<Set<string>>(new Set());
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -276,6 +283,70 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             alert('画像生成に失敗しました。');
         } finally {
             setIsGeneratingSectionImage(false);
+        }
+    };
+
+    // 画像編集モーダルを開く
+    const handleOpenEditImage = (sectionId: string) => {
+        const section = sections.find(s => s.id === sectionId);
+        if (!section) return;
+
+        setEditImageSectionId(sectionId);
+        // デフォルトのプロンプトを設定
+        const defaultPrompt = aiProductInfo || section.config?.text || '';
+        setEditImagePrompt(defaultPrompt);
+        setShowEditImageModal(true);
+    };
+
+    // 画像をAIで編集
+    const handleEditImage = async () => {
+        if (!editImageSectionId) return;
+        const section = sections.find(s => s.id === editImageSectionId);
+        if (!section?.image?.filePath) {
+            alert('編集する画像がありません。');
+            return;
+        }
+
+        setIsEditingImage(true);
+        setEditingSectionIds(prev => new Set(prev).add(editImageSectionId));
+
+        try {
+            const res = await fetch('/api/ai/edit-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    imageUrl: section.image.filePath,
+                    prompt: editImagePrompt,
+                    productInfo: aiProductInfo
+                })
+            });
+
+            const data = await res.json();
+
+            if (!data.success) {
+                throw new Error(data.message || data.error || '画像編集に失敗しました');
+            }
+
+            // 編集された画像でセクションを更新
+            setSections(prev => prev.map(s =>
+                s.id === editImageSectionId
+                    ? { ...s, imageId: data.media.id, image: data.media }
+                    : s
+            ));
+
+            setShowEditImageModal(false);
+            alert('画像を編集しました！');
+
+        } catch (error: any) {
+            console.error('画像編集エラー:', error);
+            alert(error.message || '画像編集に失敗しました。');
+        } finally {
+            setIsEditingImage(false);
+            setEditingSectionIds(prev => {
+                const next = new Set(prev);
+                next.delete(editImageSectionId);
+                return next;
+            });
         }
     };
 
@@ -584,12 +655,14 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 document.getElementById('section-file-input')?.click();
                                             }}
                                             onAIImage={handleSectionAIImage}
+                                            onEditImage={handleOpenEditImage}
                                             onSaveSection={handleSaveSection}
                                             onReviewSection={handleReviewSection}
                                             onChatEdit={handleChatEdit}
                                             isSaving={savingSectionId === section.id}
                                             isReviewing={reviewingSectionId === section.id}
                                             isChatting={chattingSectionId === section.id}
+                                            isEditingImage={editingSectionIds.has(section.id)}
                                             reviewResult={reviewResults[section.id]}
                                         />
                                     ))}
@@ -766,6 +839,68 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 >
                                     {isGeneratingSectionImage ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                                     <span>画像を生成</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 画像編集モーダル (Nano Banana Pro) */}
+            {showEditImageModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-6">
+                    <div className="w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl animate-in zoom-in duration-300">
+                        <div className="p-8">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                                    <Wand2 className="h-5 w-5 text-purple-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-gray-900"><span>AIで画像を編集</span></h3>
+                                    <p className="text-[10px] font-bold text-purple-500 uppercase tracking-widest"><span>Powered by Nano Banana</span></p>
+                                </div>
+                            </div>
+                            <p className="text-sm text-gray-500 mb-6 font-medium">
+                                <span>元の画像のレイアウトを維持しながら、新しい商材/サービス用にリブランディングします。</span>
+                            </p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                        <span>編集指示（詳細なほど良い結果に）</span>
+                                    </label>
+                                    <textarea
+                                        value={editImagePrompt}
+                                        onChange={(e) => setEditImagePrompt(e.target.value)}
+                                        className="w-full min-h-[150px] rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm font-medium outline-none focus:bg-white focus:ring-4 focus:ring-purple-50 transition-all shadow-inner"
+                                        placeholder="例: この電力会社のLPを、熱々の冷凍餃子の販促用に作り変えてください。ターゲットは主婦層で、シズル感を重視。色味はオレンジ系の暖色で。"
+                                    />
+                                </div>
+
+                                {aiProductInfo && (
+                                    <div className="rounded-xl bg-purple-50 p-3 border border-purple-100">
+                                        <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">
+                                            <span>プロモーション情報（自動適用）</span>
+                                        </p>
+                                        <p className="text-xs text-purple-700 line-clamp-2">{aiProductInfo}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-8 flex gap-3">
+                                <button
+                                    onClick={() => setShowEditImageModal(false)}
+                                    className="flex-1 rounded-2xl py-3.5 text-sm font-bold text-gray-400 hover:bg-gray-50 transition-all font-black uppercase tracking-widest"
+                                >
+                                    <span>キャンセル</span>
+                                </button>
+                                <button
+                                    onClick={handleEditImage}
+                                    disabled={isEditingImage || !editImagePrompt}
+                                    className="flex-[2] flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3.5 text-sm font-black text-white shadow-xl shadow-purple-100 hover:bg-purple-700 disabled:opacity-50 transition-all"
+                                >
+                                    {isEditingImage ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                                    <span>{isEditingImage ? '編集中...' : '画像を編集'}</span>
                                 </button>
                             </div>
                         </div>

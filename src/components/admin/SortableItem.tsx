@@ -3,7 +3,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, ShieldCheck, Target, Info, AlertTriangle, CheckCircle, MessageSquare, Send, Check } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, ShieldCheck, Target, Info, AlertTriangle, CheckCircle, MessageSquare, Send, Check, Wand2 } from 'lucide-react';
 import Image from 'next/image';
 
 interface SortableItemProps {
@@ -17,12 +17,14 @@ interface SortableItemProps {
     onRemove: (id: string) => void;
     onImageChange: (id: string) => void;
     onAIImage: (id: string) => void;
+    onEditImage?: (id: string) => void;
     onSaveSection?: (id: string) => void;
     onReviewSection?: (id: string) => void;
     onChatEdit?: (id: string, message: string) => Promise<any>;
     isSaving?: boolean;
     isReviewing?: boolean;
     isChatting?: boolean;
+    isEditingImage?: boolean;
     reviewResult?: {
         status: string;
         count: number;
@@ -99,6 +101,16 @@ export function SortableItem(props: SortableItemProps) {
                         >
                             <Sparkles className="h-3.5 w-3.5" />
                         </button>
+                        {props.onEditImage && preview && (
+                            <button
+                                onClick={() => props.onEditImage?.(props.id)}
+                                disabled={props.isEditingImage}
+                                className="p-1.5 rounded-full bg-purple-500/80 hover:bg-purple-500 text-white transition-colors disabled:opacity-50"
+                                title="AIで画像を編集"
+                            >
+                                {props.isEditingImage ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                            </button>
+                        )}
                     </div>
                 </div>
 
