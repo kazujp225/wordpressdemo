@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# antigravity debug scripts
+check_db.js
+check_db_full.js
+check_sections.js

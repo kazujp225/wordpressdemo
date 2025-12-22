@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
         // Note: Imagen 3 is the current state-of-the-art for Google.
         // We use the predict endpoint for Imagen models.
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.1-generate-001:predict?key=${GOOGLE_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${GOOGLE_API_KEY}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Google Imagen API error:', errorText);
-            throw new Error('Google Imagen 3 での画像生成に失敗しました。APIキーの権限またはモデルの可用性をご確認ください。');
+            throw new Error(`Google Imagen 3 API Error: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
         const data = await response.json();

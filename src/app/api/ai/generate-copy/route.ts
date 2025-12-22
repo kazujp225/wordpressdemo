@@ -9,12 +9,17 @@ export async function POST(request: NextRequest) {
     try {
         const { productInfo, taste, sections } = await request.json();
 
-        // Use the stable model identifier to resolve 404 errors (v1beta requires specific versions sometimes)
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Use the high-accuracy "Nanobananapro" grade model: gemini-2.0-flash
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         if (!sections || sections.length === 0) {
             return NextResponse.json({ error: '画像がありません。' }, { status: 400 });
         }
+
+        // Mapping info for the AI
+        const mappingInfo = sections.map((s: any, i: number) => {
+            return `[Section ${i + 1}] ID: ${s.id} | Role: ${s.role || 'unknown'}`;
+        }).join('\n');
 
         // 1. Process images (Stitching)
         const buffers = await Promise.all(sections.map(async (s: any) => {
@@ -42,64 +47,109 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: '分析できる画像が見つかりません。' }, { status: 400 });
         }
 
+        const STITCH_LIMIT = 10000;
         const canvasWidth = 800;
+
+        // Dynamic resizing to fit within Gemini/Sharp limits
+        // If many sections, reduce individual image height to fit total limit
+        let scaleFactor = 1.0;
+        const initialTotalHeight = buffers.reduce((acc, img) => acc + (img.metadata.height || 0) * (canvasWidth / (img.metadata.width || 800)), 0);
+
+        if (initialTotalHeight > STITCH_LIMIT) {
+            scaleFactor = STITCH_LIMIT / initialTotalHeight;
+        }
+
         let currentY = 0;
         const processedImages = await Promise.all(buffers.map(async (img) => {
-            const resized = await sharp(img.buffer).resize(canvasWidth).toBuffer();
-            const metadata = await sharp(resized).metadata();
+            const targetWidth = Math.floor(canvasWidth);
+            const targetHeight = Math.floor((img.metadata.height || 0) * (canvasWidth / (img.metadata.width || 800)) * scaleFactor);
+
+            const resized = await sharp(img.buffer)
+                .resize(targetWidth, targetHeight, { fit: 'fill' })
+                .toBuffer();
+
             const top = currentY;
-            currentY += metadata.height || 0;
+            currentY += targetHeight;
             return { input: resized, top, left: 0 };
         }));
 
         const stitchedImage = await sharp({
             create: {
                 width: canvasWidth,
-                height: Math.min(currentY, 10000), // Cap height for Gemini stability
+                height: Math.max(1, Math.min(currentY, STITCH_LIMIT)),
                 channels: 3,
                 background: { r: 255, g: 255, b: 255 }
             }
         })
             .composite(processedImages)
-            .jpeg({ quality: 80 })
+            .jpeg({ quality: 75 }) // Slightly lower quality to save bandwidth
             .toBuffer();
 
         const prompt = `
-            あなたはLP専属のプロコピーライター兼ディレクターです。
-            全画像を縦に繋ぎ合わせた「1枚の開発中LP（下書き）」を見て、全体のストーリーが繋がるように各セクションに最適な日本語キャッチコピーを提案し、さらに実務運用に耐えうる「設計データ（DSL）」を定義してください。
-            
-            【重要】リブランディング指示:
-            - 今回のプロモーション内容: "${productInfo || '特に指定なし（画像から推測してください）'}"
-            - 全体のテイスト: "${taste || 'professional'}" (例: popsなら親しみやすく、luxuryなら格調高く)
-            
-            ※もしプロモーション内容に別の商材への書き換え指示がある場合は、**その指示を最優先**し、画像はイメージとして扱いながら、文言と設計は完全に新しい商材向けに構築してください。
+            あなたは、数々の億単位の売上を叩き出してきた【超一流のLPシニアクリエイティブディレクター】です。
+            渡された「LPの下書き画像」の構成を維持しつつ、中身（商材）を「完全に指定の商材にリブランディング」してください。
 
-            入力情報:
-            - 各セクションのID: ${buffers.map(b => b.id).join(', ')}
+            【リブランディング指示：最優先！】
+            1. 新商材情報: "${productInfo}"
+            2. 全体のテイスト: "${taste}"
 
-            出力形式（純粋なJSON配列のみ）:
+            【重要：画像は「レイアウト構成のヒント」としてのみ扱うこと】
+            アップロードされた画像に含まれるテキストや商材情報は、一切無視してください。
+            今回の絶対的な任務は、画像が示しているセクション構成（hero, solution 等）を維持しつつ、中身を"${productInfo}"に「完全に、かつ戦略的に」書き換えることです。
+            業界プリセット（legal等）が指定されている場合は、その規制やトーンを厳守せよ。
+
+            【セクション構成（上から順に並んでいます）】
+            ${mappingInfo}
+
+            【思考ステップ (Strategic Thinking)】
+            1. 役割の解析: 各セクションの ID と Roleを確認し、指定商材("${productInfo}")におけるそのセクションの最適な訴求ポイントを定義せよ。
+            2. コピー執筆: テイスト("${taste}")に基づき、ターゲットに刺さるキャッチコピーをセクションごとに生成せよ。
+            3. マッピング: 各セクションの ID を一字一句違わずに JSON に埋め込め。絶対に捏造するな。
+
+            【重要：マッピングルール】
+            渡された各セクションの ID ("temp-..." または数値) を、一字一句違わずに JSON の "id" フィールドに設定してください。「Section 1」などの番号や「ID=」などの文字は含めず、純粋なID文字列/数値のみを入れること。
+
+            出力形式（JSON配列のみ。余計な解説は不要。省略禁止）:
             [
               {
-                "id": "セクションID",
-                "text": "生成されたキャッチコピー",
+                "id": "ここに mappingInfo の各 ID (例: temp-xxx または 7) を正確に入れる",
+                "text": "生成された戦略的コピー",
                 "dsl": {
-                  "constraints": "文字数、必須キーワード、訴求ポイントの制約",
-                  "brand_guidelines": "語尾（ですます等）、ブランドトーン、表記揺れルール",
-                  "image_intent": "このセクションの画像に込める意図、構図、避けるべき要素"
+                  "strategy_intent": "このセクションでユーザーの心理をどう動かそうとしているか",
+                  "constraints": "文字数、必須キーワード、ベネフィット",
+                  "preset": "現在のプリセット（継続または最適化）",
+                  "tone": "${taste} に基づく詳細なトーン指定",
+                  "image_intent": "このセクションにふさわしい画像の構図・色彩指示"
                 }
               }
             ]
         `;
 
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: stitchedImage.toString('base64'),
-                    mimeType: "image/jpeg"
+        let result;
+        try {
+            result = await model.generateContent([
+                prompt,
+                {
+                    inlineData: {
+                        data: stitchedImage.toString('base64'),
+                        mimeType: "image/jpeg"
+                    }
                 }
-            }
-        ]);
+            ]);
+        } catch (genError: any) {
+            console.warn('Gemini 2.0 Flash failed, retrying with 1.5-flash...', genError.message);
+            // Fallback to 1.5-flash which might have separate quota
+            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            result = await fallbackModel.generateContent([
+                prompt,
+                {
+                    inlineData: {
+                        data: stitchedImage.toString('base64'),
+                        mimeType: "image/jpeg"
+                    }
+                }
+            ]);
+        }
 
         const response = await result.response;
         const text = response.text();
@@ -110,7 +160,7 @@ export async function POST(request: NextRequest) {
             await prisma.generationRun.create({
                 data: {
                     type: 'copy',
-                    model: "gemini-1.5-flash-001",
+                    model: "gemini-2.0-flash",
                     inputPrompt: prompt,
                     outputResult: text,
                     status: "failed",
@@ -126,7 +176,7 @@ export async function POST(request: NextRequest) {
         await prisma.generationRun.create({
             data: {
                 type: 'copy',
-                model: "gemini-1.5-flash-001",
+                model: "gemini-2.0-flash",
                 inputPrompt: prompt,
                 outputResult: JSON.stringify(resultData),
                 status: "succeeded"
@@ -135,19 +185,24 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(resultData);
     } catch (error: any) {
-        console.error('Gemini Final Error:', error);
-        // エラーログの記録
+        console.error('Gemini Copy Generation Final Error:', error);
         try {
             await prisma.generationRun.create({
                 data: {
                     type: 'copy',
-                    model: "gemini-1.5-flash-001",
+                    model: "gemini-2.0-flash",
                     inputPrompt: "Error occurred before prompt finalization",
                     status: "failed",
                     errorMessage: error.message
                 }
             });
-        } catch (e) { }
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        } catch (dbError) {
+            console.error('Failed to log error to DB:', dbError);
+        }
+        return NextResponse.json({
+            error: 'AI Copy Generation Failed',
+            details: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }, { status: 500 });
     }
 }

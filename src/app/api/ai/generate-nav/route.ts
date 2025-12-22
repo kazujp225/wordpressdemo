@@ -13,7 +13,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: '画像がありません。' }, { status: 400 });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+        // Mapping info for context
+        const mappingInfo = sections.map((s: any, i: number) => `Section ${i + 1}: ${s.role || 'unknown'}`).join('\n');
 
         // 1. Process images (Stitching for context)
         const buffers = await Promise.all(sections.map(async (s: any) => {
@@ -36,21 +39,33 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: '分析できる画像が見つかりません。' }, { status: 400 });
         }
 
-        // Simple stitch to give Gemini full page context
+        const STITCH_LIMIT = 8000;
         const canvasWidth = 800;
+
+        // Dynamic resizing for nav context
+        let scaleFactor = 1.0;
+        const initialTotalHeight = buffers.slice(0, 10).reduce((acc, img) => acc + (img.metadata.height || 0) * (canvasWidth / (img.metadata.width || 800)), 0);
+
+        if (initialTotalHeight > STITCH_LIMIT) {
+            scaleFactor = STITCH_LIMIT / initialTotalHeight;
+        }
+
         let currentY = 0;
-        const processedImages = await Promise.all(buffers.slice(0, 5).map(async (img) => { // Sample top 5
-            const resized = await sharp(img.buffer).resize(canvasWidth).toBuffer();
-            const metadata = await sharp(resized).metadata();
+        const processedImages = await Promise.all(buffers.slice(0, 10).map(async (img) => {
+            const targetWidth = Math.floor(canvasWidth);
+            const targetHeight = Math.floor((img.metadata.height || 0) * (canvasWidth / (img.metadata.width || 800)) * scaleFactor);
+
+            const resized = await sharp(img.buffer).resize(targetWidth, targetHeight).toBuffer();
+
             const top = currentY;
-            currentY += metadata.height || 0;
+            currentY += targetHeight;
             return { input: resized, top, left: 0 };
         }));
 
         const stitchedImage = await sharp({
             create: {
                 width: canvasWidth,
-                height: Math.min(currentY, 8000),
+                height: Math.max(1, Math.min(currentY, STITCH_LIMIT)),
                 channels: 3,
                 background: { r: 255, g: 255, b: 255 }
             }
@@ -90,6 +105,11 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(navConfig);
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('AI Nav Generation Final Error:', error);
+        return NextResponse.json({
+            error: 'AI Nav Generation Failed',
+            details: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }, { status: 500 });
     }
 }

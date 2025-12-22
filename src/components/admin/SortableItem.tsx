@@ -23,7 +23,13 @@ interface SortableItemProps {
     isSaving?: boolean;
     isReviewing?: boolean;
     isChatting?: boolean;
-    reviewResult?: { status: string; count: number; messages: string[] } | null;
+    reviewResult?: {
+        status: string;
+        count: number;
+        messages: string[];
+        scores?: { legal: number; brand: number; ux: number };
+        direction?: string;
+    } | null;
 }
 
 export function SortableItem(props: SortableItemProps) {
@@ -74,7 +80,7 @@ export function SortableItem(props: SortableItemProps) {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={preview} alt="Preview" className="h-full w-full object-cover transition-transform group-hover/img:scale-110" />
                     ) : (
-                        <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">画像なし</div>
+                        <div className="flex h-full w-full items-center justify-center text-xs text-gray-400"><span>画像なし</span></div>
                     )}
 
                     {/* 画像ホバー時のアクション */}
@@ -97,7 +103,7 @@ export function SortableItem(props: SortableItemProps) {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">セクションの役割</label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-400"><span>セクションの役割</span></label>
                     <div className="relative">
                         <select
                             value={props.role}
@@ -130,20 +136,20 @@ export function SortableItem(props: SortableItemProps) {
             {/* テキスト埋め込み設定 */}
             <div className="mt-2 rounded-lg bg-zinc-50 p-4 border border-zinc-100 relative group/texts">
                 <div className="mb-3 flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-500">テキスト埋め込み設定</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-500"><span>テキスト埋め込み設定</span></h4>
                 </div>
 
                 <div className="space-y-4">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <label className="block text-[10px] font-bold uppercase text-zinc-400">埋め込むテキスト</label>
+                            <label className="block text-[10px] font-bold uppercase text-zinc-400"><span>埋め込むテキスト</span></label>
                             <button
                                 onClick={() => props.onAIImage(props.id)}
                                 className="flex items-center gap-1 text-[9px] font-black text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full transition-all border border-blue-100"
                                 title="このテキストに合う画像を生成"
                             >
                                 <Sparkles className="h-2.5 w-2.5" />
-                                画像生成
+                                <span>画像生成</span>
                             </button>
                             <div className="flex-1" />
                             <div className="flex items-center gap-1.5">
@@ -186,15 +192,15 @@ export function SortableItem(props: SortableItemProps) {
                                         <div className="rounded bg-white/20 p-1">
                                             <Sparkles className="h-3 w-3" />
                                         </div>
-                                        <span className="text-[10px] font-black uppercase tracking-widest">AIディレクターの提案</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest"><span>AIディレクターの提案</span></span>
                                     </div>
                                     <button onClick={() => setChatResult(null)} className="text-white/50 hover:text-white"><X className="h-3 w-3" /></button>
                                 </div>
-                                <p className="text-sm font-bold leading-relaxed mb-4">{chatResult.revisedText}</p>
+                                <p className="text-sm font-bold leading-relaxed mb-4"><span>{chatResult.revisedText}</span></p>
                                 <div className="flex items-center justify-between border-t border-white/10 pt-4">
                                     <div className="text-[10px] text-white/70 italic flex items-center gap-1">
                                         <Info className="h-3 w-3" />
-                                        {chatResult.reason}
+                                        <span>{chatResult.reason}</span>
                                     </div>
                                     <button
                                         onClick={() => {
@@ -204,7 +210,7 @@ export function SortableItem(props: SortableItemProps) {
                                         className="flex items-center gap-1.5 rounded-xl bg-white px-4 py-1.5 text-[11px] font-black text-indigo-600 shadow-xl transition-all hover:scale-105 active:scale-95"
                                     >
                                         <Check className="h-3 w-3" />
-                                        この案を採用
+                                        <span>この案を採用</span>
                                     </button>
                                 </div>
                             </div>
@@ -219,25 +225,25 @@ export function SortableItem(props: SortableItemProps) {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400">テキストの色</label>
+                            <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400"><span>テキストの色</span></label>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => props.onConfigChange(props.id, { textColor: 'white' })}
                                     className={`h-8 flex-1 rounded border text-xs font-medium transition-all ${props.config?.textColor === 'white' || !props.config?.textColor ? 'border-blue-500 bg-blue-50 text-blue-600 ring-2 ring-blue-500/20' : 'border-zinc-200 bg-white text-zinc-600'}`}
                                 >
-                                    白
+                                    <span>白</span>
                                 </button>
                                 <button
                                     onClick={() => props.onConfigChange(props.id, { textColor: 'black' })}
                                     className={`h-8 flex-1 rounded border text-xs font-medium transition-all ${props.config?.textColor === 'black' ? 'border-blue-500 bg-blue-50 text-blue-600 ring-2 ring-blue-500/20' : 'border-zinc-200 bg-white text-zinc-600'}`}
                                 >
-                                    黒
+                                    <span>黒</span>
                                 </button>
                             </div>
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400">表示位置</label>
+                            <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400"><span>表示位置</span></label>
                             <div className="grid grid-cols-3 gap-1">
                                 {['top', 'middle', 'bottom'].map((pos) => (
                                     <button
@@ -245,7 +251,7 @@ export function SortableItem(props: SortableItemProps) {
                                         onClick={() => props.onConfigChange(props.id, { position: pos })}
                                         className={`h-8 rounded border text-[10px] font-bold uppercase transition-all ${props.config?.position === pos || (!props.config?.position && pos === 'middle') ? 'border-blue-500 bg-blue-50 text-blue-600 ring-2 ring-blue-500/20' : 'border-zinc-200 bg-white text-zinc-400'}`}
                                     >
-                                        {pos === 'top' ? '上' : pos === 'middle' ? '中' : '下'}
+                                        <span>{pos === 'top' ? '上' : pos === 'middle' ? '中' : '下'}</span>
                                     </button>
                                 ))}
                             </div>
@@ -258,7 +264,7 @@ export function SortableItem(props: SortableItemProps) {
                 <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Palette className="h-4 w-4 text-indigo-500" />
-                        <h4 className="text-xs font-black uppercase tracking-widest text-indigo-600">ビジュアル調整（無料）</h4>
+                        <h4 className="text-xs font-black uppercase tracking-widest text-indigo-600"><span>ビジュアル調整（無料）</span></h4>
                     </div>
                 </div>
 
@@ -267,9 +273,9 @@ export function SortableItem(props: SortableItemProps) {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="text-[10px] font-bold uppercase text-indigo-400 flex items-center gap-1.5">
-                                    <Sun className="h-3 w-3" /> 明るさ
+                                    <Sun className="h-3 w-3" /> <span>明るさ</span>
                                 </label>
-                                <span className="text-[10px] font-black text-indigo-600">{props.config?.brightness || 100}%</span>
+                                <span className="text-[10px] font-black text-indigo-600"><span>{props.config?.brightness || 100}%</span></span>
                             </div>
                             <input
                                 type="range" min="50" max="150" value={props.config?.brightness || 100}
@@ -279,8 +285,8 @@ export function SortableItem(props: SortableItemProps) {
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <label className="text-[10px] font-bold uppercase text-indigo-400">白黒化</label>
-                                <span className="text-[10px] font-black text-indigo-600">{props.config?.grayscale || 0}%</span>
+                                <label className="text-[10px] font-bold uppercase text-indigo-400"><span>白黒化</span></label>
+                                <span className="text-[10px] font-black text-indigo-600"><span>{props.config?.grayscale || 0}%</span></span>
                             </div>
                             <input
                                 type="range" min="0" max="100" value={props.config?.grayscale || 0}
@@ -292,7 +298,7 @@ export function SortableItem(props: SortableItemProps) {
 
                     <div className="space-y-4">
                         <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase text-indigo-400">オーバーレイの色</label>
+                            <label className="mb-2 block text-[10px] font-bold uppercase text-indigo-400"><span>オーバーレイの色</span></label>
                             <div className="flex gap-1.5 flex-wrap">
                                 {['transparent', 'black', 'white', '#1e3a8a', '#1e1b4b'].map((color) => (
                                     <button
@@ -306,8 +312,8 @@ export function SortableItem(props: SortableItemProps) {
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <label className="text-[10px] font-bold uppercase text-indigo-400">色の濃さ</label>
-                                <span className="text-[10px] font-black text-indigo-600">{props.config?.overlayOpacity || 0}%</span>
+                                <label className="text-[10px] font-bold uppercase text-indigo-400"><span>色の濃さ</span></label>
+                                <span className="text-[10px] font-black text-indigo-600"><span>{props.config?.overlayOpacity || 0}%</span></span>
                             </div>
                             <input
                                 type="range" min="0" max="90" value={props.config?.overlayOpacity || 0}
@@ -327,8 +333,8 @@ export function SortableItem(props: SortableItemProps) {
                             <ShieldCheck className="h-4 w-4" />
                         </div>
                         <div>
-                            <h4 className="text-xs font-black uppercase tracking-widest text-indigo-900">AIディレクター：品質保証</h4>
-                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tight">AI Director & Quality Guard</p>
+                            <h4 className="text-xs font-black uppercase tracking-widest text-indigo-900"><span>AIディレクター：品質保証</span></h4>
+                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tight"><span>AI Director & Quality Guard</span></p>
                         </div>
                     </div>
                     <button
@@ -337,26 +343,68 @@ export function SortableItem(props: SortableItemProps) {
                         className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-[10px] font-black text-indigo-600 shadow-sm hover:shadow-md transition-all border border-indigo-100 disabled:opacity-50"
                     >
                         {props.isReviewing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <AlertTriangle className="h-3 w-3" />}
-                        AIレビュー（赤入れ）を実行
+                        <span>AIレビュー（赤入れ）を実行</span>
                     </button>
                 </div>
 
                 {/* レビュー結果の表示 */}
                 {props.reviewResult && (
-                    <div className={`mb-4 rounded-2xl p-4 text-[11px] font-bold ${props.reviewResult.status === 'danger' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                            {props.reviewResult.status === 'danger' ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                            <span>AI判定: {props.reviewResult.status === 'danger' ? `リスク検出 (${props.reviewResult.count}点)` : '品質クリア'}</span>
+                    <div className={`mb-4 rounded-2xl p-6 shadow-sm border ${props.reviewResult.status === 'danger' ? 'bg-red-50 text-red-700 border-red-100' :
+                        props.reviewResult.status === 'warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                            'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        }`}>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                {props.reviewResult.status === 'danger' ? <AlertTriangle className="h-5 w-5" /> :
+                                    props.reviewResult.status === 'warning' ? <Info className="h-5 w-5" /> :
+                                        <CheckCircle className="h-5 w-5" />}
+                                <span className="text-sm font-black uppercase tracking-tight"><span>AIディレクター判定: {
+                                    props.reviewResult.status === 'danger' ? 'リスク検出' :
+                                        props.reviewResult.status === 'warning' ? '改善推奨' : '品質クリア'
+                                }</span></span>
+                            </div>
+                            <div className="text-[10px] font-black bg-white/50 px-3 py-1 rounded-full border border-current opacity-50">
+                                <span>指摘 {props.reviewResult.count}点</span>
+                            </div>
                         </div>
-                        <ul className="list-disc list-inside space-y-1 opacity-80">
-                            {props.reviewResult.messages?.map((m, i) => <li key={i}>{m}</li>)}
-                        </ul>
+
+                        {/* スコア表示 */}
+                        {props.reviewResult.scores && (
+                            <div className="grid grid-cols-3 gap-2 mb-4">
+                                {[
+                                    { label: '法務', score: props.reviewResult.scores.legal, color: 'current' },
+                                    { label: 'ブランド', score: props.reviewResult.scores.brand, color: 'current' },
+                                    { label: 'UX', score: props.reviewResult.scores.ux, color: 'current' }
+                                ].map((s, i) => (
+                                    <div key={i} className="bg-white/40 rounded-xl p-2 text-center border border-current/5">
+                                        <div className="text-[9px] font-black uppercase opacity-60 mb-1"><span>{s.label}</span></div>
+                                        <div className="text-lg font-black leading-none"><span>{s.score}</span></div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="space-y-3">
+                            {props.reviewResult.direction && (
+                                <p className="text-[11px] font-black italic bg-white/30 p-2 rounded-lg border border-current/10">
+                                    <span>ディレクション: {props.reviewResult.direction}</span>
+                                </p>
+                            )}
+                            <ul className="space-y-1.5">
+                                {props.reviewResult.messages?.map((m, i) => (
+                                    <li key={i} className="flex gap-2 text-[11px] leading-relaxed">
+                                        <span className="shrink-0 mt-1.5 h-1 w-1 rounded-full bg-current" />
+                                        <span>{m}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
                     </div>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">トーンの指定</label>
+                        <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest"><span>トーンの指定</span></label>
                         <div className="flex flex-wrap gap-2">
                             {['Professional', 'Pop', 'Luxury', 'Impact'].map(t => (
                                 <button
@@ -364,13 +412,13 @@ export function SortableItem(props: SortableItemProps) {
                                     onClick={() => props.onConfigChange(props.id, { dsl: { ...props.config?.dsl, tone: t } })}
                                     className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${props.config?.dsl?.tone === t ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-indigo-400 border border-indigo-50 hover:border-indigo-200'}`}
                                 >
-                                    {t}
+                                    <span>{t}</span>
                                 </button>
                             ))}
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">業界・法務プリセット</label>
+                        <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest"><span>業界・法務プリセット</span></label>
                         <select
                             value={props.config?.dsl?.preset || ''}
                             onChange={(e) => props.onConfigChange(props.id, { dsl: { ...props.config?.dsl, preset: e.target.value } })}
@@ -387,12 +435,21 @@ export function SortableItem(props: SortableItemProps) {
                 {/* 詳細設定 (Advanced) - 必要時のみ開く */}
                 <details className="mt-4 group">
                     <summary className="text-[9px] font-black uppercase text-indigo-300 cursor-pointer hover:text-indigo-500 list-none flex items-center gap-1 group-open:mb-4">
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-200 transition-all group-open:bg-indigo-500" />
-                        高度な設計データ (Raw DSL)
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-200 transition-all group-open:bg-indigo-500" />
+                        <span>高度な設計データ (Raw DSL)</span>
                     </summary>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
                         <div className="space-y-1">
-                            <label className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-indigo-400">制約</label>
+                            <label className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-indigo-400"><span>戦略意図</span></label>
+                            <textarea
+                                value={props.config?.dsl?.strategy_intent || ''}
+                                placeholder="このセクションの狙い..."
+                                onChange={(e) => props.onConfigChange(props.id, { dsl: { ...props.config?.dsl, strategy_intent: e.target.value } })}
+                                className="w-full text-[10px] h-16 bg-white/50 border border-indigo-50 rounded-xl p-3 focus:bg-white outline-none transition-all"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-indigo-400"><span>制約/ベネフィット</span></label>
                             <textarea
                                 value={props.config?.dsl?.constraints || ''}
                                 onChange={(e) => props.onConfigChange(props.id, { dsl: { ...props.config?.dsl, constraints: e.target.value } })}
@@ -400,18 +457,10 @@ export function SortableItem(props: SortableItemProps) {
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-indigo-400">画像意図</label>
+                            <label className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-indigo-400"><span>画像意図</span></label>
                             <textarea
                                 value={props.config?.dsl?.image_intent || ''}
                                 onChange={(e) => props.onConfigChange(props.id, { dsl: { ...props.config?.dsl, image_intent: e.target.value } })}
-                                className="w-full text-[10px] h-16 bg-white/50 border border-indigo-50 rounded-xl p-3 focus:bg-white outline-none transition-all"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-indigo-400">自由記述</label>
-                            <textarea
-                                value={props.config?.dsl?.brand_guidelines || ''}
-                                onChange={(e) => props.onConfigChange(props.id, { dsl: { ...props.config?.dsl, brand_guidelines: e.target.value } })}
                                 className="w-full text-[10px] h-16 bg-white/50 border border-indigo-50 rounded-xl p-3 focus:bg-white outline-none transition-all"
                             />
                         </div>
@@ -426,7 +475,7 @@ export function SortableItem(props: SortableItemProps) {
                     className="flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-[10px] font-black text-white hover:bg-black transition-all disabled:opacity-50"
                 >
                     {props.isSaving ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                    このセクションのみ保存
+                    <span>このセクションのみ保存</span>
                 </button>
             </div>
         </div>

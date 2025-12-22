@@ -49,6 +49,7 @@ export default async function PageEditor({ params }: { params: { id: string } })
             initialSections={initialSections}
             initialHeaderConfig={initialHeaderConfig}
             initialSlug={!isNew ? (await prisma.page.findUnique({ where: { id: parseInt(params.id) } }))?.slug || '' : 'new'}
+            initialStatus={!isNew ? (await prisma.page.findUnique({ where: { id: parseInt(params.id) } }))?.status || 'draft' : 'draft'}
         />
     );
 }

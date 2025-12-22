@@ -54,7 +54,7 @@ export function PagesHeader() {
                     <div className="w-full max-w-2xl overflow-hidden rounded-[3rem] bg-white shadow-2xl animate-in fade-in zoom-in duration-300">
                         <div className="p-10">
                             <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-2xl font-black text-gray-900">作成方法を選択</h2>
+                                <h2 className="text-2xl font-black text-gray-900"><span>作成方法を選択</span></h2>
                                 <button onClick={() => setShowSelection(false)} className="text-gray-400 hover:text-gray-900 transition-colors">
                                     <X className="h-6 w-6" />
                                 </button>
@@ -69,9 +69,9 @@ export function PagesHeader() {
                                         <div className="mb-6 rounded-2xl bg-blue-100 p-4 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
                                             <Layout className="h-8 w-8" />
                                         </div>
-                                        <h3 className="text-lg font-black text-gray-900 mb-2">ゼロから作成</h3>
+                                        <h3 className="text-lg font-black text-gray-900 mb-2"><span>ゼロから作成</span></h3>
                                         <p className="text-sm font-medium text-gray-500 leading-relaxed">
-                                            画像をアップロードしたり、AIで画像を生成してオリジナルのLPを構築します。
+                                            <span>画像をアップロードしたり、AIで画像を生成してオリジナルのLPを構築します。</span>
                                         </p>
                                     </button>
 
@@ -82,16 +82,16 @@ export function PagesHeader() {
                                         <div className="mb-6 rounded-2xl bg-indigo-100 p-4 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
                                             <Globe className="h-8 w-8" />
                                         </div>
-                                        <h3 className="text-lg font-black text-gray-900 mb-2">URLからインポート</h3>
+                                        <h3 className="text-lg font-black text-gray-900 mb-2"><span>URLからインポート</span></h3>
                                         <p className="text-sm font-medium text-gray-500 leading-relaxed">
-                                            既存のウェブサイトのURLを入力し、スクリーンショットから自動でベースを作成します。
+                                            <span>既存のウェブサイトのURLを入力し、スクリーンショットから自動でベースを作成します。</span>
                                         </p>
                                     </button>
                                 </div>
                             ) : (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
                                     <div>
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">インポートするURL</label>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3"><span>インポートするURL</span></label>
                                         <div className="flex gap-2">
                                             <input
                                                 type="url"
@@ -107,7 +107,7 @@ export function PagesHeader() {
                                             onClick={() => setMode('select')}
                                             className="flex-1 rounded-2xl border border-gray-100 py-4 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all"
                                         >
-                                            戻る
+                                            <span>戻る</span>
                                         </button>
                                         <button
                                             onClick={handleImport}
@@ -115,7 +115,7 @@ export function PagesHeader() {
                                             className="flex-[2] flex items-center justify-center gap-2 rounded-2xl bg-gray-900 py-4 text-sm font-black text-white shadow-xl hover:bg-black disabled:opacity-50"
                                         >
                                             {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-blue-400" />}
-                                            インポートを開始
+                                            <span>インポートを開始</span>
                                         </button>
                                     </div>
                                 </div>
@@ -126,8 +126,8 @@ export function PagesHeader() {
             )}
 
             <div>
-                <h1 className="text-3xl font-black tracking-tight text-gray-900">Pages</h1>
-                <p className="text-gray-500 mt-1">ランディングページの作成と管理を行います。</p>
+                <h1 className="text-3xl font-black tracking-tight text-gray-900"><span>Pages</span></h1>
+                <p className="text-gray-500 mt-1"><span>ランディングページの作成と管理を行います。</span></p>
             </div>
 
             <button
@@ -135,7 +135,7 @@ export function PagesHeader() {
                 className="flex items-center gap-2 rounded-xl bg-blue-600 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98]"
             >
                 <Plus className="h-5 w-5" />
-                ページを新規作成
+                <span>ページを新規作成</span>
             </button>
         </div>
     );

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         const buffer = await imgRes.arrayBuffer();
         const base64Content = Buffer.from(buffer).toString('base64');
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const prompt = `
             あなたは画像生成AI（MidjourneyやDALL-E 3）のプロンプトエンジニアです。
@@ -54,7 +54,11 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(JSON.parse(jsonMatch[0]));
     } catch (error: any) {
-        console.error('Image Analysis Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('Image Analysis Final Error:', error);
+        return NextResponse.json({
+            error: 'Image Analysis Failed',
+            details: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }, { status: 500 });
     }
 }

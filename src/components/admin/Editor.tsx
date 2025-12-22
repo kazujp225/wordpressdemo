@@ -4,18 +4,20 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from '@/components/admin/SortableItem';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Share2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import clsx from 'clsx';
 
 interface EditorProps {
     pageId: string;
     initialSections: any[];
     initialHeaderConfig: any;
     initialSlug: string;
+    initialStatus?: string;
 }
 
-export default function Editor({ pageId, initialSections, initialHeaderConfig, initialSlug }: EditorProps) {
+export default function Editor({ pageId, initialSections, initialHeaderConfig, initialSlug, initialStatus = 'draft' }: EditorProps) {
     const router = useRouter();
     const [sections, setSections] = useState(initialSections);
     const [headerConfig, setHeaderConfig] = useState(() => {
@@ -92,6 +94,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 taste: aiTaste,
                 sections: sections.map(s => ({
                     id: s.id,
+                    role: s.role, // 役割を渡すことでリブランディングの精度を向上
                     base64: s.base64,
                     image: s.image
                 }))
@@ -107,9 +110,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 throw new Error(data.error || 'AIが期待した形式で回答できませんでした。');
             }
 
+            let matchCount = 0;
             const updatedSections = sections.map((section) => {
-                const aiData = data.find((d: any) => d.id === section.id);
+                // IDの型（数値/文字列）の違いによるマッチング失敗を防止
+                const aiData = data.find((d: any) => String(d.id) === String(section.id));
                 if (aiData) {
+                    matchCount++;
                     return {
                         ...section,
                         config: {
@@ -124,7 +130,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 return section;
             });
 
-            setSections(updatedSections);
+            if (matchCount === 0) {
+                alert(`AIは${data.length}件のセクションを生成しましたが、編集中のセクションIDと一致しませんでした。マッピングに失敗しています。`);
+            } else {
+                setSections(updatedSections);
+                alert(`${matchCount}件のセクションを新しい商材内容にリブランディングしました！`);
+            }
 
             // 2. オプション: ナビゲーション（ヘッダー）の自動提案
             try {
@@ -329,6 +340,31 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         }
     };
 
+    const [status, setStatus] = useState(initialStatus);
+    const [isSyncing, setIsSyncing] = useState<'github' | 'webhook' | null>(null);
+
+    const handleSync = async (type: 'github' | 'webhook') => {
+        if (pageId === 'new') {
+            alert('同期する前にページを保存してください。');
+            return;
+        }
+        setIsSyncing(type);
+        try {
+            const res = await fetch(`/api/pages/${pageId}/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            alert(data.message);
+        } catch (error: any) {
+            alert(error.message || '同期に失敗しました。設定画面で連携情報を確認してください。');
+        } finally {
+            setIsSyncing(null);
+        }
+    };
+
     const handleExport = async () => {
         if (pageId === 'new') {
             alert('エクスポートする前にページを保存してください。');
@@ -368,6 +404,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         config: s.config || {}
                     })),
                     headerConfig: headerConfig,
+                    status: status
                 })
             });
 
@@ -393,19 +430,46 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             {/* トップバー */}
             <div className="flex h-20 items-center justify-between border-b border-gray-100 bg-white/80 px-8 backdrop-blur-xl sticky top-0 z-50">
                 <div className="flex items-center gap-4">
-                    <h1 className="text-xl font-black tracking-tight text-gray-900">エディター</h1>
+                    <h1 className="text-xl font-black tracking-tight text-gray-900"><span>エディター</span></h1>
                     <div className="h-4 w-px bg-gray-200" />
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{pageId === 'new' ? '新規作成' : '編集モード'}</span>
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest"><span>{pageId === 'new' ? '新規作成' : '編集モード'}</span></span>
+                    <button
+                        onClick={() => setStatus(status === 'published' ? 'draft' : 'published')}
+                        className={clsx(
+                            "ml-2 rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest shadow-sm transition-all hover:scale-105 active:scale-95",
+                            status === 'published' ? "bg-green-500 text-white" : "bg-gray-400 text-white"
+                        )}
+                    >
+                        <span>{status === 'published' ? '● 公開中' : '○ 下書き'}</span>
+                    </button>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={() => handleSync('github')}
+                        disabled={!!isSyncing}
+                        className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200 disabled:opacity-50"
+                        title="GitHubへ直接プッシュ"
+                    >
+                        {isSyncing === 'github' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />}
+                        <span>GitHub同期</span>
+                    </button>
+                    <button
+                        onClick={() => handleSync('webhook')}
+                        disabled={!!isSyncing}
+                        className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200 disabled:opacity-50"
+                        title="CMSへWebhook送信"
+                    >
+                        {isSyncing === 'webhook' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+                        <span>Webhook連携</span>
+                    </button>
                     <button onClick={handleExport} className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200">
-                        <Download className="h-4 w-4" /> ZIP保存
+                        <Download className="h-4 w-4" /> <span><span>ZIP保存</span></span>
                     </button>
                     <Link href={`/p/${initialSlug || pageId}`} target="_blank" className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200">
-                        <Eye className="h-4 w-4" /> プレビュー
+                        <Eye className="h-4 w-4" /> <span>プレビュー</span>
                     </Link>
                     <button onClick={() => handleSave()} disabled={isSaving} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50">
-                        <Save className="h-4 w-4" /> {isSaving ? '保存中...' : 'ページを保存'}
+                        <Save className="h-4 w-4" /> <span>{isSaving ? '保存中...' : 'ページを保存'}</span>
                     </button>
                 </div>
             </div>
@@ -423,10 +487,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             </div>
                             <div className="mt-4">
                                 <span className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-8 py-3.5 text-sm font-black text-white shadow-xl group-hover:bg-blue-600 transition-all">
-                                    画像をアップロード
+                                    <span>画像をアップロード</span>
                                 </span>
                             </div>
-                            <p className="mt-4 text-xs text-gray-400 font-bold uppercase tracking-widest">またはここに画像をドラッグ＆ドロップ</p>
+                            <p className="mt-4 text-xs text-gray-400 font-bold uppercase tracking-widest"><span>またはここに画像をドラッグ＆ドロップ</span></p>
                         </div>
 
                         {/* AI生成コントロール */}
@@ -436,15 +500,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     <span className="text-8xl font-black italic">AI</span>
                                 </div>
                                 <h2 className="mb-4 text-xl font-black flex items-center gap-3 relative z-10">
-                                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm animate-pulse">✨</span>
-                                    AIアシスタント
+                                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm animate-pulse"><span>✨</span></span>
+                                    <span>AIアシスタント</span>
                                 </h2>
                                 <p className="mb-6 text-sm font-medium text-gray-400 max-w-lg leading-relaxed">
-                                    アップロードされた画像を1つのLPとして分析し、ストーリー性のあるキャッチコピーを自動生成します。
+                                    <span>アップロードされた画像を1つのLPとして分析し、ストーリー性のあるキャッチコピーを自動生成します。</span>
                                 </p>
                                 <div className="space-y-4 relative z-10">
                                     <div>
-                                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">プロモーション情報・詳細指示（入力上限なし）</label>
+                                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400"><span>プロモーション情報・詳細指示（入力上限なし）</span></label>
                                         <textarea
                                             value={aiProductInfo}
                                             onChange={(e) => setAiProductInfo(e.target.value)}
@@ -455,7 +519,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                                     <div className="flex flex-col gap-6 md:flex-row md:items-end">
                                         <div className="flex-1">
-                                            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">全体のテイスト</label>
+                                            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400"><span>全体のテイスト</span></label>
                                             <div className="flex gap-2 flex-wrap">
                                                 {[
                                                     { id: 'professional', label: 'ビジネス・信頼', icon: '💼' },
@@ -469,7 +533,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                         onClick={() => setAiTaste(t.id)}
                                                         className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${aiTaste === t.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
                                                     >
-                                                        <span>{t.icon}</span> {t.label}
+                                                        <span>{t.icon}</span> <span>{t.label}</span>
                                                     </button>
                                                 ))}
                                             </div>
@@ -489,7 +553,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             disabled={isGenerating}
                                             className="h-14 rounded-2xl bg-blue-600 px-10 text-sm font-black text-white transition-all hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 shadow-xl shadow-blue-900/40 shrink-0"
                                         >
-                                            {isGenerating ? '一括リブランディング中...' : 'AIで一括作成・修正'}
+                                            <span>{isGenerating ? '一括リブランディング中...' : 'AIで一括作成・修正'}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -541,7 +605,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     className="flex items-center gap-2 rounded-full border-2 border-dashed border-gray-300 px-8 py-4 text-sm font-bold text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-all"
                                 >
                                     <Upload className="h-4 w-4" />
-                                    さらに画像を追加
+                                    <span>さらに画像を追加</span>
                                 </button>
                             </div>
                         )}
@@ -552,14 +616,14 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 {/* 右サイドバー（設定） */}
                 <div className="w-96 border-l border-gray-100 bg-white/80 p-8 overflow-y-auto backdrop-blur-xl">
                     <div className="mb-8">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">設定</span>
-                        <h3 className="text-xl font-black text-gray-900 mt-1">ヘッダー設定</h3>
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400"><span>設定</span></span>
+                        <h3 className="text-xl font-black text-gray-900 mt-1"><span>ヘッダー設定</span></h3>
                     </div>
 
                     <div className="space-y-8">
                         {/* Logo Control */}
                         <div className="space-y-3">
-                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest">ロゴテキスト</label>
+                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest"><span>ロゴテキスト</span></label>
                             <input
                                 type="text"
                                 value={headerConfig.logoText}
@@ -571,7 +635,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                         {/* Sticky Control */}
                         <div className="flex items-center justify-between rounded-2xl bg-blue-50/50 p-4 border border-blue-50">
-                            <label className="text-xs font-black text-blue-900 uppercase tracking-widest">ヘッダーを固定</label>
+                            <label className="text-xs font-black text-blue-900 uppercase tracking-widest"><span>ヘッダーを固定</span></label>
                             <button
                                 onClick={() => setHeaderConfig({ ...headerConfig, sticky: !headerConfig.sticky })}
                                 className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${headerConfig.sticky ? 'bg-blue-600' : 'bg-gray-200'}`}
@@ -584,7 +648,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                         {/* CTA Control */}
                         <div className="space-y-4">
-                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest">CTAボタン (最右)</label>
+                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest"><span>CTAボタン (最右)</span></label>
                             <div className="space-y-3">
                                 <div className="relative">
                                     <input
@@ -610,7 +674,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         {/* Nav Items Control */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest">ナビメニュー</label>
+                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest"><span>ナビメニュー</span></label>
                                 <button
                                     onClick={() => setHeaderConfig({
                                         ...headerConfig,
@@ -678,8 +742,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-6">
                     <div className="w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl animate-in zoom-in duration-300">
                         <div className="p-8">
-                            <h3 className="text-xl font-black text-gray-900 mb-2">セクション画像を生成</h3>
-                            <p className="text-sm text-gray-500 mb-6 font-medium">どのような要素の画像を生成しますか？</p>
+                            <h3 className="text-xl font-black text-gray-900 mb-2"><span>セクション画像を生成</span></h3>
+                            <p className="text-sm text-gray-500 mb-6 font-medium"><span>どのような要素の画像を生成しますか？</span></p>
 
                             <textarea
                                 value={sectionAIPrompt}
@@ -693,7 +757,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     onClick={() => setShowSectionAIModal(false)}
                                     className="flex-1 rounded-2xl py-3.5 text-sm font-bold text-gray-400 hover:bg-gray-50 transition-all font-black uppercase tracking-widest"
                                 >
-                                    キャンセル
+                                    <span>キャンセル</span>
                                 </button>
                                 <button
                                     onClick={generateSectionImage}
@@ -701,7 +765,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     className="flex-[2] flex items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-black text-white shadow-xl shadow-blue-100 hover:bg-blue-700 disabled:opacity-50 transition-all"
                                 >
                                     {isGeneratingSectionImage ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                                    画像を生成
+                                    <span>画像を生成</span>
                                 </button>
                             </div>
                         </div>
