@@ -575,7 +575,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     <span>AIアシスタント</span>
                                 </h2>
                                 <p className="mb-6 text-sm font-medium text-gray-400 max-w-lg leading-relaxed">
-                                    <span>アップロードされた画像を1つのLPとして分析し、ストーリー性のあるキャッチコピーを自動生成します。</span>
+                                    <span>アップロードされた画像をAIアシスタントが作り替えます</span>
                                 </p>
                                 <div className="space-y-4 relative z-10">
                                     <div>
