@@ -51,9 +51,9 @@ ${productInfo}
 ${prompt ? `追加指示: ${prompt}` : ''}`
             : prompt;
 
-        // Call Gemini 2.5 Flash Image (Nano Banana) for image editing
+        // Call Gemini 3 Pro Image (Nano Banana Pro) for image editing - 最新モデルで日本語性能が高い
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -78,12 +78,12 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Gemini Image Edit API error:', errorText);
+            console.error('Gemini 3 Pro Image API error:', errorText);
 
-            // Try fallback model
-            console.log('Trying fallback model: gemini-2.0-flash-preview-image-generation');
+            // Try fallback model (Gemini 2.5 Flash Image / Nano Banana)
+            console.log('Trying fallback model: gemini-2.5-flash-preview-image-generation');
             const fallbackResponse = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GOOGLE_API_KEY}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-image-generation:generateContent?key=${GOOGLE_API_KEY}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
