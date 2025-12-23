@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Globe, Loader2, X, Layout, Sparkles } from 'lucide-react';
+import { Plus, Globe, Loader2, X, Layout, Sparkles, Monitor, Smartphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function PagesHeader() {
@@ -11,6 +11,7 @@ export function PagesHeader() {
     const [importUrl, setImportUrl] = useState('');
     const [showSelection, setShowSelection] = useState(false);
     const [mode, setMode] = useState<'select' | 'import'>('select');
+    const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
 
     const handleImport = async () => {
         if (!importUrl) return;
@@ -19,13 +20,13 @@ export function PagesHeader() {
             const res = await fetch('/api/import-url', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: importUrl })
+                body: JSON.stringify({ url: importUrl, device })
             });
             const data = await res.json();
 
             if (data.error) throw new Error(data.error);
 
-            // Create a new page with these media segments
+            // Create a new page with these media segments (レイアウト情報を含む)
             const pageRes = await fetch('/api/pages', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -33,7 +34,8 @@ export function PagesHeader() {
                     title: `Imported: ${importUrl}`,
                     sections: data.media.map((m: any, idx: number) => ({
                         role: idx === 0 ? 'hero' : 'other',
-                        imageId: m.id
+                        imageId: m.id,
+                        config: { layout: data.device } // mobile or desktop
                     }))
                 })
             });
@@ -102,6 +104,41 @@ export function PagesHeader() {
                                             />
                                         </div>
                                     </div>
+
+                                    {/* デバイス選択 */}
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3"><span>デバイス</span></label>
+                                        <div className="flex gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setDevice('desktop')}
+                                                className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all ${
+                                                    device === 'desktop'
+                                                        ? 'bg-gray-900 text-white shadow-lg'
+                                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                <Monitor className="h-4 w-4" />
+                                                <span>デスクトップ</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDevice('mobile')}
+                                                className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all ${
+                                                    device === 'mobile'
+                                                        ? 'bg-gray-900 text-white shadow-lg'
+                                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                <Smartphone className="h-4 w-4" />
+                                                <span>モバイル</span>
+                                            </button>
+                                        </div>
+                                        <p className="mt-2 text-xs text-gray-400">
+                                            {device === 'desktop' ? '1280×800px のビューポートで取得' : '375×812px (iPhone) のビューポートで取得'}
+                                        </p>
+                                    </div>
+
                                     <div className="flex gap-3">
                                         <button
                                             onClick={() => setMode('select')}

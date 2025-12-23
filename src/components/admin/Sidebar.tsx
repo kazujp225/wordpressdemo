@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Images, Settings, LogOut, FileText, Navigation } from 'lucide-react';
+import { LayoutDashboard, Images, Settings, LogOut, FileText, Navigation, Crown } from 'lucide-react';
 import clsx from 'clsx';
-import { logout } from '@/lib/auth';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 const navItems = [
     { name: 'ページ一覧', href: '/admin/pages', icon: FileText },
@@ -15,6 +16,29 @@ const navItems = [
 
 export function Sidebar() {
     const pathname = usePathname();
+    const [user, setUser] = useState<any>(null);
+    const [plan, setPlan] = useState<'normal' | 'premium'>('normal');
+
+    useEffect(() => {
+        const supabase = createClient();
+
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        };
+        getUser();
+
+        const fetchPlan = async () => {
+            try {
+                const res = await fetch('/api/user/settings');
+                const data = await res.json();
+                setPlan(data.plan || 'normal');
+            } catch (e) {
+                console.error('Failed to fetch plan', e);
+            }
+        };
+        fetchPlan();
+    }, []);
 
     return (
         <div className="flex h-screen w-64 flex-col border-r border-gray-100 bg-white/80 backdrop-blur-md">
@@ -53,10 +77,25 @@ export function Sidebar() {
 
             <div className="border-t border-gray-50 p-6">
                 <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-b from-gray-200 to-gray-300 ring-2 ring-white" />
+                    <div className={clsx(
+                        "h-10 w-10 rounded-full ring-2 ring-white flex items-center justify-center text-white font-bold",
+                        plan === 'premium'
+                            ? "bg-gradient-to-b from-amber-400 to-yellow-500"
+                            : "bg-gradient-to-b from-gray-300 to-gray-400"
+                    )}>
+                        {user?.email?.[0]?.toUpperCase() || 'U'}
+                    </div>
                     <div className="flex-1 overflow-hidden">
-                        <div className="truncate text-xs font-bold text-gray-900">Admin User</div>
-                        <div className="truncate text-[10px] text-gray-500">Premium Plan</div>
+                        <div className="truncate text-xs font-bold text-gray-900">
+                            {user?.email?.split('@')[0] || 'Admin User'}
+                        </div>
+                        <div className={clsx(
+                            "truncate text-[10px] font-semibold flex items-center gap-1",
+                            plan === 'premium' ? "text-amber-600" : "text-gray-500"
+                        )}>
+                            {plan === 'premium' && <Crown className="h-3 w-3" />}
+                            {plan === 'premium' ? 'Premium Plan' : 'Normal Plan'}
+                        </div>
                     </div>
                 </div>
             </div>

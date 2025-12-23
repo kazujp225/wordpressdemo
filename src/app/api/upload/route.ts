@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
+    // ユーザー認証
+    const supabaseAuth = await createClient();
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
@@ -41,6 +46,7 @@ export async function POST(request: NextRequest) {
     // Create DB Record
     const media = await prisma.mediaImage.create({
         data: {
+            userId: user?.id || null,
             filePath: publicUrl,
             mime: file.type,
             width: 0,

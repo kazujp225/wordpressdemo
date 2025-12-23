@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from '@/components/admin/SortableItem';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2 } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
@@ -38,6 +38,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [isSaving, setIsSaving] = useState(false);
     const [aiProductInfo, setAiProductInfo] = useState('');
     const [aiTaste, setAiTaste] = useState('professional');
+    const [aiAspectRatio, setAiAspectRatio] = useState('9:16'); // デフォルトは縦長
     const [shouldGenImages, setShouldGenImages] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
 
@@ -47,6 +48,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [showSectionAIModal, setShowSectionAIModal] = useState(false);
     const [sectionAIPrompt, setSectionAIPrompt] = useState('');
     const [savingSectionId, setSavingSectionId] = useState<string | null>(null);
+
+    // チャットコパイロット状態
+    const [showCopilot, setShowCopilot] = useState(false);
+    const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
+        { role: 'assistant', content: 'こんにちは！LP画像生成のプロンプト作成をお手伝いします。\n\nどんな商材やサービスのLPを作りたいですか？' }
+    ]);
+    const [chatInput, setChatInput] = useState('');
+    const [isChatLoading, setIsChatLoading] = useState(false);
+    const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
     const [reviewingSectionId, setReviewingSectionId] = useState<string | null>(null);
     const [chattingSectionId, setChattingSectionId] = useState<string | null>(null);
     const [reviewResults, setReviewResults] = useState<Record<string, any>>({});
@@ -93,6 +103,50 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     const handleRemove = (id: string) => {
         setSections((items) => items.filter((item) => item.id !== id));
+    };
+
+    // チャットコパイロット送信
+    const handleSendChat = async () => {
+        if (!chatInput.trim() || isChatLoading) return;
+
+        const userMessage = chatInput.trim();
+        setChatInput('');
+        setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setIsChatLoading(true);
+
+        try {
+            const res = await fetch('/api/ai/prompt-copilot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [...chatMessages, { role: 'user', content: userMessage }]
+                })
+            });
+
+            const data = await res.json();
+            if (data.error) {
+                setChatMessages(prev => [...prev, { role: 'assistant', content: `エラー: ${data.error}` }]);
+            } else {
+                setChatMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+            }
+        } catch (error) {
+            setChatMessages(prev => [...prev, { role: 'assistant', content: 'エラーが発生しました。もう一度お試しください。' }]);
+        } finally {
+            setIsChatLoading(false);
+        }
+    };
+
+    // プロンプトをコピーしてメイン欄に挿入
+    const handleUsePrompt = (prompt: string) => {
+        setAiProductInfo(prev => prev ? `${prev}\n\n${prompt}` : prompt);
+        setCopiedPrompt(prompt);
+        setTimeout(() => setCopiedPrompt(null), 2000);
+    };
+
+    // チャットメッセージからプロンプト例を抽出
+    const extractPromptExample = (text: string): string | null => {
+        const match = text.match(/【プロンプト例】\s*([\s\S]*?)(?=\n\n|$)/);
+        return match ? match[1].trim() : null;
     };
 
     const handleGenerateAI = async () => {
@@ -182,7 +236,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 body: JSON.stringify({
                                     prompt: section.config.text,
                                     taste: aiTaste,
-                                    brandInfo: aiProductInfo
+                                    brandInfo: aiProductInfo,
+                                    aspectRatio: aiAspectRatio
                                 })
                             });
                             const media = await imgRes.json();
@@ -298,7 +353,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             const res = await fetch('/api/ai/generate-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: sectionAIPrompt })
+                body: JSON.stringify({
+                    prompt: sectionAIPrompt,
+                    aspectRatio: aiAspectRatio,
+                    taste: aiTaste,
+                    brandInfo: aiProductInfo
+                })
             });
             const media = await res.json();
             setSections(prev => prev.map(s => s.id === editingSectionId ? { ...s, imageId: media.id, image: media } : s));
@@ -554,6 +614,16 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     <Link href={`/p/${initialSlug || pageId}`} target="_blank" className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200">
                         <Eye className="h-4 w-4" /> <span>プレビュー</span>
                     </Link>
+                    <button
+                        onClick={() => setShowCopilot(!showCopilot)}
+                        className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all ${
+                            showCopilot
+                                ? 'bg-violet-600 text-white shadow-lg shadow-violet-200'
+                                : 'border border-gray-100 bg-white text-gray-600 shadow-sm hover:bg-gray-50 hover:border-gray-200'
+                        }`}
+                    >
+                        <MessageCircle className="h-4 w-4" /> <span>Copilot</span>
+                    </button>
                     <button onClick={() => handleSave()} disabled={isSaving} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50">
                         <Save className="h-4 w-4" /> <span>{isSaving ? '保存中...' : 'ページを保存'}</span>
                     </button>
@@ -562,89 +632,182 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
             <div className="flex flex-1 overflow-hidden">
                 {/* メインコンテンツエリア */}
-                <div className="flex-1 overflow-y-auto p-8">
+                <div className={`flex-1 overflow-y-auto p-8 transition-all duration-300 ${showCopilot ? 'mr-[400px]' : ''}`}>
                     <div className="mx-auto max-w-3xl">
-
-                        {/* Upload Zone */}
-                        <div className="mb-10 rounded-[2rem] border-2 border-dashed border-gray-200 p-12 text-center bg-white/50 hover:bg-white hover:border-blue-400 transition-all duration-300 relative group shadow-sm hover:shadow-xl hover:shadow-blue-50">
-                            <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                            <div className="mx-auto h-16 w-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                                <Upload className="h-8 w-8 text-blue-600" />
-                            </div>
-                            <div className="mt-4">
-                                <span className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-8 py-3.5 text-sm font-black text-white shadow-xl group-hover:bg-blue-600 transition-all">
-                                    <span>画像をアップロード</span>
-                                </span>
-                            </div>
-                            <p className="mt-4 text-xs text-gray-400 font-bold uppercase tracking-widest"><span>またはここに画像をドラッグ＆ドロップ</span></p>
-                        </div>
 
                         {/* AI生成コントロール */}
                         {sections.length > 0 && (
-                            <div className="mb-10 overflow-hidden rounded-[2rem] bg-gray-900 p-8 text-white shadow-2xl relative">
-                                <div className="absolute top-0 right-0 p-8 opacity-10">
-                                    <span className="text-8xl font-black italic">AI</span>
+                            <div className="mb-10">
+                                <div className="mb-6">
+                                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white text-lg shadow-lg shadow-purple-200">✨</span>
+                                        <span>AI Assistant</span>
+                                    </h2>
+                                    <p className="mt-2 text-sm text-gray-500 ml-[52px]">
+                                        Transform your images with AI-powered generation
+                                    </p>
                                 </div>
-                                <h2 className="mb-4 text-xl font-black flex items-center gap-3 relative z-10">
-                                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm animate-pulse"><span>✨</span></span>
-                                    <span>AIアシスタント</span>
-                                </h2>
-                                <p className="mb-6 text-sm font-medium text-gray-400 max-w-lg leading-relaxed">
-                                    <span>アップロードされた画像をAIアシスタントが作り替えます</span>
-                                </p>
                                 <div className="space-y-4 relative z-10">
-                                    <div>
-                                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400"><span>プロモーション情報・詳細指示（入力上限なし）</span></label>
+                                    {/* プロンプト入力エリア */}
+                                    <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
+                                        <h3 className="text-base font-bold text-gray-900 mb-4">Prompt</h3>
                                         <textarea
                                             value={aiProductInfo}
                                             onChange={(e) => setAiProductInfo(e.target.value)}
                                             placeholder="例: 電気代のLPだけど、今回は『熱々の冷凍餃子』の販促用に作り変えてください。ターゲットは主婦層で、シズル感を重視した文言に。テイストは明るくポップな感じで。"
-                                            className="w-full min-h-[160px] rounded-2xl border-none bg-white/10 px-5 py-4 text-sm font-medium text-white placeholder-white/30 backdrop-blur-md focus:bg-white/20 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner"
+                                            className="w-full min-h-[140px] rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition-all resize-none"
                                         />
+                                        <p className="mt-2 text-[11px] text-gray-400">商材情報、ターゲット、トーン&マナーなど自由に入力</p>
                                     </div>
 
-                                    <div className="flex flex-col gap-6 md:flex-row md:items-end">
-                                        <div className="flex-1">
-                                            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400"><span>全体のテイスト</span></label>
-                                            <div className="flex gap-2 flex-wrap">
-                                                {[
-                                                    { id: 'professional', label: 'ビジネス・信頼', icon: '💼' },
-                                                    { id: 'pops', label: 'ポップ・親しみ', icon: '🎨' },
-                                                    { id: 'luxury', label: '高級・洗練', icon: '💎' },
-                                                    { id: 'minimal', label: 'シンプル・清潔', icon: '🌿' },
-                                                    { id: 'emotional', label: '情熱・エモい', icon: '🔥' }
-                                                ].map((t) => (
-                                                    <button
-                                                        key={t.id}
-                                                        onClick={() => setAiTaste(t.id)}
-                                                        className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${aiTaste === t.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
-                                                    >
-                                                        <span>{t.icon}</span> <span>{t.label}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
+                                    {/* テイストセレクター (Midjourney風) */}
+                                    <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
+                                        <h3 className="text-base font-bold text-gray-900 mb-4">Style</h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                            {[
+                                                { id: 'professional', label: 'Business', sub: '信頼感', color: 'from-blue-500 to-blue-600' },
+                                                { id: 'pops', label: 'Pop', sub: '親しみ', color: 'from-pink-500 to-orange-400' },
+                                                { id: 'luxury', label: 'Luxury', sub: '高級感', color: 'from-amber-600 to-yellow-500' },
+                                                { id: 'minimal', label: 'Minimal', sub: '清潔感', color: 'from-gray-400 to-gray-500' },
+                                                { id: 'emotional', label: 'Emotional', sub: '情熱的', color: 'from-red-500 to-orange-500' }
+                                            ].map((t) => (
+                                                <button
+                                                    key={t.id}
+                                                    onClick={() => setAiTaste(t.id)}
+                                                    className={`relative flex flex-col items-center gap-1 rounded-xl px-3 py-3 text-xs font-semibold transition-all duration-200 ${
+                                                        aiTaste === t.id
+                                                            ? 'bg-gray-900 text-white shadow-lg scale-[1.02]'
+                                                            : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${t.color} mb-1 ${aiTaste === t.id ? 'shadow-md' : ''}`} />
+                                                    <span className="font-bold">{t.label}</span>
+                                                    <span className={`text-[10px] ${aiTaste === t.id ? 'text-gray-400' : 'text-gray-400'}`}>{t.sub}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* アスペクト比セレクター (Midjourney風) */}
+                                    <div className="mt-6 rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
+                                        <div className="flex items-center justify-between mb-5">
+                                            <h3 className="text-base font-bold text-gray-900">Image Size</h3>
+                                            <button
+                                                onClick={() => setAiAspectRatio('1:1')}
+                                                className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
+                                            >
+                                                Reset
+                                            </button>
                                         </div>
 
-                                        <div className="flex items-center gap-2 mr-4 mb-2">
-                                            <button
-                                                onClick={() => setShouldGenImages(!shouldGenImages)}
-                                                className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${shouldGenImages ? 'bg-blue-600' : 'bg-white/10'}`}
-                                            >
-                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${shouldGenImages ? 'translate-x-5' : 'translate-x-1'}`} />
-                                            </button>
-                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">画像も全入替</span>
+                                        <div className="flex gap-6">
+                                            {/* アスペクト比プレビュー */}
+                                            <div className="w-32 h-32 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center bg-gray-50/50 relative">
+                                                <div
+                                                    className={`bg-white border-2 border-gray-300 rounded-lg transition-all duration-300 flex items-center justify-center shadow-sm ${
+                                                        aiAspectRatio === '9:16' ? 'w-10 h-[72px]' :
+                                                        aiAspectRatio === '3:4' ? 'w-14 h-[72px]' :
+                                                        aiAspectRatio === '1:1' ? 'w-16 h-16' :
+                                                        aiAspectRatio === '4:3' ? 'w-[72px] h-14' :
+                                                        'w-[72px] h-10'
+                                                    }`}
+                                                >
+                                                    <span className="text-sm font-bold text-gray-700">{aiAspectRatio.replace(':', ' : ')}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex-1 space-y-5">
+                                                {/* Portrait / Square / Landscape トグル */}
+                                                <div className="flex bg-gray-100 rounded-xl p-1">
+                                                    {[
+                                                        { id: 'portrait', label: 'Portrait', ratios: ['9:16', '3:4'] },
+                                                        { id: 'square', label: 'Square', ratios: ['1:1'] },
+                                                        { id: 'landscape', label: 'Landscape', ratios: ['4:3', '16:9'] }
+                                                    ].map((mode) => (
+                                                        <button
+                                                            key={mode.id}
+                                                            onClick={() => setAiAspectRatio(mode.ratios[0])}
+                                                            className={`flex-1 py-2.5 px-4 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                                                                mode.ratios.includes(aiAspectRatio)
+                                                                    ? 'bg-white text-gray-900 shadow-sm'
+                                                                    : 'text-gray-500 hover:text-gray-700'
+                                                            }`}
+                                                        >
+                                                            {mode.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {/* 詳細スライダー */}
+                                                <div className="px-1">
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="4"
+                                                        value={['9:16', '3:4', '1:1', '4:3', '16:9'].indexOf(aiAspectRatio)}
+                                                        onChange={(e) => {
+                                                            const ratios = ['9:16', '3:4', '1:1', '4:3', '16:9'];
+                                                            setAiAspectRatio(ratios[parseInt(e.target.value)]);
+                                                        }}
+                                                        className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-gray-800 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                                                    />
+                                                    {/* 比率ラベル */}
+                                                    <div className="flex justify-between text-[10px] font-medium text-gray-400 mt-2">
+                                                        <span>9:16</span>
+                                                        <span>3:4</span>
+                                                        <span>1:1</span>
+                                                        <span>4:3</span>
+                                                        <span>16:9</span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button
-                                            onClick={handleGenerateAI}
-                                            disabled={isGenerating}
-                                            className="h-14 rounded-2xl bg-blue-600 px-10 text-sm font-black text-white transition-all hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 shadow-xl shadow-blue-900/40 shrink-0"
-                                        >
-                                            <span>{isGenerating ? '一括リブランディング中...' : 'AIで一括作成・修正'}</span>
-                                        </button>
+                                    </div>
+
+                                    {/* アクションボタンエリア */}
+                                    <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
+                                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => setShouldGenImages(!shouldGenImages)}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${shouldGenImages ? 'bg-gray-900' : 'bg-gray-200'}`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 shadow-sm ${shouldGenImages ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                                <span className="text-sm font-medium text-gray-700">Regenerate Images</span>
+                                            </div>
+                                            <button
+                                                onClick={handleGenerateAI}
+                                                disabled={isGenerating}
+                                                className="h-12 rounded-xl bg-gray-900 px-8 text-sm font-bold text-white transition-all hover:bg-black hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                                            >
+                                                {isGenerating ? (
+                                                    <span className="flex items-center gap-2">
+                                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                        </svg>
+                                                        Processing...
+                                                    </span>
+                                                ) : (
+                                                    <span>Generate with AI</span>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         )}
+
+                        {/* Upload Zone */}
+                        <div className="mb-10 rounded-3xl border-2 border-dashed border-gray-200 p-10 text-center bg-gray-50/50 hover:bg-white hover:border-gray-400 transition-all duration-300 relative group">
+                            <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                            <div className="mx-auto h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4 group-hover:bg-gray-200 transition-all duration-300">
+                                <Upload className="h-6 w-6 text-gray-500" />
+                            </div>
+                            <p className="text-sm font-semibold text-gray-600 mb-1">Upload Images</p>
+                            <p className="text-xs text-gray-400">Drag and drop or click to browse</p>
+                        </div>
 
                         {/* Sortable List */}
                         <DndContext
@@ -923,6 +1086,118 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
                 </div>
             )}
+
+            {/* Copilot サイドパネル */}
+            <div className={`fixed right-0 top-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-2xl transform transition-transform duration-300 z-50 flex flex-col ${showCopilot ? 'translate-x-0' : 'translate-x-full'}`}>
+                {/* ヘッダー */}
+                <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-200">
+                            <MessageCircle className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-900">Prompt Copilot</h3>
+                            <p className="text-[10px] text-gray-400">AI-powered prompt assistant</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setShowCopilot(false)}
+                        className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {/* チャットメッセージエリア */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {chatMessages.map((msg, idx) => (
+                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                                msg.role === 'user'
+                                    ? 'bg-gray-900 text-white'
+                                    : 'bg-gray-100 text-gray-800'
+                            }`}>
+                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                {/* プロンプト例がある場合は「使う」ボタンを表示 */}
+                                {msg.role === 'assistant' && extractPromptExample(msg.content) && (
+                                    <button
+                                        onClick={() => handleUsePrompt(extractPromptExample(msg.content)!)}
+                                        className="mt-3 flex items-center gap-2 text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors"
+                                    >
+                                        {copiedPrompt === extractPromptExample(msg.content) ? (
+                                            <>
+                                                <Check className="h-3 w-3" />
+                                                <span>プロンプトに追加しました</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Copy className="h-3 w-3" />
+                                                <span>このプロンプトを使う</span>
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {isChatLoading && (
+                        <div className="flex justify-start">
+                            <div className="bg-gray-100 rounded-2xl px-4 py-3">
+                                <div className="flex items-center gap-2 text-gray-500">
+                                    <div className="flex gap-1">
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* クイックアクション */}
+                <div className="px-4 py-2 border-t border-gray-100">
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                        {[
+                            'プロンプトを作って',
+                            'もっと具体的に',
+                            'ターゲット層は？',
+                            '色味を変えたい'
+                        ].map((suggestion) => (
+                            <button
+                                key={suggestion}
+                                onClick={() => {
+                                    setChatInput(suggestion);
+                                }}
+                                className="flex-shrink-0 px-3 py-1.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                            >
+                                {suggestion}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 入力エリア */}
+                <div className="p-4 border-t border-gray-100">
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendChat()}
+                            placeholder="メッセージを入力..."
+                            className="flex-1 px-4 py-3 rounded-xl bg-gray-100 text-sm outline-none focus:bg-gray-50 focus:ring-2 focus:ring-violet-500 transition-all"
+                        />
+                        <button
+                            onClick={handleSendChat}
+                            disabled={!chatInput.trim() || isChatLoading}
+                            className="h-12 w-12 rounded-xl bg-violet-600 text-white flex items-center justify-center hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-200"
+                        >
+                            <Send className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

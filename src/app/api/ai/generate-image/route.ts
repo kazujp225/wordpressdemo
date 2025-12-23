@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
-import { getGoogleApiKey } from '@/lib/apiKeys';
+import { createClient } from '@/lib/supabase/server';
+import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 
 // LPデザイナーとしてのシステムプロンプト
 const LP_DESIGNER_SYSTEM_PROMPT = `あなたはプロフェッショナルなLPデザイナーです。
@@ -33,15 +34,30 @@ const LP_DESIGNER_SYSTEM_PROMPT = `あなたはプロフェッショナルなLP�
 
 すべての画像を並べた時に「1つの美しいLPのパーツ」として完璧に調和させてください。`;
 
+// アスペクト比の設定
+const ASPECT_RATIOS: Record<string, { width: number; height: number; prompt: string }> = {
+    '9:16': { width: 768, height: 1366, prompt: '縦長の画像（アスペクト比 9:16）' },
+    '3:4': { width: 768, height: 1024, prompt: 'ポートレート画像（アスペクト比 3:4）' },
+    '1:1': { width: 1024, height: 1024, prompt: '正方形の画像（アスペクト比 1:1）' },
+    '4:3': { width: 1024, height: 768, prompt: 'ランドスケープ画像（アスペクト比 4:3）' },
+    '16:9': { width: 1366, height: 768, prompt: 'ワイド画像（アスペクト比 16:9）' },
+};
+
 export async function POST(request: NextRequest) {
     try {
-        const { prompt, taste, brandInfo } = await request.json();
+        const { prompt, taste, brandInfo, aspectRatio = '9:16' } = await request.json();
 
         if (!prompt) {
             return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
         }
 
-        const GOOGLE_API_KEY = await getGoogleApiKey();
+        const arConfig = ASPECT_RATIOS[aspectRatio] || ASPECT_RATIOS['9:16'];
+
+        // ユーザー認証を確認してAPIキーを取得
+        const supabaseAuth = await createClient();
+        const { data: { user } } = await supabaseAuth.auth.getUser();
+
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user?.id || null);
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({ error: 'Google API key is not configured. 設定画面でAPIキーを設定してください。' }, { status: 500 });
         }
@@ -67,10 +83,14 @@ export async function POST(request: NextRequest) {
         const imagePrompt = `${prompt}${styleInstruction}${brandContext}
 
 【要件】
+- ${arConfig.prompt}を生成すること
 - このLPの他の画像と統一感のあるビジュアル
 - 高解像度、シャープな画質
 - LP/広告に適した構図
-- テキストや文字は一切含めない（純粋な画像のみ）`;
+- テキストや文字は一切含めない（純粋な画像のみ）
+
+【アスペクト比指定】
+必ず${arConfig.prompt}で出力してください。幅${arConfig.width}px、高さ${arConfig.height}pxの比率。`;
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
@@ -120,11 +140,11 @@ export async function POST(request: NextRequest) {
             }
 
             const fallbackData = await fallbackResponse.json();
-            return await processImageResponse(fallbackData);
+            return await processImageResponse(fallbackData, arConfig, user?.id || null);
         }
 
         const data = await response.json();
-        return await processImageResponse(data);
+        return await processImageResponse(data, arConfig, user?.id || null);
 
     } catch (error: any) {
         console.error('Image Generation Error:', error);
@@ -132,7 +152,7 @@ export async function POST(request: NextRequest) {
     }
 }
 
-async function processImageResponse(data: any) {
+async function processImageResponse(data: any, arConfig: { width: number; height: number; prompt: string }, userId: string | null) {
     const parts = data.candidates?.[0]?.content?.parts || [];
     let base64Image: string | null = null;
 
@@ -172,13 +192,14 @@ async function processImageResponse(data: any) {
         .from('images')
         .getPublicUrl(filename);
 
-    // Create DB Record
+    // Create DB Record with selected aspect ratio
     const media = await prisma.mediaImage.create({
         data: {
+            userId,
             filePath: publicUrl,
             mime: 'image/png',
-            width: 1024,
-            height: 1024,
+            width: arConfig.width,
+            height: arConfig.height,
         },
     });
 

@@ -51,6 +51,17 @@ export default async function PublicPage({ params }: { params: { slug: string } 
         }
     } catch { }
 
+    // ページ全体のレイアウトを最初のセクションから判定
+    let pageLayout = 'mobile'; // デフォルト
+    if (page.sections.length > 0 && page.sections[0].config) {
+        try {
+            const firstConfig = JSON.parse(page.sections[0].config);
+            if (firstConfig.layout) pageLayout = firstConfig.layout;
+        } catch { }
+    }
+
+    const isDesktopLayout = pageLayout === 'desktop';
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             {/* Dynamic Header */}
@@ -76,8 +87,12 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                 </a>
             </header>
 
-            {/* Main Content: Vertical Image Stack */}
-            <main className="mx-auto w-full max-w-md bg-white shadow-2xl md:max-w-xl lg:max-w-2xl">
+            {/* Main Content: レイアウトに応じて幅を調整 */}
+            <main className={`mx-auto w-full bg-white shadow-2xl ${
+                isDesktopLayout
+                    ? 'max-w-7xl' // デスクトップ: ほぼ全幅
+                    : 'max-w-md md:max-w-xl lg:max-w-2xl' // モバイル: 縦長中央
+            }`}>
                 {page.sections.map((section) => (
                     <section key={section.id} id={section.role} className="relative w-full overflow-hidden group">
                         {/* Visual Adjustments & Text Overlay */}

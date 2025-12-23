@@ -2,35 +2,57 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Layout, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Layout, Lock, Mail, ArrowRight, Loader2, UserPlus } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [message, setMessage] = useState('');
   const router = useRouter();
+  const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
+      if (isSignUp) {
+        // サインアップ
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        router.push('/admin');
+        if (error) {
+          setError(error.message);
+        } else {
+          setMessage('確認メールを送信しました。メールをご確認ください。');
+        }
       } else {
-        setError(data.error || 'ログインに失敗しました');
+        // ログイン
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          setError(error.message);
+        } else {
+          router.push('/admin');
+          router.refresh();
+        }
       }
     } catch (err) {
-      setError('ログインに失敗しました');
+      setError('認証に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -45,11 +67,32 @@ export default function LoginPage() {
             <Layout className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">LP Builder</h1>
-          <p className="text-slate-400 mt-1">管理画面にログイン</p>
+          <p className="text-slate-400 mt-1">
+            {isSignUp ? '新規アカウント作成' : '管理画面にログイン'}
+          </p>
         </div>
 
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+          <div className="mb-4">
+            <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
+              メールアドレス
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="example@email.com"
+                required
+                autoFocus
+              />
+            </div>
+          </div>
+
           <div className="mb-6">
             <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
               パスワード
@@ -64,7 +107,7 @@ export default function LoginPage() {
                 className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="パスワードを入力"
                 required
-                autoFocus
+                minLength={6}
               />
             </div>
           </div>
@@ -72,6 +115,12 @@ export default function LoginPage() {
           {error && (
             <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
               {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="mb-6 p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm">
+              {message}
             </div>
           )}
 
@@ -84,16 +133,30 @@ export default function LoginPage() {
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               <>
-                ログイン
-                <ArrowRight className="h-5 w-5" />
+                {isSignUp ? 'アカウント作成' : 'ログイン'}
+                {isSignUp ? <UserPlus className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
               </>
             )}
           </button>
+
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError('');
+                setMessage('');
+              }}
+              className="text-slate-400 text-sm hover:text-white transition-colors"
+            >
+              {isSignUp ? '既にアカウントをお持ちの方はこちら' : '新規アカウント作成はこちら'}
+            </button>
+          </div>
         </form>
 
         {/* Footer */}
         <p className="text-center text-slate-500 text-sm mt-8">
-          LP Builder v0.0.0.0
+          LP Builder v0.1.0
         </p>
       </div>
     </div>

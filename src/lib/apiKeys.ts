@@ -1,24 +1,46 @@
 import { prisma } from '@/lib/db';
 
-// Google AI APIキーを取得（DB優先、なければ環境変数）
-export async function getGoogleApiKey(): Promise<string | null> {
+// ユーザーIDを指定してAPIキーを取得
+export async function getGoogleApiKeyForUser(userId: string | null): Promise<string | null> {
+    if (!userId) {
+        // ユーザーIDがない場合は環境変数のみ使用
+        return process.env.GOOGLE_GENERATIVE_AI_API_KEY || null;
+    }
+
     try {
-        const config = await prisma.globalConfig.findUnique({
-            where: { key: 'googleApiKey' }
+        // ユーザー固有の設定を取得
+        const userSettings = await prisma.userSettings.findUnique({
+            where: { userId }
         });
 
-        if (config?.value) {
-            // JSON文字列として保存されている場合はパース
-            try {
-                return JSON.parse(config.value);
-            } catch {
-                return config.value;
-            }
+        if (userSettings?.googleApiKey) {
+            return userSettings.googleApiKey;
         }
     } catch (e) {
-        console.error('Failed to fetch API key from DB:', e);
+        console.error('Failed to fetch user API key from DB:', e);
     }
 
     // フォールバック: 環境変数
     return process.env.GOOGLE_GENERATIVE_AI_API_KEY || null;
+}
+
+// 後方互換性のため（ユーザーIDなしで呼び出された場合）
+export async function getGoogleApiKey(): Promise<string | null> {
+    return process.env.GOOGLE_GENERATIVE_AI_API_KEY || null;
+}
+
+// ユーザーのAPIキーを保存
+export async function saveGoogleApiKeyForUser(userId: string, apiKey: string): Promise<void> {
+    await prisma.userSettings.upsert({
+        where: { userId },
+        update: { googleApiKey: apiKey },
+        create: { userId, googleApiKey: apiKey }
+    });
+}
+
+// ユーザー設定を取得
+export async function getUserSettings(userId: string) {
+    return prisma.userSettings.findUnique({
+        where: { userId }
+    });
 }

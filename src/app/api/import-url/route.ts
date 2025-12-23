@@ -4,13 +4,33 @@ import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import sharp from 'sharp';
 
+// デバイスプリセット（高解像度対応）
+const DEVICE_PRESETS = {
+    desktop: {
+        width: 1280,
+        height: 800,
+        deviceScaleFactor: 2, // Retina品質
+        isMobile: false,
+        userAgent: undefined
+    },
+    mobile: {
+        width: 375,
+        height: 812,
+        deviceScaleFactor: 3, // iPhone Retina品質
+        isMobile: true,
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+    }
+};
+
 export async function POST(request: NextRequest) {
     try {
-        const { url } = await request.json();
+        const { url, device = 'desktop' } = await request.json();
 
         if (!url) {
             return NextResponse.json({ error: 'URL is required' }, { status: 400 });
         }
+
+        const deviceConfig = DEVICE_PRESETS[device as keyof typeof DEVICE_PRESETS] || DEVICE_PRESETS.desktop;
 
         // 1. Launch Puppeteer
         const browser = await puppeteer.launch({
@@ -19,8 +39,19 @@ export async function POST(request: NextRequest) {
         });
         const page = await browser.newPage();
 
-        // Set viewport for a standard desktop view or mobile depending on preference
-        await page.setViewport({ width: 1280, height: 800 });
+        // Set viewport based on device selection (高解像度)
+        await page.setViewport({
+            width: deviceConfig.width,
+            height: deviceConfig.height,
+            deviceScaleFactor: deviceConfig.deviceScaleFactor,
+            isMobile: deviceConfig.isMobile,
+            hasTouch: deviceConfig.isMobile
+        });
+
+        // Set mobile user agent if needed
+        if (deviceConfig.userAgent) {
+            await page.setUserAgent(deviceConfig.userAgent);
+        }
 
         // Go to URL
         await page.goto(url, { waitUntil: 'networkidle2' });
@@ -83,7 +114,7 @@ export async function POST(request: NextRequest) {
             createdMedia.push(media);
         }
 
-        return NextResponse.json({ success: true, media: createdMedia });
+        return NextResponse.json({ success: true, media: createdMedia, device });
 
     } catch (error: any) {
         console.error('URL Screenshot Error:', error);

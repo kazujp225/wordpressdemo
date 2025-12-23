@@ -1,13 +1,27 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
     try {
+        // ユーザー認証
+        const supabaseAuth = await createClient();
+        const { data: { user } } = await supabaseAuth.auth.getUser();
+
+        // 未認証の場合は空配列を返す
+        if (!user) {
+            return NextResponse.json([]);
+        }
+
+        // ログインユーザーの画像のみ取得
         const media = await prisma.mediaImage.findMany({
+            where: { userId: user.id },
             orderBy: { createdAt: 'desc' }
         });
         return NextResponse.json(media);
     } catch (error) {
-        return NextResponse.json({ error: 'Failed to fetch media' }, { status: 500 });
+        console.error('Media fetch error:', error);
+        // エラー時も空配列を返す（フロントエンドの.filter()エラー防止）
+        return NextResponse.json([]);
     }
 }

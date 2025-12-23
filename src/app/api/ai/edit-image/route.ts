@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { prisma } from '@/lib/db';
-import { getGoogleApiKey } from '@/lib/apiKeys';
+import { createClient } from '@/lib/supabase/server';
+import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 
 export async function POST(request: NextRequest) {
     try {
@@ -11,7 +12,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Prompt or productInfo is required' }, { status: 400 });
         }
 
-        const GOOGLE_API_KEY = await getGoogleApiKey();
+        // ユーザー認証を確認してAPIキーを取得
+        const supabaseAuth = await createClient();
+        const { data: { user } } = await supabaseAuth.auth.getUser();
+
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user?.id || null);
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({ error: 'Google API key is not configured. 設定画面でAPIキーを設定してください。' }, { status: 500 });
         }
@@ -47,9 +52,10 @@ ${productInfo}
 - テキスト部分を新しい商材に合わせて変更
 - 色味やスタイルは新商材に適したものに調整
 - プロフェッショナルなLP画像として仕上げてください
+- 縦長の画像（ポートレート、アスペクト比 9:16 または 3:4）で出力すること
 
 ${prompt ? `追加指示: ${prompt}` : ''}`
-            : prompt;
+            : `${prompt}\n\n【重要】縦長の画像（ポートレート形式）で出力してください。`;
 
         // Call Gemini 3 Pro Image (Nano Banana Pro) for image editing - 最新モデルで日本語性能が高い
         const response = await fetch(
@@ -113,11 +119,11 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             }
 
             const fallbackData = await fallbackResponse.json();
-            return processImageResponse(fallbackData);
+            return processImageResponse(fallbackData, user?.id || null);
         }
 
         const data = await response.json();
-        return processImageResponse(data);
+        return processImageResponse(data, user?.id || null);
 
     } catch (error: any) {
         console.error('Image Edit Error:', error);
@@ -125,7 +131,7 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
     }
 }
 
-async function processImageResponse(data: any) {
+async function processImageResponse(data: any, userId: string | null) {
     // Extract image from response
     const parts = data.candidates?.[0]?.content?.parts || [];
     let editedImageBase64: string | null = null;
@@ -173,13 +179,14 @@ async function processImageResponse(data: any) {
         .from('images')
         .getPublicUrl(filename);
 
-    // Create DB record
+    // Create DB record (縦長画像: 9:16比率)
     const media = await prisma.mediaImage.create({
         data: {
+            userId,
             filePath: publicUrl,
             mime: 'image/png',
-            width: 1024,
-            height: 1024,
+            width: 768,
+            height: 1366,
         },
     });
 
