@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from '@/components/admin/SortableItem';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Share2, Loader2, Wand2 } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
@@ -436,9 +436,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     };
 
     const [status, setStatus] = useState(initialStatus);
-    const [isSyncing, setIsSyncing] = useState<'github' | 'webhook' | null>(null);
+    const [isSyncing, setIsSyncing] = useState<'github' | null>(null);
 
-    const handleSync = async (type: 'github' | 'webhook') => {
+    const handleSync = async (type: 'github') => {
         if (pageId === 'new') {
             alert('同期する前にページを保存してください。');
             return;
@@ -547,15 +547,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     >
                         {isSyncing === 'github' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />}
                         <span>GitHub同期</span>
-                    </button>
-                    <button
-                        onClick={() => handleSync('webhook')}
-                        disabled={!!isSyncing}
-                        className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200 disabled:opacity-50"
-                        title="CMSへWebhook送信"
-                    >
-                        {isSyncing === 'webhook' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-                        <span>Webhook連携</span>
                     </button>
                     <button onClick={handleExport} className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200">
                         <Download className="h-4 w-4" /> <span><span>ZIP保存</span></span>

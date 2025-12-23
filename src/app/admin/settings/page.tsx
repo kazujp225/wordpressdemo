@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Save, Globe, Shield, Bell, Database, Github, Webhook, Loader2, CheckCircle } from 'lucide-react';
+import { Save, Globe, Shield, Bell, Database, Github, Loader2, CheckCircle } from 'lucide-react';
 
 export default function SettingsPage() {
     const [config, setConfig] = useState<any>({
         siteName: 'マイ・ランディングページ',
         language: 'ja',
-        github: { token: '', owner: '', repo: '', branch: 'main', path: 'public/lp' },
-        webhook: { url: '', secret: '' }
+        github: { token: '', owner: '', repo: '', branch: 'main', path: 'public/lp' }
     });
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success'>('idle');
@@ -116,28 +115,6 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                {/* Webhook Integration */}
-                <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="rounded-xl bg-orange-50 p-2 text-orange-600">
-                            <Webhook className="h-5 w-5" />
-                        </div>
-                        <h2 className="text-lg font-bold text-gray-900">Webhook連携 (CMSプッシュ)</h2>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-[11px] font-black uppercase text-gray-400 tracking-widest mb-2">Webhook URL</label>
-                            <input
-                                type="url"
-                                value={config.webhook?.url || ''}
-                                placeholder="https://your-cms.com/api/webhook"
-                                onChange={e => setConfig({ ...config, webhook: { ...config.webhook, url: e.target.value } })}
-                                className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-sm outline-none focus:ring-4 focus:ring-orange-500/10 focus:bg-white focus:border-orange-500 transition-all font-bold"
-                            />
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* Bottom Bar */}
