@@ -13,7 +13,13 @@ export async function GET() {
             return NextResponse.json([]);
         }
 
-        // ログインユーザーの画像のみ取得
+        // userIdがnullのメディアを現在のユーザーに紐づける（自動マイグレーション）
+        await prisma.mediaImage.updateMany({
+            where: { userId: null },
+            data: { userId: user.id }
+        });
+
+        // ログインユーザーの画像を取得
         const media = await prisma.mediaImage.findMany({
             where: { userId: user.id },
             orderBy: { createdAt: 'desc' }

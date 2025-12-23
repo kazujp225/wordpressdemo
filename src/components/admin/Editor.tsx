@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from '@/components/admin/SortableItem';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check } from 'lucide-react';
+import { ImageInpaintEditor } from '@/components/lp-builder/ImageInpaintEditor';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
@@ -67,6 +68,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [editImagePrompt, setEditImagePrompt] = useState('');
     const [isEditingImage, setIsEditingImage] = useState(false);
     const [editingSectionIds, setEditingSectionIds] = useState<Set<string>>(new Set());
+
+    // インペインティング（部分編集）用の状態
+    const [showInpaintModal, setShowInpaintModal] = useState(false);
+    const [inpaintSectionId, setInpaintSectionId] = useState<string | null>(null);
+    const [inpaintImageUrl, setInpaintImageUrl] = useState<string | null>(null);
 
     // 画像一括生成中のセクションID
     const [generatingImageSectionIds, setGeneratingImageSectionIds] = useState<Set<string>>(new Set());
@@ -434,6 +440,46 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         }
     };
 
+    // インペインティング（部分編集）モーダルを開く
+    const handleOpenInpaint = (sectionId: string, imageUrl: string) => {
+        setInpaintSectionId(sectionId);
+        setInpaintImageUrl(imageUrl);
+        setShowInpaintModal(true);
+    };
+
+    // インペインティング結果を保存
+    const handleInpaintSave = async (newImageUrl: string) => {
+        if (!inpaintSectionId) return;
+
+        const targetSectionId = inpaintSectionId;
+
+        // 新しい画像でセクションを更新
+        // APIから返された画像URLを使用してセクションを更新
+        const res = await fetch('/api/media');
+        const mediaList = await res.json();
+        const newMedia = mediaList.find((m: any) => m.filePath === newImageUrl);
+
+        if (newMedia) {
+            setSections(prev => prev.map(s =>
+                s.id === targetSectionId
+                    ? { ...s, imageId: newMedia.id, image: newMedia }
+                    : s
+            ));
+        }
+
+        setShowInpaintModal(false);
+        setInpaintSectionId(null);
+        setInpaintImageUrl(null);
+
+        // 編集したセクションまでスクロール
+        setTimeout(() => {
+            const element = document.getElementById(`section-${targetSectionId}`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+    };
+
     const handleSaveSection = async (sectionId: string) => {
         setSavingSectionId(sectionId);
         try {
@@ -580,406 +626,223 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         setIsSaving(false);
     };
 
+    // AIアシスタントパネル表示状態
+    const [showAIPanel, setShowAIPanel] = useState(false);
+
     return (
-        <div className="flex h-full flex-col bg-gray-50/50">
-            {/* トップバー */}
-            <div className="flex h-20 items-center justify-between border-b border-gray-100 bg-white/80 px-8 backdrop-blur-xl sticky top-0 z-50">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-xl font-black tracking-tight text-gray-900"><span>エディター</span></h1>
-                    <div className="h-4 w-px bg-gray-200" />
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest"><span>{pageId === 'new' ? '新規作成' : '編集モード'}</span></span>
-                    <button
-                        onClick={() => setStatus(status === 'published' ? 'draft' : 'published')}
-                        className={clsx(
-                            "ml-2 rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest shadow-sm transition-all hover:scale-105 active:scale-95",
-                            status === 'published' ? "bg-green-500 text-white" : "bg-gray-400 text-white"
-                        )}
-                    >
-                        <span>{status === 'published' ? '● 公開中' : '○ 下書き'}</span>
-                    </button>
-                </div>
-                <div className="flex gap-3">
-                    <button
-                        onClick={() => handleSync('github')}
-                        disabled={!!isSyncing}
-                        className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200 disabled:opacity-50"
-                        title="GitHubへ直接プッシュ"
-                    >
-                        {isSyncing === 'github' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />}
-                        <span>GitHub同期</span>
-                    </button>
-                    <button onClick={handleExport} className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200">
-                        <Download className="h-4 w-4" /> <span><span>ZIP保存</span></span>
-                    </button>
-                    <Link href={`/p/${initialSlug || pageId}`} target="_blank" className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-200">
-                        <Eye className="h-4 w-4" /> <span>プレビュー</span>
-                    </Link>
-                    <button
-                        onClick={() => setShowCopilot(!showCopilot)}
-                        className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all ${
-                            showCopilot
-                                ? 'bg-violet-600 text-white shadow-lg shadow-violet-200'
-                                : 'border border-gray-100 bg-white text-gray-600 shadow-sm hover:bg-gray-50 hover:border-gray-200'
-                        }`}
-                    >
-                        <MessageCircle className="h-4 w-4" /> <span>Copilot</span>
-                    </button>
-                    <button onClick={() => handleSave()} disabled={isSaving} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50">
-                        <Save className="h-4 w-4" /> <span>{isSaving ? '保存中...' : 'ページを保存'}</span>
-                    </button>
+        <div className="min-h-screen bg-gray-100">
+            {/* フローティングツールバー */}
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl px-4 py-2 border border-gray-200">
+                <button
+                    onClick={() => setStatus(status === 'published' ? 'draft' : 'published')}
+                    className={clsx(
+                        "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                        status === 'published' ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"
+                    )}
+                >
+                    {status === 'published' ? '公開中' : '下書き'}
+                </button>
+                <div className="w-px h-6 bg-gray-200" />
+                <button
+                    onClick={() => document.getElementById('file-upload-input')?.click()}
+                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-all"
+                    title="画像追加"
+                >
+                    <Plus className="h-4 w-4" />
+                </button>
+                <div className="w-px h-6 bg-gray-200" />
+                <Link href={`/p/${initialSlug || pageId}`} target="_blank" className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-all" title="新しいタブでプレビュー">
+                    <Eye className="h-4 w-4" />
+                </Link>
+                <button onClick={handleExport} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-all" title="ZIPダウンロード">
+                    <Download className="h-4 w-4" />
+                </button>
+                <button
+                    onClick={() => setShowAIPanel(!showAIPanel)}
+                    className={clsx(
+                        "p-2 rounded-lg transition-all",
+                        showAIPanel ? "bg-purple-100 text-purple-600" : "text-gray-500 hover:bg-gray-100"
+                    )}
+                    title="AIアシスタント"
+                >
+                    <Sparkles className="h-4 w-4" />
+                </button>
+                <div className="w-px h-6 bg-gray-200" />
+                <button
+                    onClick={() => handleSave()}
+                    disabled={isSaving}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-blue-700 transition-all disabled:opacity-50"
+                >
+                    {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    <span>保存</span>
+                </button>
+            </div>
+
+            {/* Hidden file input */}
+            <input
+                id="file-upload-input"
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+            />
+
+            {/* 完全LPプレビュー - メインビュー */}
+            <div className="flex justify-center py-20 px-4">
+                <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl bg-white shadow-2xl">
+                    {/* ヘッダー */}
+                    <header className="flex h-16 items-center justify-between bg-white/90 px-4 shadow-sm backdrop-blur-md">
+                        <div className="text-xl font-bold text-gray-900">
+                            {headerConfig.logoText}
+                        </div>
+                        <nav className="hidden md:flex gap-6">
+                            {headerConfig.navItems?.map((item: any) => (
+                                <span key={item.id} className="text-sm font-medium text-gray-700">
+                                    {item.label}
+                                </span>
+                            ))}
+                        </nav>
+                        <span className="rounded-full bg-blue-600 px-6 py-2 text-sm font-bold text-white">
+                            {headerConfig.ctaText}
+                        </span>
+                    </header>
+
+                    {/* セクション - クリックで編集 */}
+                    {sections.length === 0 ? (
+                        <div
+                            className="h-96 flex flex-col items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300 cursor-pointer hover:bg-gray-100 transition-all"
+                            onClick={() => document.getElementById('file-upload-input')?.click()}
+                        >
+                            <Upload className="h-12 w-12 text-gray-400 mb-4" />
+                            <p className="text-gray-500 font-medium">クリックして画像をアップロード</p>
+                            <p className="text-gray-400 text-sm mt-1">ドラッグ&ドロップも可能</p>
+                        </div>
+                    ) : (
+                        sections.map((section) => (
+                            <div
+                                key={section.id}
+                                id={`section-${section.id}`}
+                                className="relative group cursor-pointer"
+                                onClick={() => {
+                                    if (section.image?.filePath) {
+                                        handleOpenInpaint(section.id, section.image.filePath);
+                                    }
+                                }}
+                            >
+                                {section.image?.filePath ? (
+                                    <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={section.image.filePath}
+                                            alt={section.role}
+                                            className="block w-full h-auto"
+                                        />
+                                        {/* ホバーオーバーレイ */}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">
+                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center gap-2">
+                                                <div className="h-14 w-14 rounded-full bg-white flex items-center justify-center shadow-xl">
+                                                    <Pencil className="h-6 w-6 text-gray-800" />
+                                                </div>
+                                                <span className="text-white text-sm font-bold bg-black/60 px-4 py-1.5 rounded-full">
+                                                    クリックで編集
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {/* ローディング */}
+                                        {(generatingImageSectionIds.has(section.id) || editingSectionIds.has(section.id)) && (
+                                            <div className="absolute inset-0 bg-purple-600/80 flex items-center justify-center">
+                                                <RefreshCw className="h-10 w-10 text-white animate-spin" />
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="h-48 bg-gray-100 flex items-center justify-center">
+                                        <span className="text-gray-400">画像なし</span>
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    )}
+
+                    {/* フッター */}
+                    <footer className="bg-gray-900 py-8 text-center text-white">
+                        <p className="text-sm opacity-70">&copy; {new Date().getFullYear()} {headerConfig.logoText}. All rights reserved.</p>
+                    </footer>
                 </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* メインコンテンツエリア */}
-                <div className={`flex-1 overflow-y-auto p-8 transition-all duration-300 ${showCopilot ? 'mr-[400px]' : ''}`}>
-                    <div className="mx-auto max-w-3xl">
-
-                        {/* AI生成コントロール */}
-                        {sections.length > 0 && (
-                            <div className="mb-10">
-                                <div className="mb-6">
-                                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white text-lg shadow-lg shadow-purple-200">✨</span>
-                                        <span>AI Assistant</span>
-                                    </h2>
-                                    <p className="mt-2 text-sm text-gray-500 ml-[52px]">
-                                        Transform your images with AI-powered generation
-                                    </p>
-                                </div>
-                                <div className="space-y-4 relative z-10">
-                                    {/* プロンプト入力エリア */}
-                                    <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
-                                        <h3 className="text-base font-bold text-gray-900 mb-4">Prompt</h3>
-                                        <textarea
-                                            value={aiProductInfo}
-                                            onChange={(e) => setAiProductInfo(e.target.value)}
-                                            placeholder="例: 電気代のLPだけど、今回は『熱々の冷凍餃子』の販促用に作り変えてください。ターゲットは主婦層で、シズル感を重視した文言に。テイストは明るくポップな感じで。"
-                                            className="w-full min-h-[140px] rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition-all resize-none"
-                                        />
-                                        <p className="mt-2 text-[11px] text-gray-400">商材情報、ターゲット、トーン&マナーなど自由に入力</p>
-                                    </div>
-
-                                    {/* テイストセレクター (Midjourney風) */}
-                                    <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
-                                        <h3 className="text-base font-bold text-gray-900 mb-4">Style</h3>
-                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                            {[
-                                                { id: 'professional', label: 'Business', sub: '信頼感', color: 'from-blue-500 to-blue-600' },
-                                                { id: 'pops', label: 'Pop', sub: '親しみ', color: 'from-pink-500 to-orange-400' },
-                                                { id: 'luxury', label: 'Luxury', sub: '高級感', color: 'from-amber-600 to-yellow-500' },
-                                                { id: 'minimal', label: 'Minimal', sub: '清潔感', color: 'from-gray-400 to-gray-500' },
-                                                { id: 'emotional', label: 'Emotional', sub: '情熱的', color: 'from-red-500 to-orange-500' }
-                                            ].map((t) => (
-                                                <button
-                                                    key={t.id}
-                                                    onClick={() => setAiTaste(t.id)}
-                                                    className={`relative flex flex-col items-center gap-1 rounded-xl px-3 py-3 text-xs font-semibold transition-all duration-200 ${
-                                                        aiTaste === t.id
-                                                            ? 'bg-gray-900 text-white shadow-lg scale-[1.02]'
-                                                            : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                                                    }`}
-                                                >
-                                                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${t.color} mb-1 ${aiTaste === t.id ? 'shadow-md' : ''}`} />
-                                                    <span className="font-bold">{t.label}</span>
-                                                    <span className={`text-[10px] ${aiTaste === t.id ? 'text-gray-400' : 'text-gray-400'}`}>{t.sub}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* アスペクト比セレクター (Midjourney風) */}
-                                    <div className="mt-6 rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
-                                        <div className="flex items-center justify-between mb-5">
-                                            <h3 className="text-base font-bold text-gray-900">Image Size</h3>
-                                            <button
-                                                onClick={() => setAiAspectRatio('1:1')}
-                                                className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
-                                            >
-                                                Reset
-                                            </button>
-                                        </div>
-
-                                        <div className="flex gap-6">
-                                            {/* アスペクト比プレビュー */}
-                                            <div className="w-32 h-32 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center bg-gray-50/50 relative">
-                                                <div
-                                                    className={`bg-white border-2 border-gray-300 rounded-lg transition-all duration-300 flex items-center justify-center shadow-sm ${
-                                                        aiAspectRatio === '9:16' ? 'w-10 h-[72px]' :
-                                                        aiAspectRatio === '3:4' ? 'w-14 h-[72px]' :
-                                                        aiAspectRatio === '1:1' ? 'w-16 h-16' :
-                                                        aiAspectRatio === '4:3' ? 'w-[72px] h-14' :
-                                                        'w-[72px] h-10'
-                                                    }`}
-                                                >
-                                                    <span className="text-sm font-bold text-gray-700">{aiAspectRatio.replace(':', ' : ')}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex-1 space-y-5">
-                                                {/* Portrait / Square / Landscape トグル */}
-                                                <div className="flex bg-gray-100 rounded-xl p-1">
-                                                    {[
-                                                        { id: 'portrait', label: 'Portrait', ratios: ['9:16', '3:4'] },
-                                                        { id: 'square', label: 'Square', ratios: ['1:1'] },
-                                                        { id: 'landscape', label: 'Landscape', ratios: ['4:3', '16:9'] }
-                                                    ].map((mode) => (
-                                                        <button
-                                                            key={mode.id}
-                                                            onClick={() => setAiAspectRatio(mode.ratios[0])}
-                                                            className={`flex-1 py-2.5 px-4 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                                                                mode.ratios.includes(aiAspectRatio)
-                                                                    ? 'bg-white text-gray-900 shadow-sm'
-                                                                    : 'text-gray-500 hover:text-gray-700'
-                                                            }`}
-                                                        >
-                                                            {mode.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-
-                                                {/* 詳細スライダー */}
-                                                <div className="px-1">
-                                                    <input
-                                                        type="range"
-                                                        min="0"
-                                                        max="4"
-                                                        value={['9:16', '3:4', '1:1', '4:3', '16:9'].indexOf(aiAspectRatio)}
-                                                        onChange={(e) => {
-                                                            const ratios = ['9:16', '3:4', '1:1', '4:3', '16:9'];
-                                                            setAiAspectRatio(ratios[parseInt(e.target.value)]);
-                                                        }}
-                                                        className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-gray-800 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
-                                                    />
-                                                    {/* 比率ラベル */}
-                                                    <div className="flex justify-between text-[10px] font-medium text-gray-400 mt-2">
-                                                        <span>9:16</span>
-                                                        <span>3:4</span>
-                                                        <span>1:1</span>
-                                                        <span>4:3</span>
-                                                        <span>16:9</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* アクションボタンエリア */}
-                                    <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
-                                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => setShouldGenImages(!shouldGenImages)}
-                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${shouldGenImages ? 'bg-gray-900' : 'bg-gray-200'}`}
-                                                >
-                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 shadow-sm ${shouldGenImages ? 'translate-x-6' : 'translate-x-1'}`} />
-                                                </button>
-                                                <span className="text-sm font-medium text-gray-700">Regenerate Images</span>
-                                            </div>
-                                            <button
-                                                onClick={handleGenerateAI}
-                                                disabled={isGenerating}
-                                                className="h-12 rounded-xl bg-gray-900 px-8 text-sm font-bold text-white transition-all hover:bg-black hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                                            >
-                                                {isGenerating ? (
-                                                    <span className="flex items-center gap-2">
-                                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                                        </svg>
-                                                        Processing...
-                                                    </span>
-                                                ) : (
-                                                    <span>Generate with AI</span>
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Upload Zone */}
-                        <div className="mb-10 rounded-3xl border-2 border-dashed border-gray-200 p-10 text-center bg-gray-50/50 hover:bg-white hover:border-gray-400 transition-all duration-300 relative group">
-                            <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                            <div className="mx-auto h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4 group-hover:bg-gray-200 transition-all duration-300">
-                                <Upload className="h-6 w-6 text-gray-500" />
-                            </div>
-                            <p className="text-sm font-semibold text-gray-600 mb-1">Upload Images</p>
-                            <p className="text-xs text-gray-400">Drag and drop or click to browse</p>
-                        </div>
-
-                        {/* Sortable List */}
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleDragEnd}
-                        >
-                            <SortableContext items={sections} strategy={verticalListSortingStrategy}>
-                                <div className="space-y-4">
-                                    {sections.map((section) => (
-                                        <SortableItem
-                                            key={section.id}
-                                            id={section.id}
-                                            role={section.role}
-                                            config={section.config || {}}
-                                            file={section.file} // Temp file for preview
-                                            imageUrl={section.image?.filePath} // Database path
-                                            onRoleChange={handleRoleChange}
-                                            onConfigChange={handleConfigChange}
-                                            onRemove={handleRemove}
-                                            onImageChange={(id) => {
-                                                setEditingSectionId(id);
-                                                document.getElementById('section-file-input')?.click();
-                                            }}
-                                            onAIImage={handleSectionAIImage}
-                                            onEditImage={handleOpenEditImage}
-                                            onSaveSection={handleSaveSection}
-                                            onReviewSection={handleReviewSection}
-                                            onChatEdit={handleChatEdit}
-                                            isSaving={savingSectionId === section.id}
-                                            isReviewing={reviewingSectionId === section.id}
-                                            isChatting={chattingSectionId === section.id}
-                                            isEditingImage={editingSectionIds.has(section.id)}
-                                            isGeneratingImage={generatingImageSectionIds.has(section.id)}
-                                            reviewResult={reviewResults[section.id]}
-                                        />
-                                    ))}
-                                </div>
-                            </SortableContext>
-                        </DndContext>
-
-                        {/* Bottom Add Button */}
-                        {sections.length > 0 && (
-                            <div className="mt-8 flex justify-center">
-                                <button
-                                    onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-                                    className="flex items-center gap-2 rounded-full border-2 border-dashed border-gray-300 px-8 py-4 text-sm font-bold text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-all"
-                                >
-                                    <Upload className="h-4 w-4" />
-                                    <span>さらに画像を追加</span>
-                                </button>
-                            </div>
-                        )}
-
+            {/* AIアシスタントパネル（たたみ可能） */}
+            <div className={clsx(
+                "fixed bottom-0 left-0 right-0 bg-white shadow-2xl border-t border-gray-200 transform transition-transform duration-300 z-40",
+                showAIPanel ? "translate-y-0" : "translate-y-full"
+            )}>
+                <div className="max-w-4xl mx-auto p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <Sparkles className="h-5 w-5 text-purple-500" />
+                            AIアシスタント
+                        </h3>
+                        <button onClick={() => setShowAIPanel(false)} className="p-2 text-gray-400 hover:text-gray-600">
+                            <X className="h-5 w-5" />
+                        </button>
                     </div>
-                </div>
-
-                {/* 右サイドバー（設定） */}
-                <div className="w-96 border-l border-gray-100 bg-white/80 p-8 overflow-y-auto backdrop-blur-xl">
-                    <div className="mb-8">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400"><span>設定</span></span>
-                        <h3 className="text-xl font-black text-gray-900 mt-1"><span>ヘッダー設定</span></h3>
-                    </div>
-
-                    <div className="space-y-8">
-                        {/* Logo Control */}
-                        <div className="space-y-3">
-                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest"><span>ロゴテキスト</span></label>
-                            <input
-                                type="text"
-                                value={headerConfig.logoText}
-                                onChange={(e) => setHeaderConfig({ ...headerConfig, logoText: e.target.value })}
-                                className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm font-bold focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner"
-                                placeholder="店名やブランド名"
+                    <div className="grid md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 mb-2 block">プロンプト</label>
+                            <textarea
+                                value={aiProductInfo}
+                                onChange={(e) => setAiProductInfo(e.target.value)}
+                                placeholder="商材情報を入力..."
+                                className="w-full h-24 rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none"
                             />
                         </div>
-
-                        {/* Sticky Control */}
-                        <div className="flex items-center justify-between rounded-2xl bg-blue-50/50 p-4 border border-blue-50">
-                            <label className="text-xs font-black text-blue-900 uppercase tracking-widest"><span>ヘッダーを固定</span></label>
-                            <button
-                                onClick={() => setHeaderConfig({ ...headerConfig, sticky: !headerConfig.sticky })}
-                                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${headerConfig.sticky ? 'bg-blue-600' : 'bg-gray-200'}`}
-                            >
-                                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${headerConfig.sticky ? 'translate-x-6' : 'translate-x-1'} shadow-md`} />
-                            </button>
-                        </div>
-
-                        <div className="h-px bg-gray-50" />
-
-                        {/* CTA Control */}
-                        <div className="space-y-4">
-                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest"><span>CTAボタン (最右)</span></label>
-                            <div className="space-y-3">
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={headerConfig.ctaText}
-                                        onChange={(e) => setHeaderConfig({ ...headerConfig, ctaText: e.target.value })}
-                                        className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm font-bold shadow-inner outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all"
-                                        placeholder="ボタンのラベル"
-                                    />
-                                </div>
-                                <input
-                                    type="text"
-                                    value={headerConfig.ctaLink}
-                                    onChange={(e) => setHeaderConfig({ ...headerConfig, ctaLink: e.target.value })}
-                                    className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-xs font-medium shadow-inner outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all"
-                                    placeholder="リンク先 (URL/ID)"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="h-px bg-gray-50" />
-
-                        {/* Nav Items Control */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest"><span>ナビメニュー</span></label>
-                                <button
-                                    onClick={() => setHeaderConfig({
-                                        ...headerConfig,
-                                        navItems: [...headerConfig.navItems, { id: Date.now().toString(), label: '新項目', href: '#' }]
-                                    })}
-                                    className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-600 text-white shadow-md shadow-blue-100 transition-transform active:scale-90"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div className="space-y-3">
-                                {headerConfig.navItems?.map((item: any, idx: number) => (
-                                    <div key={item.id} className="group flex gap-2 items-center rounded-2xl border border-gray-50 p-2 transition-all hover:bg-gray-50">
-                                        <div className="flex flex-1 flex-col gap-1">
-                                            <input
-                                                type="text"
-                                                value={item.label}
-                                                onChange={(e) => {
-                                                    const newItems = [...headerConfig.navItems];
-                                                    newItems[idx].label = e.target.value;
-                                                    setHeaderConfig({ ...headerConfig, navItems: newItems });
-                                                }}
-                                                className="w-full bg-transparent px-2 py-1 text-xs font-bold outline-none placeholder:font-normal"
-                                                placeholder="名称"
-                                            />
-                                            <input
-                                                type="text"
-                                                value={item.href}
-                                                onChange={(e) => {
-                                                    const newItems = [...headerConfig.navItems];
-                                                    newItems[idx].href = e.target.value;
-                                                    setHeaderConfig({ ...headerConfig, navItems: newItems });
-                                                }}
-                                                className="w-full bg-transparent px-2 py-1 text-[10px] text-gray-400 outline-none"
-                                                placeholder="URL/ID"
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                const newItems = headerConfig.navItems.filter((_: any, i: number) => i !== idx);
-                                                setHeaderConfig({ ...headerConfig, navItems: newItems });
-                                            }}
-                                            className="h-8 w-8 rounded-xl flex items-center justify-center text-gray-300 hover:bg-white hover:text-red-500 p-1 transition-all hover:shadow-sm"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 mb-2 block">スタイル</label>
+                            <div className="grid grid-cols-3 gap-1">
+                                {[
+                                    { id: 'professional', label: 'Business' },
+                                    { id: 'pops', label: 'Pop' },
+                                    { id: 'luxury', label: 'Luxury' },
+                                    { id: 'minimal', label: 'Minimal' },
+                                    { id: 'emotional', label: 'Emotional' }
+                                ].map((t) => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setAiTaste(t.id)}
+                                        className={clsx(
+                                            "px-2 py-1.5 text-xs font-medium rounded-lg transition-all",
+                                            aiTaste === t.id ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                        )}
+                                    >
+                                        {t.label}
+                                    </button>
                                 ))}
                             </div>
                         </div>
+                        <div className="flex flex-col justify-end">
+                            <button
+                                onClick={handleGenerateAI}
+                                disabled={isGenerating || !aiProductInfo}
+                                className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg text-sm font-bold hover:bg-purple-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <RefreshCw className="h-4 w-4 animate-spin" />
+                                        生成中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="h-4 w-4" />
+                                        AIで生成
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+
             {/* Hidden Input for Section Image Update */}
             <input
                 id="section-file-input"
@@ -1198,6 +1061,19 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
                 </div>
             </div>
+
+            {/* インペインティング（部分編集）モーダル */}
+            {showInpaintModal && inpaintImageUrl && (
+                <ImageInpaintEditor
+                    imageUrl={inpaintImageUrl}
+                    onClose={() => {
+                        setShowInpaintModal(false);
+                        setInpaintSectionId(null);
+                        setInpaintImageUrl(null);
+                    }}
+                    onSave={handleInpaintSave}
+                />
+            )}
         </div>
     );
 }

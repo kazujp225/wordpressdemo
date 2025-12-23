@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Upload, X, Image as ImageIcon, Search, Sparkles, Wand2, Download, Copy, RefreshCw, Eye, Info, Check } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Search, Sparkles, Wand2, Download, Copy, RefreshCw, Eye, Info, Check, Pencil } from 'lucide-react';
+import { ImageInpaintEditor } from '@/components/lp-builder/ImageInpaintEditor';
 
 export default function MediaLibrary() {
     const [media, setMedia] = useState<any[]>([]);
@@ -19,6 +20,10 @@ export default function MediaLibrary() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<{ prompt: string; explanation: string } | null>(null);
     const [copied, setCopied] = useState(false);
+
+    // Inpaint Editor States
+    const [showInpaintEditor, setShowInpaintEditor] = useState(false);
+    const [inpaintTarget, setInpaintTarget] = useState<any>(null);
 
     const fetchMedia = async () => {
         try {
@@ -114,6 +119,18 @@ export default function MediaLibrary() {
         navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleOpenInpaint = (item: any) => {
+        setInpaintTarget(item);
+        setShowInpaintEditor(true);
+        setSelectedMedia(null); // Close detail sidebar
+    };
+
+    const handleInpaintSave = async (newImageUrl: string) => {
+        setShowInpaintEditor(false);
+        setInpaintTarget(null);
+        await fetchMedia(); // Refresh media list
     };
 
     const filteredMedia = media.filter(item =>
@@ -231,21 +248,32 @@ export default function MediaLibrary() {
                     {filteredMedia.map((item) => (
                         <div
                             key={item.id}
-                            onClick={() => {
-                                setSelectedMedia(item);
-                                setAnalysisResult(null);
-                            }}
-                            className="group relative aspect-square overflow-hidden rounded-[2rem] border border-gray-100 bg-white p-2 shadow-sm transition-all hover:shadow-2xl hover:shadow-gray-100 hover:-translate-y-1 cursor-pointer"
+                            className="group relative aspect-square overflow-hidden rounded-[2rem] border border-gray-100 bg-white p-2 shadow-sm transition-all hover:shadow-2xl hover:shadow-gray-100 hover:-translate-y-1"
                         >
-                            <div className="h-full w-full overflow-hidden rounded-[1.5rem] bg-gray-50">
+                            {/* 常時表示の編集ボタン */}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenInpaint(item); }}
+                                className="absolute top-4 right-4 z-20 h-10 w-10 rounded-xl bg-gradient-to-tr from-purple-600 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-purple-200 hover:scale-110 hover:shadow-xl transition-all"
+                                title="AIで部分編集"
+                            >
+                                <Pencil className="h-5 w-5" />
+                            </button>
+
+                            <div
+                                onClick={() => {
+                                    setSelectedMedia(item);
+                                    setAnalysisResult(null);
+                                }}
+                                className="h-full w-full overflow-hidden rounded-[1.5rem] bg-gray-50 cursor-pointer"
+                            >
                                 <img
                                     src={item.filePath}
                                     alt={item.filePath}
                                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                                 />
                             </div>
-                            <div className="absolute inset-2 flex flex-col justify-end rounded-[1.5rem] bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                                <div className="flex items-center justify-between">
+                            <div className="absolute inset-2 flex flex-col justify-end rounded-[1.5rem] bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none">
+                                <div className="flex items-center justify-between pointer-events-auto">
                                     <div className="overflow-hidden">
                                         <span className="block truncate text-[10px] font-black uppercase tracking-widest text-white/90">{item.mime.split('/')[1]}</span>
                                         <span className="block text-[8px] font-bold text-white/50 uppercase">{new Date(item.createdAt).toLocaleDateString()}</span>
@@ -295,22 +323,31 @@ export default function MediaLibrary() {
                     </div>
 
                     <div className="space-y-6">
-                        <div className="flex gap-3">
+                        <div className="flex flex-col gap-3">
                             <button
-                                onClick={() => handleDownload(selectedMedia)}
-                                className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-gray-900 px-6 py-4 text-sm font-black text-white shadow-xl shadow-gray-200 hover:bg-black transition-all"
+                                onClick={() => handleOpenInpaint(selectedMedia)}
+                                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-blue-100 hover:scale-[1.02] active:scale-[0.98] transition-all"
                             >
-                                <Download className="h-4 w-4" />
-                                ダウンロード
+                                <Pencil className="h-4 w-4" />
+                                AIで部分編集
                             </button>
-                            <button
-                                onClick={() => handleAnalyze(selectedMedia)}
-                                disabled={isAnalyzing}
-                                className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-indigo-100 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-                            >
-                                {isAnalyzing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                                AIプロンプト化
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => handleDownload(selectedMedia)}
+                                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-gray-900 px-6 py-4 text-sm font-black text-white shadow-xl shadow-gray-200 hover:bg-black transition-all"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    ダウンロード
+                                </button>
+                                <button
+                                    onClick={() => handleAnalyze(selectedMedia)}
+                                    disabled={isAnalyzing}
+                                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-indigo-100 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                                >
+                                    {isAnalyzing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                    プロンプト化
+                                </button>
+                            </div>
                         </div>
 
                         {/* Analysis Result */}
@@ -352,6 +389,18 @@ export default function MediaLibrary() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Inpaint Editor */}
+            {showInpaintEditor && inpaintTarget && (
+                <ImageInpaintEditor
+                    imageUrl={inpaintTarget.filePath}
+                    onClose={() => {
+                        setShowInpaintEditor(false);
+                        setInpaintTarget(null);
+                    }}
+                    onSave={handleInpaintSave}
+                />
             )}
         </div>
     );

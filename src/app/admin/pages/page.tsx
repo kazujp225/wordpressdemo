@@ -4,18 +4,26 @@ import { prisma } from '@/lib/db';
 import clsx from 'clsx';
 
 // Mock data for MVP if DB fails
-const MOCK_PAGES = [
-    { id: 1, title: 'Demo Landing Page', slug: 'demo', status: 'published', updatedAt: new Date() },
-    { id: 2, title: 'Draft Campaign', slug: 'draft-1', status: 'draft', updatedAt: new Date() },
-];
+const MOCK_PAGES: any[] = [];
 
 import { PagesHeader } from '@/components/admin/PagesHeader';
 
 export default async function PagesList() {
     // Try to fetch from DB, fallback to mock if DB not ready (safe for development step)
-    let pages = MOCK_PAGES;
+    let pages: any[] = MOCK_PAGES;
     try {
-        pages = await prisma.page.findMany({ orderBy: { updatedAt: 'desc' } });
+        pages = await prisma.page.findMany({
+            orderBy: { updatedAt: 'desc' },
+            include: {
+                sections: {
+                    orderBy: { order: 'asc' },
+                    take: 1,
+                    include: {
+                        image: true
+                    }
+                }
+            }
+        });
     } catch (e) {
         console.error("DB connection failed, using mock", e);
     }
@@ -50,10 +58,19 @@ export default async function PagesList() {
                                         <span>{page.status === 'published' ? '公開中' : '下書き'}</span>
                                     </span>
                                 </div>
-                                {/* Placeholder for thumbnail */}
-                                <div className="flex h-full w-full items-center justify-center text-gray-200">
-                                    <FileText className="h-12 w-12 opacity-20" />
-                                </div>
+                                {/* サムネイル画像 */}
+                                {page.sections?.[0]?.image?.filePath ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                        src={page.sections[0].image.filePath}
+                                        alt={page.title}
+                                        className="h-full w-full object-cover object-top"
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-gray-200">
+                                        <FileText className="h-12 w-12 opacity-20" />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="p-4 py-3">

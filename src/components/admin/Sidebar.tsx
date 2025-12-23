@@ -12,6 +12,7 @@ const navItems = [
     { name: 'メディア', href: '/admin/media', icon: Images },
     { name: '設定', href: '/admin/settings', icon: Settings },
     { name: 'ナビ', href: '/admin/navigation', icon: Navigation },
+    { name: '高度な編集', href: '/admin/lp-builder', icon: LayoutDashboard },
 ];
 
 export function Sidebar() {
@@ -49,7 +50,7 @@ export function Sidebar() {
                 </div>
             </div>
 
-            <nav className="flex-1 space-y-1.5 px-4 py-4">
+            <nav className="flex-1 space-y-1.5 px-4 py-4 overflow-y-auto">
                 <div className="mb-4 px-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">メインメニュー</div>
                 {navItems.map((item) => {
                     const Icon = item.icon;
