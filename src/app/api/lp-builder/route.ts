@@ -110,6 +110,14 @@ export async function POST(request: Request) {
                     title: title || '新規LP',
                     slug,
                     status: 'draft',
+                    headerConfig: JSON.stringify({
+                        logoText: title || '新規LP',
+                        sticky: true,
+                        ctaText: 'お問い合わせ',
+                        ctaLink: '#contact',
+                        navItems: []
+                    }),
+                    formConfig: JSON.stringify({})
                 }
             });
 
