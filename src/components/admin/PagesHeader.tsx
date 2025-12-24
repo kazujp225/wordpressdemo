@@ -112,7 +112,7 @@ export function PagesHeader() {
                                                 placeholder="https://example.com"
                                                 value={importUrl}
                                                 onChange={(e) => setImportUrl(e.target.value)}
-                                                className="flex-1 rounded-2xl border border-gray-100 bg-gray-50 px-6 py-4 text-sm font-medium outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all shadow-inner"
+                                                className="flex-1 rounded-2xl border border-gray-200 bg-white px-6 py-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 outline-none focus:ring-4 focus:ring-blue-50 transition-all"
                                             />
                                         </div>
                                     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Loader2, Wand2, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, Plus } from 'lucide-react';
+import { X, Loader2, Wand2, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, Plus, DollarSign, Clock, Check } from 'lucide-react';
 
 interface ImageInpaintEditorProps {
     imageUrl: string;
@@ -33,6 +33,8 @@ export function ImageInpaintEditor({ imageUrl, onClose, onSave }: ImageInpaintEd
     const [isPanning, setIsPanning] = useState(false);
     const [panStart, setPanStart] = useState({ x: 0, y: 0 });
     const [tool, setTool] = useState<'select' | 'pan'>('select');
+    const [costInfo, setCostInfo] = useState<{ model: string; estimatedCost: number; durationMs: number } | null>(null);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     // 画像を読み込み
     useEffect(() => {
@@ -245,7 +247,15 @@ export function ImageInpaintEditor({ imageUrl, onClose, onSave }: ImageInpaintEd
             }
 
             if (result.success && result.media?.filePath) {
-                onSave(result.media.filePath);
+                // コスト情報を保存
+                if (result.costInfo) {
+                    setCostInfo(result.costInfo);
+                }
+                setShowSuccess(true);
+                // 少し待ってから閉じる（コストを表示するため）
+                setTimeout(() => {
+                    onSave(result.media.filePath);
+                }, 2000);
             } else {
                 throw new Error(result.message || '画像の生成に失敗しました');
             }
@@ -277,6 +287,36 @@ export function ImageInpaintEditor({ imageUrl, onClose, onSave }: ImageInpaintEd
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
             <div className="relative w-[95vw] h-[95vh] bg-gray-900 rounded-2xl overflow-hidden flex flex-col">
+                {/* 成功オーバーレイ */}
+                {showSuccess && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/95 backdrop-blur-sm animate-in fade-in duration-300">
+                        <div className="text-center">
+                            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                                <Check className="w-10 h-10 text-green-400" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-white mb-2">画像を編集しました</h3>
+                            {costInfo && (
+                                <div className="flex items-center justify-center gap-4 mt-4 bg-gray-800/50 rounded-2xl px-6 py-4">
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-400 mb-1">コスト</p>
+                                        <p className="text-xl font-bold text-green-400">${costInfo.estimatedCost.toFixed(4)}</p>
+                                    </div>
+                                    <div className="w-px h-10 bg-gray-700" />
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-400 mb-1">処理時間</p>
+                                        <p className="text-xl font-bold text-blue-400">{(costInfo.durationMs / 1000).toFixed(1)}s</p>
+                                    </div>
+                                    <div className="w-px h-10 bg-gray-700" />
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-400 mb-1">モデル</p>
+                                        <p className="text-sm font-medium text-gray-300">{costInfo.model}</p>
+                                    </div>
+                                </div>
+                            )}
+                            <p className="text-gray-400 text-sm mt-4">画面を閉じています...</p>
+                        </div>
+                    </div>
+                )}
                 {/* ヘッダー */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -284,12 +324,30 @@ export function ImageInpaintEditor({ imageUrl, onClose, onSave }: ImageInpaintEd
                         画像の部分編集
                         <span className="text-sm font-normal text-gray-400">（複数選択可）</span>
                     </h2>
-                    <button
-                        onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700"
-                    >
-                        <X className="w-6 h-6" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {/* コスト表示 */}
+                        {costInfo && (
+                            <div className="flex items-center gap-3 bg-gray-800 rounded-xl px-4 py-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                                <div className="flex items-center gap-1.5 text-green-400">
+                                    <DollarSign className="w-4 h-4" />
+                                    <span className="text-sm font-bold">${costInfo.estimatedCost.toFixed(4)}</span>
+                                </div>
+                                <div className="w-px h-4 bg-gray-600" />
+                                <div className="flex items-center gap-1.5 text-blue-400">
+                                    <Clock className="w-4 h-4" />
+                                    <span className="text-sm font-medium">{(costInfo.durationMs / 1000).toFixed(1)}s</span>
+                                </div>
+                                <div className="w-px h-4 bg-gray-600" />
+                                <span className="text-xs text-gray-400">{costInfo.model}</span>
+                            </div>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 flex">

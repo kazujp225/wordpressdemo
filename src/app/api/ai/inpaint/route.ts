@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { estimateImageCost } from '@/lib/ai-costs';
 
 interface MaskArea {
     x: number;      // 選択範囲の左上X（0-1の比率）
@@ -132,14 +133,22 @@ Output the complete edited image. Do not describe the changes - generate the act
         }
 
         const data = await response.json();
-        const result = await processInpaintResponse(data, user?.id || null);
+        const modelUsed = 'gemini-3-pro-image-preview';
+        const estimatedCost = estimateImageCost(modelUsed, 1);
+        const durationMs = Date.now() - startTime;
+
+        const result = await processInpaintResponse(data, user?.id || null, {
+            model: modelUsed,
+            estimatedCost,
+            durationMs
+        });
 
         // ログ記録（成功）
         await logGeneration({
             userId: user?.id || null,
             type: 'inpaint',
             endpoint: '/api/ai/inpaint',
-            model: 'gemini-3-pro-image-preview',
+            model: modelUsed,
             inputPrompt: inpaintPrompt,
             imageCount: 1,
             status: 'succeeded',
@@ -167,7 +176,13 @@ Output the complete edited image. Do not describe the changes - generate the act
     }
 }
 
-async function processInpaintResponse(data: any, userId: string | null) {
+interface CostInfo {
+    model: string;
+    estimatedCost: number;
+    durationMs: number;
+}
+
+async function processInpaintResponse(data: any, userId: string | null, costInfo?: CostInfo) {
     console.log('Gemini Response:', JSON.stringify(data, null, 2));
 
     const parts = data.candidates?.[0]?.content?.parts || [];
@@ -233,6 +248,11 @@ async function processInpaintResponse(data: any, userId: string | null) {
     return NextResponse.json({
         success: true,
         media,
-        textResponse
+        textResponse,
+        costInfo: costInfo ? {
+            model: costInfo.model,
+            estimatedCost: costInfo.estimatedCost,
+            durationMs: costInfo.durationMs
+        } : null
     });
 }
