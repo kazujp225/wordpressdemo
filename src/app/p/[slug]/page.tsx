@@ -23,7 +23,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
         },
         include: {
             sections: {
-                include: { image: true },
+                include: { image: true, mobileImage: true },
                 orderBy: { order: 'asc' },
             },
         },

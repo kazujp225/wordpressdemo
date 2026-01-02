@@ -20,12 +20,16 @@ const log = {
 
 // バリデーションスキーマ
 const regenerateSchema = z.object({
-    style: z.enum(['sampling', 'professional', 'pops', 'luxury', 'minimal', 'emotional']).optional(),
+    style: z.enum(['sampling', 'professional', 'pops', 'luxury', 'minimal', 'emotional', 'design-definition']).optional(),
     colorScheme: z.enum(['original', 'blue', 'green', 'purple', 'orange', 'monochrome']).optional(),
     customPrompt: z.string().max(500).optional(),
     mode: z.enum(['light', 'heavy']).default('light'),
     // 隣接セクションとの整合性を取るためのコンテキスト
     contextStyle: z.string().optional(),
+    // デザイン定義（ページ全体のスタイル定義）- 柔軟なスキーマ
+    designDefinition: z.any().optional(),
+    // ユーザー指定の参照スタイル画像URL（一括再生成で使用）
+    styleReferenceUrl: z.string().url().optional(),
 });
 
 // スタイル定義
@@ -66,20 +70,22 @@ export async function POST(
         }, { status: 400 });
     }
 
-    const { style = 'professional', colorScheme, customPrompt, mode, contextStyle } = validation.data;
+    const { style = 'professional', colorScheme, customPrompt, mode, contextStyle, designDefinition, styleReferenceUrl } = validation.data;
 
     try {
         log.info(`========== Starting Regenerate for Section ${sectionId} ==========`);
+        log.info(`Section ID type: ${typeof sectionId}, value: ${sectionId}`);
 
         // セクションを取得
         const section = await prisma.pageSection.findUnique({
             where: { id: sectionId },
             include: {
                 image: true,
+                mobileImage: true,
                 page: {
                     include: {
                         sections: {
-                            include: { image: true },
+                            include: { image: true, mobileImage: true },
                             orderBy: { order: 'asc' },
                         },
                     },
@@ -88,6 +94,12 @@ export async function POST(
         });
 
         if (!section) {
+            // デバッグ: 存在するセクションIDを確認
+            const allSections = await prisma.pageSection.findMany({
+                select: { id: true, pageId: true },
+                take: 20
+            });
+            log.error(`Section ${sectionId} not found. Existing sections: ${JSON.stringify(allSections)}`);
             return Response.json({ error: 'Section not found' }, { status: 404 });
         }
 
@@ -108,10 +120,49 @@ export async function POST(
 
         log.info(`Section position: ${segmentIndex + 1}/${totalSegments}`);
 
-        // デザイントークンを生成
-        const designTokens = generateDesignTokens(style, colorScheme);
-        const tokenDescription = tokensToPromptDescription(designTokens);
-        const styleDesc = STYLE_DESCRIPTIONS[style] || STYLE_DESCRIPTIONS.professional;
+        // デザイン定義を使用する場合は専用の説明を生成
+        const isUsingDesignDefinition = style === 'design-definition' && designDefinition;
+
+        let styleDesc: string;
+        let tokenDescription: string;
+
+        if (isUsingDesignDefinition) {
+            log.info('Using design definition for regeneration');
+
+            // デザイン定義からスタイル説明を生成
+            const colors = designDefinition.colorPalette || {};
+            const colorDesc = [
+                colors.primary && `メインカラー: ${colors.primary}`,
+                colors.secondary && `サブカラー: ${colors.secondary}`,
+                colors.accent && `アクセントカラー: ${colors.accent}`,
+                colors.background && `背景色: ${colors.background}`,
+            ].filter(Boolean).join('、');
+
+            styleDesc = `ページ全体のデザイン定義に基づくスタイル：
+- 雰囲気: ${designDefinition.vibe || '統一感のあるデザイン'}
+- 特徴: ${designDefinition.description || ''}
+- カラーパレット: ${colorDesc || '既存の色調を維持'}
+${designDefinition.typography?.headingStyle ? `- 見出しスタイル: ${designDefinition.typography.headingStyle}` : ''}
+${designDefinition.style?.buttonStyle ? `- ボタンスタイル: ${designDefinition.style.buttonStyle}` : ''}
+${designDefinition.style?.borderRadius ? `- 角丸: ${designDefinition.style.borderRadius}` : ''}`;
+
+            tokenDescription = `【デザイン定義（厳守）】
+このページは統一されたデザインシステムを持っています。以下の定義に完全に従ってください：
+
+${colorDesc ? `【カラー】\n${colorDesc}\n` : ''}
+${designDefinition.vibe ? `【雰囲気】\n${designDefinition.vibe}\n` : ''}
+${designDefinition.description ? `【デザインの特徴】\n${designDefinition.description}\n` : ''}
+${designDefinition.typography?.headingStyle ? `【タイポグラフィ】\n見出し: ${designDefinition.typography.headingStyle}\n` : ''}
+${designDefinition.style?.buttonStyle ? `【ボタン】\n${designDefinition.style.buttonStyle}\n` : ''}
+
+この定義に合わせて、セクションのデザインを再生成してください。
+他のセクションと完全に統一感のあるデザインにすることが最重要です。`;
+        } else {
+            // 通常のスタイル処理
+            const designTokens = generateDesignTokens(style, colorScheme);
+            tokenDescription = tokensToPromptDescription(designTokens);
+            styleDesc = STYLE_DESCRIPTIONS[style] || STYLE_DESCRIPTIONS.professional;
+        }
 
         // セグメント情報
         const segmentInfo = segmentIndex === 0
@@ -121,30 +172,51 @@ export async function POST(
             : { position: `コンテンツセクション（${segmentIndex + 1}/${totalSegments}）`, role: '本文コンテンツ' };
 
         // ========================================
-        // 参照画像方式：最初のセクションの画像を参照として使用
-        // 2番目以降のセクションを再生成する場合、スタイル一貫性を確保
+        // 参照画像方式：ユーザー指定または最初のセクションの画像を参照として使用
         // ========================================
         const isSamplingMode = style === 'sampling';
         const firstSection = allSections[0];
-        // 最初のセクション以外を再生成する場合、かつsamplingモードでない場合に参照画像を使用
-        const useStyleReference = !isSamplingMode && segmentIndex > 0 && firstSection?.image?.filePath;
+
+        // ユーザー指定の参照URLがある場合はそれを使用、なければ自動で最初のセクションを使用
+        const useUserReference = !!styleReferenceUrl;
+        const useAutoReference = !isSamplingMode && !useUserReference && segmentIndex > 0 && firstSection?.image?.filePath;
+        const useStyleReference = useUserReference || useAutoReference;
 
         let styleReferenceBuffer: Buffer | null = null;
-        if (useStyleReference && firstSection.image) {
-            try {
-                log.info(`Fetching first section image as style reference...`);
-                const refResponse = await fetch(firstSection.image.filePath);
-                const refArrayBuffer = await refResponse.arrayBuffer();
-                styleReferenceBuffer = Buffer.from(refArrayBuffer);
-                log.success(`Style reference image loaded (${styleReferenceBuffer.length} bytes)`);
-            } catch (error: any) {
-                log.error(`Failed to load style reference: ${error.message}`);
+        if (useStyleReference) {
+            const refUrl = useUserReference ? styleReferenceUrl : firstSection?.image?.filePath;
+            if (refUrl) {
+                try {
+                    log.info(`Fetching style reference image: ${useUserReference ? 'user-specified' : 'first section'}...`);
+                    const refResponse = await fetch(refUrl);
+                    const refArrayBuffer = await refResponse.arrayBuffer();
+                    styleReferenceBuffer = Buffer.from(refArrayBuffer);
+                    log.success(`Style reference image loaded (${styleReferenceBuffer.length} bytes)`);
+                } catch (error: any) {
+                    log.error(`Failed to load style reference: ${error.message}`);
+                }
             }
         }
 
         // 参照画像がある場合は一貫性指示を追加
         const styleReferenceInstruction = styleReferenceBuffer
-            ? `【最重要：スタイル統一】
+            ? useUserReference
+                ? `【最重要：ユーザー指定の参照スタイルに完全一致させる】
+添付した1枚目の「スタイル参照画像」は、ユーザーが明示的に選択した「お手本となるデザイン」です。
+このお手本のデザインスタイルを2枚目の処理対象画像に適用してください。
+
+【必ず一致させる要素】
+- 背景色・グラデーションの色味と方向
+- ボタンの色・形状・角丸・影
+- 見出し・本文のフォントスタイル（太さ、色、装飾）
+- アイコンや装飾要素のスタイル
+- 全体的な配色トーン（暖色系/寒色系/モノトーン等）
+- 余白の取り方やレイアウトの雰囲気
+
+【重要】参照画像のスタイルを忠実に再現することが最優先です。
+
+`
+                : `【最重要：スタイル統一】
 添付した「スタイル参照画像」は、このページの最初のセクションです。
 以下を参照画像と完全に統一してください：
 - 背景色・グラデーション
@@ -216,7 +288,7 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
 
 【出力】入力と同じサイズの高品質なWebデザイン画像を出力。`;
 
-        log.info(`Processing with ${mode} mode, style: ${style}${styleReferenceBuffer ? ' (with style reference)' : ''}`);
+        log.info(`Processing with ${mode} mode, style: ${style}${styleReferenceBuffer ? (useUserReference ? ' (with USER-SPECIFIED style reference)' : ' (with auto style reference)') : ''}`);
 
         // 画像をダウンロード
         const imageResponse = await fetch(section.image.filePath);
@@ -233,7 +305,10 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
         if (styleReferenceBuffer) {
             const refBase64 = styleReferenceBuffer.toString('base64');
             parts.push({ inlineData: { mimeType: 'image/png', data: refBase64 } });
-            parts.push({ text: '↑ スタイル参照画像（このスタイルに合わせてください）' });
+            parts.push({ text: useUserReference
+                ? '↑【お手本】ユーザーが選択した参照セクション。このデザインスタイル（色、フォント、装飾、雰囲気）を下の画像に適用してください。'
+                : '↑ スタイル参照画像（このスタイルに合わせてください）'
+            });
         }
 
         // 処理対象の画像を追加
@@ -331,6 +406,21 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
                 sourceType: `regenerate-${mode}`,
             },
         });
+
+        // 履歴を保存（復元機能用）
+        if (section.imageId) {
+            await prisma.sectionImageHistory.create({
+                data: {
+                    sectionId: sectionId,
+                    userId: user.id,
+                    previousImageId: section.imageId,
+                    newImageId: newMedia.id,
+                    actionType: `regenerate-${mode}`,
+                    prompt: customPrompt || null,
+                },
+            });
+            log.info(`History saved: ${section.imageId} -> ${newMedia.id}`);
+        }
 
         // セクションを更新
         await prisma.pageSection.update({

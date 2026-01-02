@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Loader2, Wand2, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, Plus, DollarSign, Clock, Check, History, Link, MousePointer, ImagePlus, Palette, Sparkles } from 'lucide-react';
+import { X, Loader2, Wand2, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, Plus, DollarSign, Clock, Check, History, Link, MousePointer, ImagePlus, Palette, Sparkles, Monitor, Smartphone } from 'lucide-react';
 import { InpaintHistoryPanel } from './InpaintHistoryPanel';
-import type { ClickableArea, FormFieldConfig } from '@/types';
+import type { ClickableArea, FormFieldConfig, ViewportType } from '@/types';
 
 // デザイン定義の型
 interface DesignDefinition {
@@ -30,13 +30,16 @@ type EditorMode = 'inpaint' | 'button';
 interface ImageInpaintEditorProps {
     imageUrl: string;
     onClose: () => void;
-    onSave: (newImageUrl: string) => void;
+    onSave: (newImageUrl: string, newMobileImageUrl?: string) => void;
     // For clickable area mode
     clickableAreas?: ClickableArea[];
-    onSaveClickableAreas?: (areas: ClickableArea[]) => void;
+    onSaveClickableAreas?: (areas: ClickableArea[], mobileAreas?: ClickableArea[]) => void;
     initialMode?: EditorMode;
     // 追加: セクションID（ボタン保存用）
     sectionId?: string;
+    // デュアルモード用（モバイル画像）
+    mobileImageUrl?: string;
+    mobileClickableAreas?: ClickableArea[];
 }
 
 interface SelectionRect {
@@ -63,7 +66,14 @@ export function ImageInpaintEditor({
     onSaveClickableAreas,
     initialMode = 'inpaint',
     sectionId,
+    mobileImageUrl,
+    mobileClickableAreas: initialMobileClickableAreas = [],
 }: ImageInpaintEditorProps) {
+    // デュアルモード判定
+    const isDualMode = !!mobileImageUrl;
+    const [activeViewport, setActiveViewport] = useState<ViewportType>('desktop');
+
+    // Desktop canvas refs and state
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -82,6 +92,17 @@ export function ImageInpaintEditor({
     const [costInfo, setCostInfo] = useState<{ model: string; estimatedCost: number; durationMs: number } | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+
+    // Mobile canvas refs and state (for dual mode)
+    const mobileCanvasRef = useRef<HTMLCanvasElement>(null);
+    const mobileContainerRef = useRef<HTMLDivElement>(null);
+    const [mobileImage, setMobileImage] = useState<HTMLImageElement | null>(null);
+    const [mobileSelections, setMobileSelections] = useState<SelectionRect[]>([]);
+    const [mobileScale, setMobileScale] = useState(1);
+    const [mobileOffset, setMobileOffset] = useState({ x: 0, y: 0 });
+    const [mobileCurrentSelection, setMobileCurrentSelection] = useState<SelectionRect | null>(null);
+    const [isMobileSelecting, setIsMobileSelecting] = useState(false);
+    const [mobileStartPoint, setMobileStartPoint] = useState({ x: 0, y: 0 });
 
     // 参考デザイン画像機能
     const [referenceImage, setReferenceImage] = useState<string | null>(null);
@@ -141,6 +162,33 @@ export function ImageInpaintEditor({
         };
         img.src = imageUrl;
     }, [imageUrl, initialClickableAreas]);
+
+    // モバイル画像を読み込み（デュアルモード時のみ）
+    useEffect(() => {
+        if (!mobileImageUrl) return;
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            setMobileImage(img);
+            if (mobileContainerRef.current) {
+                const containerWidth = mobileContainerRef.current.clientWidth - 40;
+                const containerHeight = mobileContainerRef.current.clientHeight - 40;
+                const scaleX = containerWidth / img.width;
+                const scaleY = containerHeight / img.height;
+                const newScale = Math.min(scaleX, scaleY, 1);
+                setMobileScale(newScale);
+                setMobileOffset({
+                    x: (containerWidth - img.width * newScale) / 2,
+                    y: (containerHeight - img.height * newScale) / 2
+                });
+            }
+        };
+        img.onerror = () => {
+            console.error('モバイル画像の読み込みに失敗しました');
+        };
+        img.src = mobileImageUrl;
+    }, [mobileImageUrl]);
 
     // キャンバスに描画
     useEffect(() => {
@@ -258,6 +306,79 @@ export function ImageInpaintEditor({
         });
     }, [image, selections, currentSelection, scale, offset, editorMode, buttonAreas, selectedButtonId]);
 
+    // モバイルキャンバスに描画（デュアルモード時のみ）
+    useEffect(() => {
+        if (!isDualMode) return;
+
+        const canvas = mobileCanvasRef.current;
+        if (!canvas || !mobileImage) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        if (mobileContainerRef.current) {
+            canvas.width = mobileContainerRef.current.clientWidth;
+            canvas.height = mobileContainerRef.current.clientHeight;
+        }
+
+        // Draw neutral background
+        ctx.fillStyle = '#f3f4f6';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(mobileOffset.x, mobileOffset.y);
+        ctx.scale(mobileScale, mobileScale);
+        ctx.drawImage(mobileImage, 0, 0);
+        ctx.restore();
+
+        // 描画する選択範囲（モバイル用）- currentSelectionも含める
+        const mobileAreasToRender = mobileCurrentSelection
+            ? [...mobileSelections, mobileCurrentSelection]
+            : mobileSelections;
+
+        mobileAreasToRender.forEach((sel, index: number) => {
+            const scaledSel = {
+                x: mobileOffset.x + sel.x * mobileScale,
+                y: mobileOffset.y + sel.y * mobileScale,
+                width: sel.width * mobileScale,
+                height: sel.height * mobileScale
+            };
+
+            const colors = ['#a855f7', '#10b981', '#f59e0b', '#ef4444', '#6366f1'];
+            const color = colors[index % colors.length];
+
+            // Glow Effect
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = color;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(scaledSel.x, scaledSel.y, scaledSel.width, scaledSel.height);
+            ctx.restore();
+
+            // Border
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(scaledSel.x, scaledSel.y, scaledSel.width, scaledSel.height);
+
+            // Label
+            const labelWidth = 28;
+            const labelHeight = 20;
+            const labelX = scaledSel.x;
+            const labelY = scaledSel.y - labelHeight - 4;
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(labelX, labelY, labelWidth, labelHeight, 6);
+            ctx.fill();
+
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${index + 1}`, labelX + labelWidth / 2, labelY + 14);
+        });
+    }, [isDualMode, mobileImage, mobileSelections, mobileScale, mobileOffset, mobileCurrentSelection]);
+
     const getCanvasCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
@@ -267,6 +388,17 @@ export function ImageInpaintEditor({
         const y = (e.clientY - rect.top - offset.y) / scale;
         return { x, y };
     }, [offset, scale]);
+
+    // モバイルキャンバス用座標変換
+    const getMobileCanvasCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = mobileCanvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - mobileOffset.x) / mobileScale;
+        const y = (e.clientY - rect.top - mobileOffset.y) / mobileScale;
+        return { x, y };
+    }, [mobileOffset, mobileScale]);
 
     // ボタン領域のヒットテスト
     const hitTestButton = useCallback((coords: { x: number; y: number }): { buttonId: string | null; handle: 'nw' | 'ne' | 'sw' | 'se' | 'move' | null } => {
@@ -455,6 +587,73 @@ export function ImageInpaintEditor({
         setIsPanning(false);
     };
 
+    // モバイルキャンバス用のマウスイベントハンドラー
+    const handleMobileMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        setActiveViewport('mobile');
+
+        if (tool === 'pan') {
+            setIsPanning(true);
+            setPanStart({ x: e.clientX - mobileOffset.x, y: e.clientY - mobileOffset.y });
+            return;
+        }
+
+        const coords = getMobileCanvasCoords(e);
+
+        // 画像範囲外のクリックは無視
+        if (!mobileImage || coords.x < 0 || coords.y < 0 || coords.x > mobileImage.width || coords.y > mobileImage.height) {
+            return;
+        }
+
+        // インペイントモードのみ対応（ボタンモードはデスクトップで設定）
+        if (editorMode === 'inpaint') {
+            setIsMobileSelecting(true);
+            setMobileStartPoint(coords);
+            setMobileCurrentSelection(null);
+        }
+    };
+
+    const handleMobileMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (isPanning) {
+            setMobileOffset({
+                x: e.clientX - panStart.x,
+                y: e.clientY - panStart.y
+            });
+            return;
+        }
+
+        if (!isMobileSelecting || !mobileImage) return;
+
+        const coords = getMobileCanvasCoords(e);
+
+        const newSelection: SelectionRect = {
+            id: 'mobile-temp',
+            x: Math.max(0, Math.min(mobileStartPoint.x, coords.x)),
+            y: Math.max(0, Math.min(mobileStartPoint.y, coords.y)),
+            width: Math.min(Math.abs(coords.x - mobileStartPoint.x), mobileImage.width - Math.min(mobileStartPoint.x, coords.x)),
+            height: Math.min(Math.abs(coords.y - mobileStartPoint.y), mobileImage.height - Math.min(mobileStartPoint.y, coords.y))
+        };
+
+        setMobileCurrentSelection(newSelection);
+    };
+
+    const handleMobileMouseUp = () => {
+        if (mobileCurrentSelection && mobileCurrentSelection.width > 10 && mobileCurrentSelection.height > 10) {
+            const newId = 'mobile-' + Date.now().toString();
+            setMobileSelections(prev => [...prev, { ...mobileCurrentSelection, id: newId }]);
+        }
+        setMobileCurrentSelection(null);
+        setIsMobileSelecting(false);
+        setIsPanning(false);
+    };
+
+    const removeMobileSelection = (id: string) => {
+        setMobileSelections(prev => prev.filter(s => s.id !== id));
+    };
+
+    const clearAllMobileSelections = () => {
+        setMobileSelections([]);
+    };
+
     const removeSelection = (id: string) => {
         setSelections(prev => prev.filter(s => s.id !== id));
     };
@@ -487,7 +686,7 @@ export function ImageInpaintEditor({
             buttonAreas: buttonAreas.length,
             image: !!image,
             sectionId,
-            windowFn: !!window.__saveClickableAreas
+            windowFn: !!(window as any).__saveClickableAreas
         });
 
         if (!image) {
@@ -564,8 +763,17 @@ export function ImageInpaintEditor({
 
     // インペインティング実行
     const handleInpaint = async () => {
-        if (selections.length === 0 || !prompt.trim()) {
+        // デュアルモード時は両方の選択範囲をチェック
+        const hasDesktopSelections = selections.length > 0;
+        const hasMobileSelections = isDualMode && mobileSelections.length > 0;
+
+        if (!hasDesktopSelections && !hasMobileSelections) {
             setError('範囲を選択してプロンプトを入力してください');
+            return;
+        }
+
+        if (!prompt.trim()) {
+            setError('プロンプトを入力してください');
             return;
         }
 
@@ -578,51 +786,100 @@ export function ImageInpaintEditor({
         setError(null);
 
         try {
-            // 複数の選択範囲を0-1の比率に変換
-            const masks = selections.map(sel => ({
-                x: sel.x / image.width,
-                y: sel.y / image.height,
-                width: sel.width / image.width,
-                height: sel.height / image.height
-            }));
-
             // 参考画像がある場合はリサイズしてから送信
             let resizedReferenceImage: string | undefined;
             if (referenceImage) {
                 resizedReferenceImage = await resizeImageForUpload(referenceImage, 1024);
             }
 
-            const response = await fetch('/api/ai/inpaint', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    imageUrl,
-                    masks, // 複数のマスク
-                    mask: masks[0], // 後方互換性のため
-                    prompt: prompt.trim(),
-                    referenceDesign: referenceDesign || undefined, // 参考デザイン定義
-                    referenceImageBase64: resizedReferenceImage // 参考デザイン画像（リサイズ済みBase64）
-                })
-            });
+            // インペイント処理関数
+            const processInpaint = async (
+                targetImageUrl: string,
+                targetMasks: { x: number; y: number; width: number; height: number }[],
+                label: string
+            ): Promise<{ url: string; costInfo?: any }> => {
+                const response = await fetch('/api/ai/inpaint', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imageUrl: targetImageUrl,
+                        masks: targetMasks,
+                        mask: targetMasks[0],
+                        prompt: prompt.trim(),
+                        referenceDesign: referenceDesign || undefined,
+                        referenceImageBase64: resizedReferenceImage
+                    })
+                });
 
-            const result = await response.json();
+                const result = await response.json();
 
-            if (!response.ok) {
-                throw new Error(result.error || 'インペインティングに失敗しました');
+                if (!response.ok) {
+                    throw new Error(result.error || `${label}画像のインペインティングに失敗しました`);
+                }
+
+                if (result.success && result.media?.filePath) {
+                    return { url: result.media.filePath, costInfo: result.costInfo };
+                } else {
+                    throw new Error(result.message || `${label}画像の生成に失敗しました`);
+                }
+            };
+
+            // 並列処理用のPromise配列を構築
+            const promises: Promise<{ type: 'desktop' | 'mobile'; url: string; costInfo?: any }>[] = [];
+
+            if (hasDesktopSelections) {
+                const desktopMasks = selections.map(sel => ({
+                    x: sel.x / image.width,
+                    y: sel.y / image.height,
+                    width: sel.width / image.width,
+                    height: sel.height / image.height
+                }));
+                promises.push(
+                    processInpaint(imageUrl, desktopMasks, 'デスクトップ')
+                        .then(result => ({ type: 'desktop' as const, ...result }))
+                );
             }
 
-            if (result.success && result.media?.filePath) {
-                // コスト情報を保存
-                if (result.costInfo) {
-                    setCostInfo(result.costInfo);
+            if (hasMobileSelections && mobileImage && mobileImageUrl) {
+                const mobileMasks = mobileSelections.map(sel => ({
+                    x: sel.x / mobileImage.width,
+                    y: sel.y / mobileImage.height,
+                    width: sel.width / mobileImage.width,
+                    height: sel.height / mobileImage.height
+                }));
+                promises.push(
+                    processInpaint(mobileImageUrl, mobileMasks, 'モバイル')
+                        .then(result => ({ type: 'mobile' as const, ...result }))
+                );
+            }
+
+            // 並列実行
+            const results = await Promise.all(promises);
+
+            // 結果を抽出
+            let desktopResultUrl: string | undefined;
+            let mobileResultUrl: string | undefined;
+
+            for (const result of results) {
+                if (result.type === 'desktop') {
+                    desktopResultUrl = result.url;
+                    if (result.costInfo) {
+                        setCostInfo(result.costInfo);
+                    }
+                } else if (result.type === 'mobile') {
+                    mobileResultUrl = result.url;
                 }
+            }
+
+            // 結果を返す
+            if (desktopResultUrl || mobileResultUrl) {
                 setShowSuccess(true);
-                // 少し待ってから閉じる（コストを表示するため）
                 setTimeout(() => {
-                    onSave(result.media.filePath);
+                    // デスクトップ結果がなければ元のURLを使用
+                    onSave(desktopResultUrl || imageUrl, mobileResultUrl);
                 }, 2000);
             } else {
-                throw new Error(result.message || '画像の生成に失敗しました');
+                throw new Error('画像の生成に失敗しました');
             }
         } catch (err: any) {
             setError(err.message || 'エラーが発生しました');
@@ -633,6 +890,24 @@ export function ImageInpaintEditor({
 
     const handleZoomIn = () => setScale(prev => Math.min(prev * 1.2, 3));
     const handleZoomOut = () => setScale(prev => Math.max(prev / 1.2, 0.2));
+
+    // モバイルキャンバス用ズーム
+    const handleMobileZoomIn = () => setMobileScale(prev => Math.min(prev * 1.2, 3));
+    const handleMobileZoomOut = () => setMobileScale(prev => Math.max(prev / 1.2, 0.2));
+    const handleMobileReset = () => {
+        if (mobileImage && mobileContainerRef.current) {
+            const containerWidth = mobileContainerRef.current.clientWidth - 40;
+            const containerHeight = mobileContainerRef.current.clientHeight - 40;
+            const scaleX = containerWidth / mobileImage.width;
+            const scaleY = containerHeight / mobileImage.height;
+            const newScale = Math.min(scaleX, scaleY, 1);
+            setMobileScale(newScale);
+            setMobileOffset({
+                x: (containerWidth - mobileImage.width * newScale) / 2,
+                y: (containerHeight - mobileImage.height * newScale) / 2
+            });
+        }
+    };
 
     // 参考デザイン画像のアップロード処理
     const handleReferenceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -810,6 +1085,34 @@ export function ImageInpaintEditor({
                                 ボタン設定
                             </button>
                         </div>
+
+                        {/* Dual Mode Viewport Toggle */}
+                        {isDualMode && (
+                            <div className="flex items-center bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-1 border border-blue-200">
+                                <button
+                                    onClick={() => setActiveViewport('desktop')}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                                        activeViewport === 'desktop'
+                                            ? 'bg-white text-blue-600 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    <Monitor className="w-4 h-4" />
+                                    Desktop
+                                </button>
+                                <button
+                                    onClick={() => setActiveViewport('mobile')}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                                        activeViewport === 'mobile'
+                                            ? 'bg-white text-purple-600 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    <Smartphone className="w-4 h-4" />
+                                    Mobile
+                                </button>
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         {/* Cost Info */}
@@ -849,11 +1152,27 @@ export function ImageInpaintEditor({
                 </div>
 
                 <div className="flex-1 flex overflow-hidden">
-                    {/* Canvas Area */}
+                    {/* Canvas Area - Desktop */}
                     <div
                         ref={containerRef}
-                        className="flex-1 relative bg-surface-100 overflow-hidden"
+                        className={`relative bg-surface-100 overflow-hidden ${
+                            isDualMode
+                                ? `${activeViewport === 'desktop' ? 'flex-[6]' : 'flex-[4]'} border-r-2 ${activeViewport === 'desktop' ? 'border-blue-400' : 'border-gray-200'}`
+                                : 'flex-1'
+                        }`}
                     >
+                        {/* Viewport Label for Dual Mode */}
+                        {isDualMode && (
+                            <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-full text-xs font-bold ${
+                                activeViewport === 'desktop' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'
+                            }`}>
+                                <div className="flex items-center gap-1.5">
+                                    <Monitor className="w-3 h-3" />
+                                    Desktop
+                                </div>
+                            </div>
+                        )}
+
                         {/* Checkerboard background for transparency hint */}
                         <div className="absolute inset-0 opacity-[0.03]"
                             style={{
@@ -865,11 +1184,13 @@ export function ImageInpaintEditor({
 
                         <canvas
                             ref={canvasRef}
-                            className={`w-full h-full relative z-10 ${tool === 'select' ? 'cursor-crosshair' : 'cursor-grab'}`}
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
+                            className={`w-full h-full relative z-10 ${tool === 'select' ? 'cursor-crosshair' : 'cursor-grab'} ${
+                                isDualMode && activeViewport !== 'desktop' ? 'opacity-70' : ''
+                            }`}
+                            onMouseDown={(e) => { if (!isDualMode || activeViewport === 'desktop') handleMouseDown(e); else setActiveViewport('desktop'); }}
+                            onMouseMove={(e) => { if (!isDualMode || activeViewport === 'desktop') handleMouseMove(e); }}
+                            onMouseUp={() => { if (!isDualMode || activeViewport === 'desktop') handleMouseUp(); }}
+                            onMouseLeave={() => { if (!isDualMode || activeViewport === 'desktop') handleMouseUp(); }}
                         />
 
                         {/* Toolbar */}
@@ -917,6 +1238,76 @@ export function ImageInpaintEditor({
                             {Math.round(scale * 100)}%
                         </div>
                     </div>
+
+                    {/* Canvas Area - Mobile (Dual Mode Only) */}
+                    {isDualMode && (
+                        <div
+                            ref={mobileContainerRef}
+                            className={`relative bg-surface-100 overflow-hidden ${
+                                activeViewport === 'mobile' ? 'flex-[6] border-l-2 border-purple-400' : 'flex-[4] border-l-2 border-gray-200'
+                            }`}
+                        >
+                            {/* Viewport Label */}
+                            <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-full text-xs font-bold ${
+                                activeViewport === 'mobile' ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-600'
+                            }`}>
+                                <div className="flex items-center gap-1.5">
+                                    <Smartphone className="w-3 h-3" />
+                                    Mobile
+                                </div>
+                            </div>
+
+                            {/* Checkerboard background */}
+                            <div className="absolute inset-0 opacity-[0.03]"
+                                style={{
+                                    backgroundImage: 'linear-gradient(45deg, #000 25%, transparent 25%), linear-gradient(-45deg, #000 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #000 75%), linear-gradient(-45deg, transparent 75%, #000 75%)',
+                                    backgroundSize: '20px 20px',
+                                    backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                                }}
+                            />
+
+                            <canvas
+                                ref={mobileCanvasRef}
+                                className={`w-full h-full relative z-10 ${tool === 'select' ? 'cursor-crosshair' : 'cursor-grab'} ${
+                                    activeViewport !== 'mobile' ? 'opacity-70' : ''
+                                }`}
+                                onMouseDown={handleMobileMouseDown}
+                                onMouseMove={handleMobileMouseMove}
+                                onMouseUp={handleMobileMouseUp}
+                                onMouseLeave={handleMobileMouseUp}
+                            />
+
+                            {/* Mobile Toolbar */}
+                            <div className="absolute top-6 right-6 flex flex-col gap-2 bg-background p-1.5 rounded-lg border border-border shadow-lg z-20">
+                                <button
+                                    onClick={handleMobileZoomIn}
+                                    className="p-2.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
+                                    title="拡大"
+                                >
+                                    <ZoomIn className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={handleMobileZoomOut}
+                                    className="p-2.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
+                                    title="縮小"
+                                >
+                                    <ZoomOut className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={handleMobileReset}
+                                    className="p-2.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
+                                    title="リセット"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Scale Indicator */}
+                            <div className="absolute bottom-6 left-6 text-xs font-bold text-foreground bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-md border border-border shadow-sm z-20">
+                                {Math.round(mobileScale * 100)}%
+                            </div>
+                        </div>
+                    )}
 
                     {/* Side Panel */}
                     <div className="w-80 bg-background border-l border-border p-6 flex flex-col z-20 shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.05)]">
@@ -971,6 +1362,48 @@ export function ImageInpaintEditor({
                                         </div>
                                         <p className="text-sm font-bold text-foreground">範囲を選択</p>
                                         <p className="text-xs text-muted-foreground mt-1">画像上をドラッグして<br />編集エリアを指定します。</p>
+                                    </div>
+                                )}
+
+                                {/* Mobile Selections List (Dual Mode) */}
+                                {isDualMode && mobileSelections.length > 0 && (
+                                    <div className="mb-6 flex-1 overflow-hidden flex flex-col">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                                <Smartphone className="w-3 h-3 text-purple-500" />
+                                                {mobileSelections.length} 箇所（モバイル）
+                                            </p>
+                                            <button
+                                                onClick={clearAllMobileSelections}
+                                                className="text-[10px] font-bold text-red-500 hover:text-red-600 border border-red-100 bg-red-50 px-2 py-1 rounded-sm transition-colors"
+                                            >
+                                                全て削除
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2 overflow-y-auto pr-1">
+                                            {mobileSelections.map((sel, index) => {
+                                                const colors = ['bg-purple-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500'];
+                                                return (
+                                                    <div key={sel.id} className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-md hover:border-purple-300 transition-colors group">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${colors[index % colors.length]}`}>
+                                                                {index + 1}
+                                                            </span>
+                                                            <span className="text-xs font-medium text-muted-foreground">
+                                                                {Math.round(sel.width)} x {Math.round(sel.height)} px
+                                                            </span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => removeMobileSelection(sel.id)}
+                                                            className="opacity-0 group-hover:opacity-100 p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                                                            title="削除"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 )}
 
@@ -1114,13 +1547,15 @@ export function ImageInpaintEditor({
                                 <div className="space-y-3 pt-6 border-t border-border">
                                     <button
                                         onClick={handleInpaint}
-                                        disabled={isLoading || isAnalyzingDesign || selections.length === 0 || !prompt.trim()}
+                                        disabled={isLoading || isAnalyzingDesign || (selections.length === 0 && mobileSelections.length === 0) || !prompt.trim()}
                                         className="w-full py-3 px-4 bg-primary text-primary-foreground font-bold text-sm rounded-md hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                                     >
                                         {isLoading ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                                生成中...
+                                                {isDualMode && selections.length > 0 && mobileSelections.length > 0
+                                                    ? '両方を生成中...'
+                                                    : '生成中...'}
                                             </>
                                         ) : isAnalyzingDesign ? (
                                             <>
@@ -1130,7 +1565,11 @@ export function ImageInpaintEditor({
                                         ) : (
                                             <>
                                                 <Wand2 className="w-4 h-4" />
-                                                実行する ({selections.length})
+                                                {isDualMode ? (
+                                                    `実行する (D:${selections.length} / M:${mobileSelections.length})`
+                                                ) : (
+                                                    `実行する (${selections.length})`
+                                                )}
                                             </>
                                         )}
                                     </button>

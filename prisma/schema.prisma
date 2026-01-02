@@ -33,29 +33,32 @@ model Page {
 }
 
 model PageSection {
-  id        Int      @id @default(autoincrement())
-  pageId    Int
-  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  order     Int
-  role      String
-  imageId   Int?
-  image     MediaImage? @relation(fields: [imageId], references: [id])
-  config    String?
+  id            Int         @id @default(autoincrement())
+  pageId        Int
+  page          Page        @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  order         Int
+  role          String
+  imageId       Int?
+  image         MediaImage? @relation("DesktopImage", fields: [imageId], references: [id])
+  mobileImageId Int?
+  mobileImage   MediaImage? @relation("MobileImage", fields: [mobileImageId], references: [id])
+  config        String?
 }
 
 model MediaImage {
-  id        Int      @id @default(autoincrement())
-  userId    String?  // Supabase Auth user ID
-  filePath  String
-  width     Int?
-  height    Int?
-  mime      String
-  prompt    String?  // 生成に使用されたプロンプト
-  hash      String?  @unique // プロンプトのハッシュ（キャッシュ用）
-  sourceUrl String?  // URLインポートの元URL
-  sourceType String? // "import" | "ai-generate" | "upload" など
-  createdAt DateTime @default(now())
-  sections  PageSection[]
+  id              Int           @id @default(autoincrement())
+  userId          String?       // Supabase Auth user ID
+  filePath        String
+  width           Int?
+  height          Int?
+  mime            String
+  prompt          String?       // 生成に使用されたプロンプト
+  hash            String?       @unique // プロンプトのハッシュ（キャッシュ用）
+  sourceUrl       String?       // URLインポートの元URL
+  sourceType      String?       // "import" | "ai-generate" | "upload" など
+  createdAt       DateTime      @default(now())
+  desktopSections PageSection[] @relation("DesktopImage")
+  mobileSections  PageSection[] @relation("MobileImage")
 
   @@index([userId])
   @@index([sourceUrl])
@@ -111,6 +114,21 @@ model InpaintHistory {
   durationMs    Int?     // 処理時間 (ms)
   createdAt     DateTime @default(now())
 
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model SectionImageHistory {
+  id            Int      @id @default(autoincrement())
+  sectionId     Int      // PageSection ID
+  userId        String?  // Supabase Auth user ID
+  previousImageId Int    // 変更前のMediaImage ID
+  newImageId    Int      // 変更後のMediaImage ID
+  actionType    String   // 'regenerate' | 'inpaint' | 'upload' など
+  prompt        String?  // 使用されたプロンプト（あれば）
+  createdAt     DateTime @default(now())
+
+  @@index([sectionId])
   @@index([userId])
   @@index([createdAt])
 }

@@ -435,7 +435,7 @@ export async function POST(
             where: { id: pageId },
             include: {
                 sections: {
-                    include: { image: true },
+                    include: { image: true, mobileImage: true },
                     orderBy: { order: 'asc' },
                 },
             },

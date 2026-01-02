@@ -108,6 +108,7 @@ export const pageSectionsUpdateSchema = z.object({
     sections: z.array(z.object({
         role: z.string(),
         imageId: z.number().nullable().optional(),
+        mobileImageId: z.number().nullable().optional(),
         config: z.record(z.string(), z.unknown()).nullable().optional(),
     })),
     headerConfig: z.record(z.string(), z.unknown()).optional(),

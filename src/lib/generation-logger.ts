@@ -13,7 +13,9 @@ export type GenerationType =
   | 'chat-edit'
   | 'lp-generate'
   | 'import-arrange'
-  | 'design-analysis';
+  | 'design-analysis'
+  | 'boundary-connector'
+  | 'boundary-design';
 
 export interface LogGenerationParams {
   userId?: string | null;

@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
                     role: sec.role || 'other',
                     order: index,
                     imageId: sec.imageId || null,
+                    mobileImageId: sec.mobileImageId || null,
                     config: sec.config ? JSON.stringify(sec.config) : null,
                 })),
             },

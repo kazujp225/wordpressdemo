@@ -37,6 +37,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
                             role: sec.role,
                             order: index,
                             imageId: sec.imageId,
+                            mobileImageId: sec.mobileImageId,
                             config: sec.config ? JSON.stringify(sec.config) : null,
                         }))
                     }

@@ -5,6 +5,9 @@
 // Section Types
 export type SectionType = 'hero' | 'features' | 'pricing' | 'faq' | 'cta' | 'testimonials';
 
+// Viewport Types (for dual desktop/mobile editing)
+export type ViewportType = 'desktop' | 'mobile';
+
 // Form Field Configuration (for form-input action type)
 export interface FormFieldConfig {
     id: string;
@@ -37,7 +40,8 @@ export interface SectionProperties {
     text?: string;
     backgroundColor?: string;
     textColor?: string;
-    clickableAreas?: ClickableArea[];
+    clickableAreas?: ClickableArea[];        // Desktop clickable areas
+    mobileClickableAreas?: ClickableArea[];  // Mobile clickable areas
 }
 
 export interface SectionImage {
@@ -55,8 +59,12 @@ export interface Section {
     name: string;
     role: string;
     order: number;
+    // Desktop image (existing)
     imageId?: number | null;
     image?: SectionImage | null;
+    // Mobile image (new)
+    mobileImageId?: number | null;
+    mobileImage?: SectionImage | null;
     config?: SectionProperties | null;
     properties?: SectionProperties;
 }
@@ -148,7 +156,11 @@ export type GenerationType =
     | 'image-to-prompt'
     | 'generate-nav'
     | 'chat-edit'
-    | 'lp-generate';
+    | 'lp-generate'
+    | 'import-arrange'
+    | 'design-analysis'
+    | 'boundary-connector'
+    | 'boundary-design';
 
 export interface GenerationRun {
     id: number;

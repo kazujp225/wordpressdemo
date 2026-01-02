@@ -19,7 +19,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             where: { id },
             include: {
                 sections: {
-                    include: { image: true },
+                    include: { image: true, mobileImage: true },
                     orderBy: { order: 'asc' },
                 },
             },

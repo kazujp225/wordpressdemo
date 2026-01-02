@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             where: { id },
             include: {
                 sections: {
-                    include: { image: true },
+                    include: { image: true, mobileImage: true },
                     orderBy: { order: 'asc' },
                 },
             },

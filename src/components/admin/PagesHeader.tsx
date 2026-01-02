@@ -44,7 +44,7 @@ export function PagesHeader() {
     const [importUrl, setImportUrl] = useState('');
     const [showSelection, setShowSelection] = useState(false);
     const [mode, setMode] = useState<'select' | 'import'>('select');
-    const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
+    const [device, setDevice] = useState<'desktop' | 'mobile' | 'dual'>('desktop');
     const [importMode, setImportMode] = useState<'faithful' | 'light' | 'heavy'>('faithful');
     const [style, setStyle] = useState('sampling');
     const [colorScheme, setColorScheme] = useState('original');
@@ -58,7 +58,13 @@ export function PagesHeader() {
         setProgress({ message: 'インポートを開始しています...' });
 
         try {
-            console.log('[Import] Starting import for URL:', importUrl, 'Mode:', importMode);
+            console.log('[Import] Starting import for URL:', importUrl, 'Mode:', importMode, 'Device:', device);
+
+            // デュアルモードの場合は別のAPIを使用
+            if (device === 'dual') {
+                await handleDualImport();
+                return;
+            }
 
             const res = await fetch('/api/import-url', {
                 method: 'POST',
@@ -155,6 +161,102 @@ export function PagesHeader() {
         }
     };
 
+    // デュアルインポート処理（デスクトップ＋モバイル同時取り込み）
+    const handleDualImport = async () => {
+        try {
+            setProgress({ message: 'デュアルスクリーンショットを開始...' });
+
+            const res = await fetch('/api/screenshot/dual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: importUrl })
+            });
+
+            if (!res.ok) {
+                throw new Error('デュアルスクリーンショットに失敗しました');
+            }
+
+            const reader = res.body?.getReader();
+            if (!reader) throw new Error('ストリームの読み取りに失敗しました。');
+
+            const decoder = new TextDecoder();
+            let dualResult: { desktop: any[]; mobile: any[] } | null = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const text = decoder.decode(value, { stream: true });
+                const lines = text.split('\n').filter(line => line.startsWith('data: '));
+
+                for (const line of lines) {
+                    try {
+                        const data = JSON.parse(line.replace('data: ', ''));
+                        console.log('[DualImport] Stream event:', data);
+
+                        if (data.type === 'progress') {
+                            setProgress({ message: data.message });
+                        } else if (data.type === 'complete' && data.success) {
+                            dualResult = {
+                                desktop: data.desktop,
+                                mobile: data.mobile,
+                            };
+                        } else if (data.type === 'error') {
+                            throw new Error(data.error);
+                        }
+                    } catch (parseError) {
+                        // Skip invalid JSON
+                    }
+                }
+            }
+
+            if (!dualResult) {
+                throw new Error('デュアルスクリーンショット結果を取得できませんでした。');
+            }
+
+            console.log('[DualImport] Result:', dualResult);
+
+            // ページ作成（デスクトップとモバイルをペアで保存）
+            setProgress({ message: 'ページを作成中...' });
+
+            const maxLength = Math.max(dualResult.desktop.length, dualResult.mobile.length);
+            const sectionsPayload = [];
+
+            for (let i = 0; i < maxLength; i++) {
+                const desktopImg = dualResult.desktop[i];
+                const mobileImg = dualResult.mobile[i];
+
+                sectionsPayload.push({
+                    role: i === 0 ? 'hero' : 'other',
+                    imageId: desktopImg?.id || null,
+                    mobileImageId: mobileImg?.id || null,
+                    config: { layout: 'dual' }
+                });
+            }
+
+            console.log('[DualImport] Creating page with sections:', sectionsPayload);
+
+            const pageRes = await fetch('/api/pages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: `Dual Import: ${importUrl}`,
+                    sections: sectionsPayload
+                })
+            });
+            const pageData = await pageRes.json();
+
+            console.log('[DualImport] Page created:', pageData);
+
+            toast.success(`デスクトップ ${dualResult.desktop.length}セグメント + モバイル ${dualResult.mobile.length}セグメント を取り込みました`);
+            router.push(`/admin/pages/${pageData.id}`);
+        } catch (error: any) {
+            console.error('[DualImport] Error:', error);
+            toast.error(error.message || 'デュアルインポートに失敗しました');
+            throw error;
+        }
+    };
+
     return (
         <>
             {/* Modal */}
@@ -241,62 +343,95 @@ export function PagesHeader() {
                                                 <Smartphone className="h-4 w-4" />
                                                 <span>Mobile</span>
                                             </button>
-                                        </div>
-                                        <p className="mt-2 text-[10px] text-muted-foreground">
-                                            {device === 'desktop' ? '1280×800px viewport' : '375×812px (iPhone) viewport'}
-                                        </p>
-                                    </div>
-
-                                    {/* 変換モード */}
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2"><span>変換モード</span></label>
-                                        <div className="flex gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() => setImportMode('faithful')}
+                                                onClick={() => setDevice('dual')}
                                                 disabled={isImporting}
-                                                className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 ${importMode === 'faithful'
-                                                    ? 'bg-primary text-primary-foreground'
+                                                className={`flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-sm font-bold transition-all disabled:opacity-50 ${device === 'dual'
+                                                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
                                                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                                                     }`}
                                             >
-                                                <Copy className="h-4 w-4" />
-                                                <span>そのまま</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setImportMode('light')}
-                                                disabled={isImporting}
-                                                className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 ${importMode === 'light'
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                                                    }`}
-                                            >
-                                                <Palette className="h-4 w-4" />
-                                                <span>色だけ変更</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setImportMode('heavy')}
-                                                disabled={isImporting}
-                                                className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 ${importMode === 'heavy'
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                                                    }`}
-                                            >
-                                                <Wand2 className="h-4 w-4" />
-                                                <span>全体を再構成</span>
+                                                <Monitor className="h-3 w-3" />
+                                                <span className="text-xs">+</span>
+                                                <Smartphone className="h-3 w-3" />
+                                                <span>両方</span>
                                             </button>
                                         </div>
                                         <p className="mt-2 text-[10px] text-muted-foreground">
-                                            {importMode === 'faithful' && '変更なし。元のデザインをそのまま取り込みます。'}
-                                            {importMode === 'light' && '配置は維持して、色・フォント・装飾のみ変更します。'}
-                                            {importMode === 'heavy' && 'レイアウトも含めて新しいデザインに作り変えます。'}
+                                            {device === 'desktop' && '1280×800px viewport'}
+                                            {device === 'mobile' && '375×812px (iPhone) viewport'}
+                                            {device === 'dual' && 'デスクトップとモバイル両方を同時取得（1280px + 375px）'}
                                         </p>
                                     </div>
 
-                                    {/* Design Customization Options */}
-                                    {importMode !== 'faithful' && (
+                                    {/* デュアルモードの場合は変換モードをスキップ */}
+                                    {device === 'dual' ? (
+                                        <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+                                            <div className="flex items-center gap-3 text-sm text-gray-700">
+                                                <div className="flex items-center gap-1">
+                                                    <Monitor className="w-5 h-5 text-blue-600" />
+                                                    <span className="text-gray-400">+</span>
+                                                    <Smartphone className="w-4 h-4 text-purple-600" />
+                                                </div>
+                                                <span>デスクトップとモバイル両方のスクリーンショットを同時に取得します</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-2 ml-8">
+                                                取り込み後、エディタで両方のビューポートを並べて編集できます
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* 変換モード */}
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2"><span>変換モード</span></label>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setImportMode('faithful')}
+                                                        disabled={isImporting}
+                                                        className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 ${importMode === 'faithful'
+                                                            ? 'bg-primary text-primary-foreground'
+                                                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                                            }`}
+                                                    >
+                                                        <Copy className="h-4 w-4" />
+                                                        <span>そのまま</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setImportMode('light')}
+                                                        disabled={isImporting}
+                                                        className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 ${importMode === 'light'
+                                                            ? 'bg-primary text-primary-foreground'
+                                                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                                            }`}
+                                                    >
+                                                        <Palette className="h-4 w-4" />
+                                                        <span>色だけ変更</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setImportMode('heavy')}
+                                                        disabled={isImporting}
+                                                        className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 ${importMode === 'heavy'
+                                                            ? 'bg-primary text-primary-foreground'
+                                                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                                            }`}
+                                                    >
+                                                        <Wand2 className="h-4 w-4" />
+                                                        <span>全体を再構成</span>
+                                                    </button>
+                                                </div>
+                                                <p className="mt-2 text-[10px] text-muted-foreground">
+                                                    {importMode === 'faithful' && '変更なし。元のデザインをそのまま取り込みます。'}
+                                                    {importMode === 'light' && '配置は維持して、色・フォント・装飾のみ変更します。'}
+                                                    {importMode === 'heavy' && 'レイアウトも含めて新しいデザインに作り変えます。'}
+                                                </p>
+                                            </div>
+
+                                            {/* Design Customization Options */}
+                                            {importMode !== 'faithful' && (
                                         <div className="space-y-4 animate-in slide-in-from-top-2 duration-200 border-t border-border pt-4">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <Wand2 className="h-4 w-4 text-primary" />
@@ -401,6 +536,8 @@ export function PagesHeader() {
                                                 </p>
                                             </div>
                                         </div>
+                                    )}
+                                        </>
                                     )}
 
                                     {/* Progress */}

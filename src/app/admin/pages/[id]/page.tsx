@@ -16,7 +16,7 @@ export default async function PageEditor({ params }: { params: { id: string } })
             where: { id: pageId },
             include: {
                 sections: {
-                    include: { image: true },
+                    include: { image: true, mobileImage: true },
                     orderBy: { order: 'asc' },
                 },
             },
@@ -33,6 +33,8 @@ export default async function PageEditor({ params }: { params: { id: string } })
                 order: sec.order,
                 imageId: sec.imageId,
                 image: sec.image,
+                mobileImageId: sec.mobileImageId,
+                mobileImage: sec.mobileImage,
                 config: config,
             };
         });
