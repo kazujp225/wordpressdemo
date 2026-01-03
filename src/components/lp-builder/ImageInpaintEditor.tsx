@@ -80,6 +80,23 @@ export function ImageInpaintEditor({
     const [selections, setSelections] = useState<SelectionRect[]>([]);
     const [currentSelection, setCurrentSelection] = useState<SelectionRect | null>(null);
     const [isSelecting, setIsSelecting] = useState(false);
+
+    // currentSelectionの最新値を保持するref（デスクトップ用）
+    const currentSelectionRef = useRef<SelectionRect | null>(null);
+    useEffect(() => {
+        currentSelectionRef.current = currentSelection;
+    }, [currentSelection]);
+
+    // isSelectingの最新値を保持するref（デスクトップ用）
+    const isSelectingRef = useRef(false);
+    useEffect(() => {
+        isSelectingRef.current = isSelecting;
+    }, [isSelecting]);
+
+    // モバイル用のref（useEffectはstate定義後に移動）
+    const mobileCurrentSelectionRef = useRef<SelectionRect | null>(null);
+    const isMobileSelectingRef = useRef(false);
+
     const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -172,6 +189,14 @@ export function ImageInpaintEditor({
     const [mobileCurrentSelection, setMobileCurrentSelection] = useState<SelectionRect | null>(null);
     const [isMobileSelecting, setIsMobileSelecting] = useState(false);
     const [mobileStartPoint, setMobileStartPoint] = useState({ x: 0, y: 0 });
+
+    // モバイル選択stateの変更をrefに同期
+    useEffect(() => {
+        mobileCurrentSelectionRef.current = mobileCurrentSelection;
+    }, [mobileCurrentSelection]);
+    useEffect(() => {
+        isMobileSelectingRef.current = isMobileSelecting;
+    }, [isMobileSelecting]);
 
     // 参考デザイン画像機能
     const [referenceImage, setReferenceImage] = useState<string | null>(null);
@@ -603,6 +628,9 @@ export function ImageInpaintEditor({
             setSelectedButtonId(null);
         }
 
+        // refも同時に更新
+        isSelectingRef.current = true;
+        currentSelectionRef.current = null;
         setIsSelecting(true);
         setStartPoint(coords);
         setCurrentSelection(null);
@@ -669,7 +697,10 @@ export function ImageInpaintEditor({
             return;
         }
 
-        if (!isSelecting || !image) return;
+        if (!isSelecting || !image) {
+            // console.log('[Selection] handleMouseMove skipped', { isSelecting, image: !!image });
+            return;
+        }
 
         const newSelection: SelectionRect = {
             id: 'temp',
@@ -678,6 +709,8 @@ export function ImageInpaintEditor({
             width: Math.min(Math.abs(coords.x - startPoint.x), image.width - Math.min(startPoint.x, coords.x)),
             height: Math.min(Math.abs(coords.y - startPoint.y), image.height - Math.min(startPoint.y, coords.y))
         };
+        // refも同時に更新
+        currentSelectionRef.current = newSelection;
         setCurrentSelection(newSelection);
     };
 
@@ -692,14 +725,9 @@ export function ImageInpaintEditor({
         if (isCutting && cutStartY !== null && cutEndY !== null) {
             const minY = Math.min(cutStartY, cutEndY);
             const maxY = Math.max(cutStartY, cutEndY);
-            console.log('[Cut] End - Range:', minY, 'to', maxY, '=', maxY - minY, 'px');
-            // 最低10px以上の範囲が選択されていればカット確認を表示
             if (maxY - minY > 10) {
-                console.log('[Cut] Showing confirm dialog');
                 setShowCutConfirm(true);
             } else {
-                console.log('[Cut] Range too small, resetting');
-                // 範囲が小さすぎる場合はリセット
                 setCutStartY(null);
                 setCutEndY(null);
             }
@@ -716,24 +744,27 @@ export function ImageInpaintEditor({
             return;
         }
 
-        if (currentSelection && currentSelection.width > 10 && currentSelection.height > 10) {
+        // refまたはstateから選択を取得
+        const sel = currentSelectionRef.current || currentSelection;
+
+        if (sel && sel.width > 10 && sel.height > 10 && editorMode === 'inpaint') {
             const newId = Date.now().toString();
-            if (editorMode === 'inpaint') {
-                // 選択範囲を確定して追加
-                setSelections(prev => [...prev, { ...currentSelection, id: newId }]);
-            } else {
-                // ボタンモード: ボタンエリアを追加
-                const newButtonArea: ClickableAreaDraft = {
-                    ...currentSelection,
-                    id: newId,
-                    actionType: 'url',
-                    actionValue: '',
-                    label: '',
-                };
-                setButtonAreas(prev => [...prev, newButtonArea]);
-                setSelectedButtonId(newId);
-            }
+            setSelections(prev => [...prev, { ...sel, id: newId }]);
+        } else if (sel && sel.width > 10 && sel.height > 10 && editorMode === 'button') {
+            const newId = Date.now().toString();
+            const newButtonArea: ClickableAreaDraft = {
+                ...sel,
+                id: newId,
+                actionType: 'url',
+                actionValue: '',
+                label: '',
+            };
+            setButtonAreas(prev => [...prev, newButtonArea]);
+            setSelectedButtonId(newId);
         }
+
+        currentSelectionRef.current = null;
+        isSelectingRef.current = false;
         setCurrentSelection(null);
         setIsSelecting(false);
         setIsPanning(false);
@@ -856,6 +887,9 @@ export function ImageInpaintEditor({
 
         // インペイントモードのみ対応（ボタンモードはデスクトップで設定）
         if (editorMode === 'inpaint') {
+            // refも同時に更新
+            isMobileSelectingRef.current = true;
+            mobileCurrentSelectionRef.current = null;
             setIsMobileSelecting(true);
             setMobileStartPoint(coords);
             setMobileCurrentSelection(null);
@@ -883,14 +917,30 @@ export function ImageInpaintEditor({
             height: Math.min(Math.abs(coords.y - mobileStartPoint.y), mobileImage.height - Math.min(mobileStartPoint.y, coords.y))
         };
 
+        // refも同時に更新
+        mobileCurrentSelectionRef.current = newSelection;
         setMobileCurrentSelection(newSelection);
     };
 
     const handleMobileMouseUp = () => {
-        if (mobileCurrentSelection && mobileCurrentSelection.width > 10 && mobileCurrentSelection.height > 10) {
-            const newId = 'mobile-' + Date.now().toString();
-            setMobileSelections(prev => [...prev, { ...mobileCurrentSelection, id: newId }]);
+        if (isPanning) {
+            setIsPanning(false);
+            return;
         }
+
+        if (!isMobileSelecting) {
+            return;
+        }
+
+        // refから直接取得（stateより確実）
+        const sel = mobileCurrentSelectionRef.current;
+        if (sel && sel.width > 10 && sel.height > 10) {
+            const newId = 'mobile-' + Date.now().toString();
+            setMobileSelections(prev => [...prev, { ...sel, id: newId }]);
+        }
+
+        mobileCurrentSelectionRef.current = null;
+        isMobileSelectingRef.current = false;
         setMobileCurrentSelection(null);
         setIsMobileSelecting(false);
         setIsPanning(false);
@@ -1443,10 +1493,15 @@ export function ImageInpaintEditor({
                             } ${
                                 isDualMode && activeViewport !== 'desktop' ? 'opacity-70' : ''
                             }`}
-                            onMouseDown={(e) => { if (!isDualMode || activeViewport === 'desktop') handleMouseDown(e); else setActiveViewport('desktop'); }}
-                            onMouseMove={(e) => { if (!isDualMode || activeViewport === 'desktop') handleMouseMove(e); }}
-                            onMouseUp={() => { if (!isDualMode || activeViewport === 'desktop') handleMouseUp(); }}
-                            onMouseLeave={() => { if (!isDualMode || activeViewport === 'desktop') handleMouseUp(); }}
+                            onMouseDown={(e) => {
+                                if (isDualMode && activeViewport !== 'desktop') {
+                                    setActiveViewport('desktop');
+                                }
+                                handleMouseDown(e);
+                            }}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
                         />
 
                         {/* Toolbar - 下部中央に水平配置して画像を邪魔しないように */}
@@ -1581,8 +1636,8 @@ export function ImageInpaintEditor({
                                 </div>
 
                                 {/* Selections List */}
-                                {selections.length > 0 ? (
-                                    <div className="mb-6 flex-1 overflow-hidden flex flex-col">
+                                {selections.length > 0 && (
+                                    <div className="mb-6">
                                         <div className="flex items-center justify-between mb-2">
                                             <p className="text-xs font-bold text-foreground">{selections.length} 箇所の選択範囲</p>
                                             <button
@@ -1616,7 +1671,9 @@ export function ImageInpaintEditor({
                                             })}
                                         </div>
                                     </div>
-                                ) : (
+                                )}
+
+                                {selections.length === 0 && (
                                     <div className="mb-6 p-6 bg-surface-50 border border-dashed border-border rounded-lg flex flex-col items-center justify-center text-center">
                                         <div className="w-10 h-10 bg-surface-100 rounded-full flex items-center justify-center mb-3">
                                             <Plus className="w-5 h-5 text-muted-foreground" />
@@ -1628,7 +1685,7 @@ export function ImageInpaintEditor({
 
                                 {/* Mobile Selections List (Dual Mode) */}
                                 {isDualMode && mobileSelections.length > 0 && (
-                                    <div className="mb-6 flex-1 overflow-hidden flex flex-col">
+                                    <div className="mb-6">
                                         <div className="flex items-center justify-between mb-2">
                                             <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
                                                 <Smartphone className="w-3 h-3 text-purple-500" />
