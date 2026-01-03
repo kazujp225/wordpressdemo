@@ -45,7 +45,26 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
             })
         ]);
 
-        return NextResponse.json({ success: true });
+        // 新しいセクションIDを取得して返す
+        const updatedSections = await prisma.pageSection.findMany({
+            where: { pageId: id },
+            orderBy: { order: 'asc' },
+            include: { image: true, mobileImage: true }
+        });
+
+        return NextResponse.json({
+            success: true,
+            sections: updatedSections.map(s => ({
+                id: s.id,
+                order: s.order,
+                role: s.role,
+                imageId: s.imageId,
+                mobileImageId: s.mobileImageId,
+                image: s.image,
+                mobileImage: s.mobileImage,
+                config: s.config ? JSON.parse(s.config as string) : null
+            }))
+        });
     } catch (error) {
         console.error('Failed to update page sections:', error);
         return NextResponse.json({ error: 'Failed to update page sections' }, { status: 500 });

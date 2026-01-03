@@ -968,11 +968,44 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             const data = await res.json();
             if (pageId === 'new' && data.id) {
                 // リフレッシュ時のデータ紛失を防ぐため、新しく作成されたページIDにリダイレクト
+                toast.success('ページを作成しました');
                 router.push(`/admin/pages/${data.id}`);
             } else if (res.ok) {
-                router.refresh(); // Refresh server data
+                toast.success('保存しました');
+                // 保存後のセクションIDを反映（再生成時に正しいIDを使えるように）
+                if (data.sections && Array.isArray(data.sections)) {
+                    // 古いIDから新しいIDへのマッピングを作成（orderベース）
+                    const oldSections = sectionsToSave;
+                    const newSections = data.sections;
+                    const idMapping = new Map<string | number, number>();
+                    oldSections.forEach((oldSec, idx) => {
+                        if (newSections[idx]) {
+                            idMapping.set(oldSec.id, newSections[idx].id);
+                        }
+                    });
+
+                    // 選択状態のセクションIDを更新
+                    if (selectedSectionsForRegenerate.size > 0) {
+                        const newSelectedIds = new Set<string | number>();
+                        selectedSectionsForRegenerate.forEach(oldId => {
+                            const newId = idMapping.get(oldId);
+                            if (newId) newSelectedIds.add(newId);
+                        });
+                        setSelectedSectionsForRegenerate(newSelectedIds);
+                    }
+
+                    // 参照セクションIDも更新
+                    if (batchReferenceSection) {
+                        const newRefId = idMapping.get(batchReferenceSection);
+                        if (newRefId) setBatchReferenceSection(newRefId);
+                    }
+
+                    setSections(newSections);
+                } else {
+                    router.refresh(); // fallback
+                }
             } else {
-                toast.error('保存中にエラーが発生しました。');
+                toast.error('保存に失敗しました');
             }
 
         } catch (e) {
@@ -1151,17 +1184,18 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             setBatchRegenerateProgress({ current: i + 1, total: sectionIds.length });
 
             try {
-                // 参照セクションの画像URLを取得
+                // 参照セクションの画像URLを取得（空文字列やnullの場合はundefined）
                 const referenceSection = batchReferenceSection
                     ? sections.find(s => s.id === batchReferenceSection)
                     : null;
-                const styleReferenceUrl = referenceSection?.image?.filePath || undefined;
+                const refFilePath = referenceSection?.image?.filePath;
+                const styleReferenceUrl = refFilePath && refFilePath.startsWith('http') ? refFilePath : undefined;
 
                 console.log(`Calling API: /api/sections/${dbSectionId}/regenerate`);
                 console.log(`Style reference URL: ${styleReferenceUrl}`);
                 console.log(`Extracted colors for consistency:`, extractedColors);
 
-                const response = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
+                const response: Response = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1170,8 +1204,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         customPrompt: batchRegeneratePrompt || undefined,
                         mode: batchRegenerateGenerationMode,
                         designDefinition: !batchReferenceSection && batchRegenerateStyle === 'design-definition' ? designDefinition : undefined,
-                        styleReferenceUrl: styleReferenceUrl, // 参照セクションの画像URL
-                        extractedColors: extractedColors, // 最初のセクションから抽出したカラー（一貫性担保用）
+                        styleReferenceUrl: styleReferenceUrl || undefined,
+                        extractedColors: extractedColors || undefined,
+                        unifyDesign: !!batchReferenceSection, // デザイン統一モード
                     })
                 });
 
@@ -1230,9 +1265,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     customPrompt: batchRegeneratePrompt || undefined,
                                     mode: batchRegenerateGenerationMode,
                                     designDefinition: !batchReferenceSection && batchRegenerateStyle === 'design-definition' ? designDefinition : undefined,
-                                    styleReferenceUrl: styleReferenceUrl,
-                                    extractedColors: extractedColors,
-                                    targetImage: 'mobile', // モバイル画像を対象に
+                                    styleReferenceUrl: styleReferenceUrl || undefined,
+                                    extractedColors: extractedColors || undefined,
+                                    targetImage: 'mobile',
+                                    unifyDesign: !!batchReferenceSection,
                                 })
                             });
                             const mobileData = await mobileResponse.json();
@@ -1252,6 +1288,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     }
                 } else {
                     console.error(`Section ${sectionId} API error:`, data.error || 'Unknown error');
+                    console.error(`Section ${sectionId} API error details:`, data.details);
                     toast.error(`セクション ${i + 1}: ${data.error || '再生成失敗'}`);
                 }
             } catch (error: any) {
@@ -2162,13 +2199,17 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             キャンセル
                         </button>
                         <button
-                            onClick={() => {
+                            onClick={async () => {
                                 if (selectedSectionsForRegenerate.size > 0) {
+                                    // 一括再生成前に自動保存（セクションIDを同期するため）
+                                    toast.loading('保存中...', { id: 'batch-save' });
+                                    await handleSave();
+                                    toast.dismiss('batch-save');
                                     console.log('Opening modal with reference section:', batchReferenceSection);
                                     setShowBatchRegenerateModal(true);
                                 }
                             }}
-                            disabled={selectedSectionsForRegenerate.size === 0}
+                            disabled={selectedSectionsForRegenerate.size === 0 || isSaving}
                             className="px-4 py-1.5 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold rounded-lg hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                         >
                             <RefreshCw className="h-3.5 w-3.5" />
@@ -2943,15 +2984,18 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         setShowRestoreModal(false);
                         setRestoreSectionId(null);
                     }}
-                    onSuccess={(newImageUrl) => {
-                        // セクションの画像を更新
-                        setSections(prev => prev.map(s =>
+                    onSuccess={(newImageUrl, newImageId) => {
+                        // セクションの画像を更新（imageIdも更新して保存時に正しく反映されるようにする）
+                        const updatedSections = sections.map(s =>
                             s.id === restoreSectionId
-                                ? { ...s, image: { ...s.image, filePath: newImageUrl } }
+                                ? { ...s, imageId: newImageId, image: { ...s.image, id: newImageId, filePath: newImageUrl } }
                                 : s
-                        ));
+                        );
+                        setSections(updatedSections);
                         setShowRestoreModal(false);
                         setRestoreSectionId(null);
+                        // 自動保存
+                        handleSave(updatedSections);
                     }}
                 />
             )}
@@ -3317,22 +3361,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             {/* 一括再生成モーダル */}
             {showBatchRegenerateModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
                         {/* ヘッダー */}
-                        <div className="flex items-center justify-between px-5 py-4 border-b bg-gradient-to-r from-orange-50 to-red-50">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                                    <RefreshCw className="h-5 w-5 text-orange-600" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-900">一括再生成</h2>
-                                    <p className="text-xs text-gray-500">
-                                        {selectedSectionsForRegenerate.size}件選択中
-                                        {batchReferenceSection && selectedSectionsForRegenerate.has(batchReferenceSection) &&
-                                            `（参照1件 + 対象${selectedSectionsForRegenerate.size - 1}件）`
-                                        }
-                                    </p>
-                                </div>
+                        <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">一括再生成</h2>
+                                <p className="text-xs text-gray-500">{selectedSectionsForRegenerate.size}件のセクションを選択中</p>
                             </div>
                             <button
                                 onClick={() => setShowBatchRegenerateModal(false)}
@@ -3344,13 +3378,13 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                         {isBatchRegenerating ? (
                             <div className="p-8 flex flex-col items-center justify-center">
-                                <RefreshCw className="h-10 w-10 text-orange-600 animate-spin mb-4" />
+                                <RefreshCw className="h-10 w-10 text-blue-600 animate-spin mb-4" />
                                 <p className="text-sm font-medium text-gray-700">再生成中...</p>
                                 {batchRegenerateProgress && (
                                     <div className="w-full max-w-xs mt-4">
                                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-orange-500 transition-all duration-300"
+                                                className="h-full bg-blue-500 transition-all duration-300"
                                                 style={{ width: `${(batchRegenerateProgress.current / batchRegenerateProgress.total) * 100}%` }}
                                             />
                                         </div>
@@ -3361,277 +3395,237 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 )}
                             </div>
                         ) : (
-                            <div className="p-5 space-y-4">
-                                {/* 参照セクション選択（全セクションから選ぶ） */}
-                                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Palette className="h-4 w-4 text-blue-600" />
-                                        <span className="font-bold text-blue-800 text-sm">参照スタイルを選択（任意）</span>
-                                    </div>
-                                    <p className="text-xs text-blue-600 mb-3">
-                                        「お手本」にしたいセクションを選択。選択した{selectedSectionsForRegenerate.size}件がこのスタイルに合わせて再生成されます。
-                                    </p>
-                                    <div className="flex gap-2 flex-wrap max-h-32 overflow-y-auto">
-                                        {/* 選択なしオプション */}
-                                        <button
-                                            onClick={() => setBatchReferenceSection(null)}
-                                            className={clsx(
-                                                "px-3 py-2 rounded-lg text-xs font-medium transition-all border-2 h-16 flex items-center",
-                                                !batchReferenceSection
-                                                    ? "border-blue-500 bg-blue-100 text-blue-700"
-                                                    : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
-                                            )}
-                                        >
-                                            なし
-                                        </button>
-                                        {/* 全セクションを参照候補として表示（画像があるもののみ） */}
-                                        {sections.filter(s => s.image?.filePath).map((sec, idx) => {
-                                            const isTarget = selectedSectionsForRegenerate.has(sec.id);
-                                            return (
-                                                <button
-                                                    key={sec.id}
-                                                    onClick={() => setBatchReferenceSection(sec.id)}
-                                                    className={clsx(
-                                                        "relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0",
-                                                        batchReferenceSection === sec.id
-                                                            ? "border-blue-500 ring-2 ring-blue-300"
-                                                            : isTarget
-                                                                ? "border-orange-300 hover:border-blue-300"
-                                                                : "border-gray-200 hover:border-blue-300"
-                                                    )}
-                                                    title={`セクション ${idx + 1} を参照に設定`}
-                                                >
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img
-                                                        src={sec.image?.filePath}
-                                                        alt={`セクション ${idx + 1}`}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                    {batchReferenceSection === sec.id && (
-                                                        <div className="absolute inset-0 bg-blue-500/40 flex items-center justify-center">
-                                                            <Check className="h-6 w-6 text-white drop-shadow-lg" />
-                                                        </div>
-                                                    )}
-                                                    {isTarget && batchReferenceSection !== sec.id && (
-                                                        <div className="absolute bottom-0 left-0 right-0 bg-orange-500 text-white text-[8px] text-center py-0.5">
-                                                            対象
-                                                        </div>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    {batchReferenceSection && (
+                            <div className="flex-1 overflow-y-auto">
+                                {/* モード選択タブ */}
+                                <div className="grid grid-cols-2 gap-0 border-b">
+                                    <button
+                                        onClick={() => {
+                                            setBatchReferenceSection(null);
+                                            setBatchRegenerateStyle('sampling');
+                                        }}
+                                        className={clsx(
+                                            "py-3 text-sm font-bold transition-all border-b-2",
+                                            !batchReferenceSection
+                                                ? "text-blue-600 border-blue-600 bg-blue-50/50"
+                                                : "text-gray-400 border-transparent hover:text-gray-600"
+                                        )}
+                                    >
+                                        カスタム再生成
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            // 最初のセクションを参照として設定
+                                            const firstWithImage = sections.find(s => s.image?.filePath);
+                                            if (firstWithImage) setBatchReferenceSection(firstWithImage.id);
+                                        }}
+                                        className={clsx(
+                                            "py-3 text-sm font-bold transition-all border-b-2",
+                                            batchReferenceSection
+                                                ? "text-blue-600 border-blue-600 bg-blue-50/50"
+                                                : "text-gray-400 border-transparent hover:text-gray-600"
+                                        )}
+                                    >
+                                        🎨 デザイン統一
+                                    </button>
+                                </div>
+
+                                <div className="p-5 space-y-4">
+                                    {/* デザイン統一モード */}
+                                    {batchReferenceSection ? (
                                         <>
-                                            <p className="text-xs text-blue-700 mt-2 font-medium">
-                                                ✓ 参照セクションのスタイルを{regenerateReferenceAlso ? selectedSectionsForRegenerate.size : selectedSectionsForRegenerate.size - (selectedSectionsForRegenerate.has(batchReferenceSection) ? 1 : 0)}件に適用します
-                                            </p>
-                                            {/* 参照セクションも再生成するオプション */}
-                                            <label className="flex items-center gap-2 mt-3 pt-3 border-t border-blue-200 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={regenerateReferenceAlso}
-                                                    onChange={(e) => setRegenerateReferenceAlso(e.target.checked)}
-                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                <span className="text-xs text-blue-800">
-                                                    参照セクションも一緒に再生成する
-                                                    <span className="text-blue-600 ml-1">（一貫性を高めるため）</span>
-                                                </span>
-                                            </label>
-                                        </>
-                                    )}
-                                </div>
-
-                                {/* モバイル画像も同時に再生成するオプション */}
-                                <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
-                                    <label className="flex items-start gap-3 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={includeMobileInBatch}
-                                            onChange={(e) => setIncludeMobileInBatch(e.target.checked)}
-                                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                        />
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <Monitor className="h-4 w-4 text-purple-600" />
-                                                <span className="text-purple-600">+</span>
-                                                <Smartphone className="h-4 w-4 text-purple-600" />
-                                                <span className="font-bold text-purple-800 text-sm">モバイル画像も同時に再生成</span>
-                                            </div>
-                                            <p className="text-xs text-purple-600 mt-1">
-                                                デスクトップとモバイル両方を同じスタイルで一括再生成します
-                                            </p>
-                                            {includeMobileInBatch && (
-                                                <p className="text-xs text-purple-500 mt-1">
-                                                    ※ モバイル画像がないセクションはデスクトップのみ再生成されます
+                                            {/* 参照セクション選択 */}
+                                            <div>
+                                                <label className="mb-2 block text-xs font-bold text-gray-700">
+                                                    お手本セクションを選択
+                                                </label>
+                                                <p className="text-xs text-gray-500 mb-3">
+                                                    選択したセクションのデザインを他のセクションに適用します
                                                 </p>
-                                            )}
-                                        </div>
-                                    </label>
-                                </div>
-
-                                {/* デザイン定義を使用（参照セクションがない場合のみ表示） */}
-                                {!batchReferenceSection && designDefinition && (
-                                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
-                                        <label className="flex items-start gap-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={batchRegenerateStyle === 'design-definition'}
-                                                onChange={(e) => setBatchRegenerateStyle(e.target.checked ? 'design-definition' : 'sampling')}
-                                                className="mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                                            />
-                                            <div className="flex-1">
-                                                <span className="font-bold text-green-800 text-sm">デザイン定義に合わせる（推奨）</span>
-                                                <p className="text-xs text-green-600 mt-1">
-                                                    ページ全体のデザイン定義を使用して、統一感のあるスタイルに再生成します
-                                                </p>
-                                                <div className="flex items-center gap-2 mt-2">
-                                                    {designDefinition.colorPalette?.primary && (
-                                                        <span className="inline-block w-4 h-4 rounded-full border border-white shadow" style={{ backgroundColor: designDefinition.colorPalette.primary }} />
-                                                    )}
-                                                    {designDefinition.colorPalette?.secondary && (
-                                                        <span className="inline-block w-4 h-4 rounded-full border border-white shadow" style={{ backgroundColor: designDefinition.colorPalette.secondary }} />
-                                                    )}
-                                                    {designDefinition.colorPalette?.accent && (
-                                                        <span className="inline-block w-4 h-4 rounded-full border border-white shadow" style={{ backgroundColor: designDefinition.colorPalette.accent }} />
-                                                    )}
-                                                    {designDefinition.vibe && (
-                                                        <span className="text-xs text-green-700 ml-1">{designDefinition.vibe}</span>
-                                                    )}
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {sections.filter(s => s.image?.filePath).map((sec, idx) => (
+                                                        <button
+                                                            key={sec.id}
+                                                            onClick={() => setBatchReferenceSection(sec.id)}
+                                                            className={clsx(
+                                                                "relative w-14 h-14 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0",
+                                                                batchReferenceSection === sec.id
+                                                                    ? "border-blue-500 ring-2 ring-blue-200"
+                                                                    : selectedSectionsForRegenerate.has(sec.id)
+                                                                        ? "border-orange-300 hover:border-blue-400"
+                                                                        : "border-gray-200 hover:border-blue-400"
+                                                            )}
+                                                        >
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img src={sec.image?.filePath} alt="" className="w-full h-full object-cover" />
+                                                            {batchReferenceSection === sec.id && (
+                                                                <div className="absolute inset-0 bg-blue-500/50 flex items-center justify-center">
+                                                                    <Check className="h-5 w-5 text-white" />
+                                                                </div>
+                                                            )}
+                                                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5">
+                                                                {idx + 1}
+                                                            </div>
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
-                                        </label>
-                                    </div>
-                                )}
 
-                                {/* スタイル */}
-                                {batchRegenerateStyle !== 'design-definition' && (
-                                    <div>
-                                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                            スタイル
-                                        </label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[
-                                                { id: 'sampling', label: '元のまま' },
-                                                { id: 'professional', label: 'ビジネス' },
-                                                { id: 'pops', label: 'ポップ' },
-                                                { id: 'luxury', label: '高級' },
-                                                { id: 'minimal', label: 'シンプル' },
-                                                { id: 'emotional', label: '情熱' },
-                                            ].map((s) => (
+                                            {/* 統一オプション */}
+                                            <div className="bg-blue-50 rounded-xl p-3 space-y-2">
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={regenerateReferenceAlso}
+                                                        onChange={(e) => setRegenerateReferenceAlso(e.target.checked)}
+                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                                                    />
+                                                    <span className="text-xs text-gray-700">お手本も一緒に再生成</span>
+                                                </label>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {/* カスタムモード：スタイル選択 */}
+                                            <div>
+                                                <label className="mb-2 block text-xs font-bold text-gray-700">スタイル</label>
+                                                <div className="grid grid-cols-3 gap-1.5">
+                                                    {[
+                                                        { id: 'sampling', label: '元のまま', icon: '📋' },
+                                                        { id: 'professional', label: 'ビジネス', icon: '💼' },
+                                                        { id: 'pops', label: 'ポップ', icon: '🎉' },
+                                                        { id: 'luxury', label: '高級', icon: '✨' },
+                                                        { id: 'minimal', label: 'シンプル', icon: '◻️' },
+                                                        { id: 'emotional', label: '情熱', icon: '🔥' },
+                                                    ].map((s) => (
+                                                        <button
+                                                            key={s.id}
+                                                            onClick={() => setBatchRegenerateStyle(s.id)}
+                                                            className={clsx(
+                                                                "px-2 py-2 rounded-lg text-xs font-medium transition-all border",
+                                                                batchRegenerateStyle === s.id
+                                                                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                                                                    : "border-gray-200 hover:border-gray-300 text-gray-600"
+                                                            )}
+                                                        >
+                                                            <span className="mr-1">{s.icon}</span>{s.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* カラー選択 */}
+                                            <div>
+                                                <label className="mb-2 block text-xs font-bold text-gray-700">カラー</label>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {[
+                                                        { id: 'original', label: 'そのまま', color: '#9CA3AF' },
+                                                        { id: 'blue', label: 'ブルー', color: '#3B82F6' },
+                                                        { id: 'green', label: 'グリーン', color: '#22C55E' },
+                                                        { id: 'purple', label: 'パープル', color: '#A855F7' },
+                                                        { id: 'orange', label: 'オレンジ', color: '#F97316' },
+                                                        { id: 'monochrome', label: 'モノクロ', color: '#1F2937' },
+                                                    ].map((c) => (
+                                                        <button
+                                                            key={c.id}
+                                                            onClick={() => setBatchRegenerateColorScheme(c.id)}
+                                                            className={clsx(
+                                                                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full transition-all border",
+                                                                batchRegenerateColorScheme === c.id
+                                                                    ? "border-blue-500 bg-blue-50"
+                                                                    : "border-gray-200 hover:border-gray-300"
+                                                            )}
+                                                        >
+                                                            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: c.color }} />
+                                                            <span className="text-xs text-gray-700">{c.label}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* 共通オプション */}
+                                    <div className="pt-3 border-t space-y-3">
+                                        {/* モード */}
+                                        <div>
+                                            <label className="mb-2 block text-xs font-bold text-gray-700">変更の度合い</label>
+                                            <div className="grid grid-cols-2 gap-2">
                                                 <button
-                                                    key={s.id}
-                                                    onClick={() => setBatchRegenerateStyle(s.id)}
+                                                    onClick={() => setBatchRegenerateGenerationMode('light')}
                                                     className={clsx(
-                                                        "px-3 py-2 rounded-lg text-sm font-medium transition-all border-2",
-                                                        batchRegenerateStyle === s.id
-                                                            ? "border-orange-500 bg-orange-50 text-orange-700"
-                                                            : "border-gray-100 hover:border-gray-200 text-gray-600"
+                                                        "px-3 py-2 rounded-lg text-xs font-medium transition-all border",
+                                                        batchRegenerateGenerationMode === 'light'
+                                                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                                                            : "border-gray-200 hover:border-gray-300 text-gray-600"
                                                     )}
                                                 >
-                                                    {s.label}
+                                                    🎨 色・スタイルのみ
                                                 </button>
-                                            ))}
+                                                <button
+                                                    onClick={() => setBatchRegenerateGenerationMode('heavy')}
+                                                    className={clsx(
+                                                        "px-3 py-2 rounded-lg text-xs font-medium transition-all border",
+                                                        batchRegenerateGenerationMode === 'heavy'
+                                                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                                                            : "border-gray-200 hover:border-gray-300 text-gray-600"
+                                                    )}
+                                                >
+                                                    🔄 レイアウトも変更
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* モバイル同時再生成 */}
+                                        <label className="flex items-center gap-2 cursor-pointer bg-gray-50 rounded-lg p-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={includeMobileInBatch}
+                                                onChange={(e) => setIncludeMobileInBatch(e.target.checked)}
+                                                className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                                            />
+                                            <div className="flex items-center gap-1.5">
+                                                <Monitor className="h-3.5 w-3.5 text-gray-500" />
+                                                <span className="text-gray-400">+</span>
+                                                <Smartphone className="h-3.5 w-3.5 text-gray-500" />
+                                                <span className="text-xs text-gray-700">モバイル画像も同時に再生成</span>
+                                            </div>
+                                        </label>
+
+                                        {/* 追加指示 */}
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-bold text-gray-700">追加指示（任意）</label>
+                                            <textarea
+                                                value={batchRegeneratePrompt}
+                                                onChange={(e) => setBatchRegeneratePrompt(e.target.value)}
+                                                placeholder="例: 背景を明るく、ボタンを大きく"
+                                                className="w-full h-16 rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            />
                                         </div>
                                     </div>
-                                )}
-
-                                {/* カラー */}
-                                <div>
-                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                        カラー
-                                    </label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {[
-                                            { id: 'original', label: 'そのまま', color: 'bg-gray-400' },
-                                            { id: 'blue', label: 'ブルー', color: 'bg-blue-500' },
-                                            { id: 'green', label: 'グリーン', color: 'bg-green-500' },
-                                            { id: 'purple', label: 'パープル', color: 'bg-purple-500' },
-                                            { id: 'orange', label: 'オレンジ', color: 'bg-orange-500' },
-                                            { id: 'monochrome', label: 'モノクロ', color: 'bg-gray-800' },
-                                        ].map((c) => (
-                                            <button
-                                                key={c.id}
-                                                onClick={() => setBatchRegenerateColorScheme(c.id)}
-                                                className={clsx(
-                                                    "flex items-center gap-2 px-3 py-2 rounded-lg transition-all border-2",
-                                                    batchRegenerateColorScheme === c.id
-                                                        ? "border-orange-500 bg-orange-50"
-                                                        : "border-gray-100 hover:border-gray-200"
-                                                )}
-                                            >
-                                                <span className={`h-3 w-3 rounded-full ${c.color}`} />
-                                                <span className="text-xs font-medium text-gray-700">{c.label}</span>
-                                            </button>
-                                        ))}
-                                    </div>
                                 </div>
+                            </div>
+                        )}
 
-                                {/* モード */}
-                                <div>
-                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                        モード
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button
-                                            onClick={() => setBatchRegenerateGenerationMode('light')}
-                                            className={clsx(
-                                                "px-3 py-2 rounded-lg text-sm font-medium transition-all border-2",
-                                                batchRegenerateGenerationMode === 'light'
-                                                    ? "border-orange-500 bg-orange-50 text-orange-700"
-                                                    : "border-gray-100 hover:border-gray-200 text-gray-600"
-                                            )}
-                                        >
-                                            色だけ変更
-                                        </button>
-                                        <button
-                                            onClick={() => setBatchRegenerateGenerationMode('heavy')}
-                                            className={clsx(
-                                                "px-3 py-2 rounded-lg text-sm font-medium transition-all border-2",
-                                                batchRegenerateGenerationMode === 'heavy'
-                                                    ? "border-orange-500 bg-orange-50 text-orange-700"
-                                                    : "border-gray-100 hover:border-gray-200 text-gray-600"
-                                            )}
-                                        >
-                                            全体を再構成
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* 追加指示 */}
-                                <div>
-                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                        追加指示（任意）
-                                    </label>
-                                    <textarea
-                                        value={batchRegeneratePrompt}
-                                        onChange={(e) => setBatchRegeneratePrompt(e.target.value)}
-                                        placeholder="例: 背景を明るく、ボタンを大きく"
-                                        className="w-full h-20 rounded-xl border border-gray-200 px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    />
-                                </div>
-
-                                {/* 実行ボタン */}
-                                <div className="pt-4 flex gap-3">
-                                    <button
-                                        onClick={() => setShowBatchRegenerateModal(false)}
-                                        className="flex-1 rounded-2xl py-3.5 text-sm font-bold text-gray-400 hover:bg-gray-50 transition-all"
-                                    >
-                                        キャンセル
-                                    </button>
-                                    <button
-                                        onClick={handleBatchRegenerate}
-                                        disabled={batchReferenceSection ? selectedSectionsForRegenerate.size <= 1 : selectedSectionsForRegenerate.size === 0}
-                                        className="flex-[2] flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 py-3.5 text-sm font-black text-white shadow-xl hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <RefreshCw className="h-4 w-4" />
-                                        {batchReferenceSection
-                                            ? `${selectedSectionsForRegenerate.size - (selectedSectionsForRegenerate.has(batchReferenceSection) ? 1 : 0)}件を再生成`
-                                            : `${selectedSectionsForRegenerate.size}件を再生成`
-                                        }
-                                    </button>
-                                </div>
+                        {/* 実行ボタン（フッター固定） */}
+                        {!isBatchRegenerating && (
+                            <div className="flex-shrink-0 px-5 py-4 border-t bg-gray-50 flex gap-3">
+                                <button
+                                    onClick={() => setShowBatchRegenerateModal(false)}
+                                    className="flex-1 rounded-xl py-3 text-sm font-medium text-gray-500 hover:bg-gray-100 transition-all"
+                                >
+                                    キャンセル
+                                </button>
+                                <button
+                                    onClick={handleBatchRegenerate}
+                                    disabled={batchReferenceSection ? selectedSectionsForRegenerate.size <= 1 : selectedSectionsForRegenerate.size === 0}
+                                    className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <RefreshCw className="h-4 w-4" />
+                                    {batchReferenceSection
+                                        ? `${selectedSectionsForRegenerate.size - (selectedSectionsForRegenerate.has(batchReferenceSection) && !regenerateReferenceAlso ? 1 : 0)}件を統一`
+                                        : `${selectedSectionsForRegenerate.size}件を再生成`
+                                    }
+                                </button>
                             </div>
                         )}
                     </div>

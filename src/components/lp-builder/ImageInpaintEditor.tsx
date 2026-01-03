@@ -83,6 +83,69 @@ export function ImageInpaintEditor({
     const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // スロット型プロンプト用state
+    type EditType = 'color' | 'text' | 'object' | 'background' | 'style' | 'custom';
+    const [editType, setEditType] = useState<EditType>('color');
+    const [slotBefore, setSlotBefore] = useState('');
+    const [slotAfter, setSlotAfter] = useState('');
+
+    // 編集タイプごとのプリセット
+    const editTypeConfig: Record<EditType, { label: string; icon: string; beforePlaceholder: string; afterPlaceholder: string; examples: string[] }> = {
+        color: {
+            label: '色',
+            icon: '🎨',
+            beforePlaceholder: '例: 青いボタン',
+            afterPlaceholder: '例: 緑のボタン',
+            examples: ['赤', '青', '緑', '白', '黒', 'グレー', 'ゴールド']
+        },
+        text: {
+            label: 'テキスト',
+            icon: '✏️',
+            beforePlaceholder: '例: 無料体験',
+            afterPlaceholder: '例: 今すぐ申込',
+            examples: ['削除する', '日本語に', '英語に']
+        },
+        object: {
+            label: 'オブジェクト',
+            icon: '📦',
+            beforePlaceholder: '例: 左の人物',
+            afterPlaceholder: '例: 削除して背景で埋める',
+            examples: ['削除', '別の画像に', '移動']
+        },
+        background: {
+            label: '背景',
+            icon: '🖼️',
+            beforePlaceholder: '例: 白い背景',
+            afterPlaceholder: '例: 青空の背景',
+            examples: ['白に', '透明に', '青空', 'グラデーション']
+        },
+        style: {
+            label: 'スタイル',
+            icon: '✨',
+            beforePlaceholder: '例: シンプルなデザイン',
+            afterPlaceholder: '例: モダンで洗練されたデザイン',
+            examples: ['モダンに', 'ミニマルに', 'ポップに', 'プロフェッショナルに']
+        },
+        custom: {
+            label: '自由入力',
+            icon: '💬',
+            beforePlaceholder: '現在の状態を記述...',
+            afterPlaceholder: '変更後の状態を記述...',
+            examples: []
+        }
+    };
+
+    // スロットからプロンプトを生成
+    const generatePromptFromSlots = (): string => {
+        if (editType === 'custom') {
+            return prompt;
+        }
+        if (!slotBefore.trim() && !slotAfter.trim()) {
+            return '';
+        }
+        return `【${editTypeConfig[editType].label}の変更】\n変更前: ${slotBefore.trim() || '（現在の状態）'}\n変更後: ${slotAfter.trim()}`;
+    };
     const [error, setError] = useState<string | null>(null);
     const [scale, setScale] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -959,8 +1022,10 @@ export function ImageInpaintEditor({
             return;
         }
 
-        if (!prompt.trim()) {
-            setError('プロンプトを入力してください');
+        // スロットからプロンプトを生成
+        const generatedPrompt = generatePromptFromSlots();
+        if (!generatedPrompt.trim()) {
+            setError('変更内容を入力してください');
             return;
         }
 
@@ -992,7 +1057,7 @@ export function ImageInpaintEditor({
                         imageUrl: targetImageUrl,
                         masks: targetMasks,
                         mask: targetMasks[0],
-                        prompt: prompt.trim(),
+                        prompt: generatedPrompt,
                         referenceDesign: referenceDesign || undefined,
                         referenceImageBase64: resizedReferenceImage
                     })
@@ -1709,21 +1774,107 @@ export function ImageInpaintEditor({
                                     )}
                                 </div>
 
-                                {/* Prompt Input */}
-                                <div className="mb-6 mt-auto">
-                                    <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-3">
-                                        編集プロンプト
-                                    </label>
-                                    <textarea
-                                        value={prompt}
-                                        onChange={(e) => setPrompt(e.target.value)}
-                                        placeholder={referenceDesign
-                                            ? "例: 参考デザインのスタイルで背景を変更..."
-                                            : "例: テキストを消す、背景を青空にする..."}
-                                        className="w-full h-32 px-4 py-3 rounded-md border border-input bg-background text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none shadow-sm"
-                                    />
+                                {/* Slot-based Prompt Input */}
+                                <div className="mb-6 mt-auto space-y-4">
+                                    {/* Edit Type Selector */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-2">
+                                            編集タイプ
+                                        </label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {(Object.keys(editTypeConfig) as EditType[]).map((type) => (
+                                                <button
+                                                    key={type}
+                                                    onClick={() => {
+                                                        setEditType(type);
+                                                        setSlotBefore('');
+                                                        setSlotAfter('');
+                                                    }}
+                                                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+                                                        editType === type
+                                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                                            : 'bg-surface-100 text-muted-foreground hover:bg-surface-200 hover:text-foreground'
+                                                    }`}
+                                                >
+                                                    <span className="mr-1">{editTypeConfig[type].icon}</span>
+                                                    {editTypeConfig[type].label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Before/After Inputs */}
+                                    {editType === 'custom' ? (
+                                        <div>
+                                            <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-2">
+                                                自由プロンプト
+                                            </label>
+                                            <textarea
+                                                value={prompt}
+                                                onChange={(e) => setPrompt(e.target.value)}
+                                                placeholder="例: テキストを消す、背景を青空にする..."
+                                                className="w-full h-24 px-4 py-3 rounded-md border border-input bg-background text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none shadow-sm"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {/* Before Input */}
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                                    <span className="text-red-400">Before</span>
+                                                    <span className="text-muted-foreground/50">現在の状態</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={slotBefore}
+                                                    onChange={(e) => setSlotBefore(e.target.value)}
+                                                    placeholder={editTypeConfig[editType].beforePlaceholder}
+                                                    className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm"
+                                                />
+                                            </div>
+
+                                            {/* Arrow */}
+                                            <div className="flex justify-center">
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <div className="h-px w-8 bg-border" />
+                                                    <span className="text-lg">↓</span>
+                                                    <div className="h-px w-8 bg-border" />
+                                                </div>
+                                            </div>
+
+                                            {/* After Input */}
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                                    <span className="text-green-500">After</span>
+                                                    <span className="text-muted-foreground/50">変更後</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={slotAfter}
+                                                    onChange={(e) => setSlotAfter(e.target.value)}
+                                                    placeholder={editTypeConfig[editType].afterPlaceholder}
+                                                    className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm"
+                                                />
+                                                {/* Quick Examples */}
+                                                {editTypeConfig[editType].examples.length > 0 && (
+                                                    <div className="mt-2 flex flex-wrap gap-1">
+                                                        {editTypeConfig[editType].examples.map((example) => (
+                                                            <button
+                                                                key={example}
+                                                                onClick={() => setSlotAfter(example)}
+                                                                className="px-2 py-0.5 text-[10px] bg-surface-100 text-muted-foreground rounded hover:bg-surface-200 hover:text-foreground transition-colors"
+                                                            >
+                                                                {example}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {referenceDesign && (
-                                        <p className="mt-2 text-[10px] text-primary flex items-center gap-1">
+                                        <p className="text-[10px] text-primary flex items-center gap-1">
                                             <Sparkles className="w-3 h-3" />
                                             参考デザインのスタイルが編集に反映されます
                                         </p>
@@ -1743,7 +1894,7 @@ export function ImageInpaintEditor({
                                 <div className="space-y-3 pt-6 border-t border-border">
                                     <button
                                         onClick={handleInpaint}
-                                        disabled={isLoading || isAnalyzingDesign || (selections.length === 0 && mobileSelections.length === 0) || !prompt.trim()}
+                                        disabled={isLoading || isAnalyzingDesign || (selections.length === 0 && mobileSelections.length === 0) || !generatePromptFromSlots().trim()}
                                         className="w-full py-3 px-4 bg-primary text-primary-foreground font-bold text-sm rounded-md hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                                     >
                                         {isLoading ? (

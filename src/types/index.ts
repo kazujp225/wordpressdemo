@@ -160,7 +160,9 @@ export type GenerationType =
     | 'import-arrange'
     | 'design-analysis'
     | 'boundary-connector'
-    | 'boundary-design';
+    | 'boundary-design'
+    | '4k-upscale'
+    | 'section-generate';
 
 export interface GenerationRun {
     id: number;

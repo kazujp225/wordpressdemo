@@ -19,7 +19,15 @@ const restoreSchema = z.object({
     bottomAmount: z.number().min(0).max(500).default(0),
     prompt: z.string().min(1).max(1000),
     referenceImageBase64: z.string().optional(),
+    creativity: z.enum(['low', 'medium', 'high']).default('medium'),
 });
+
+// creativity → temperature マッピング
+const creativityToTemperature = {
+    low: 0.3,
+    medium: 0.5,
+    high: 0.8,
+};
 
 export async function POST(
     request: NextRequest,
@@ -46,12 +54,13 @@ export async function POST(
         return Response.json({ error: 'Validation failed', details: validation.error.issues }, { status: 400 });
     }
 
-    const { direction, topAmount, bottomAmount, prompt, referenceImageBase64 } = validation.data;
+    const { direction, topAmount, bottomAmount, prompt, referenceImageBase64, creativity } = validation.data;
+    const temperature = creativityToTemperature[creativity];
 
     // 増築量チェック
-    const totalAmount = (direction === 'top' ? topAmount : 0) +
-                       (direction === 'bottom' ? bottomAmount : 0) +
-                       (direction === 'both' ? topAmount + bottomAmount : 0);
+    const actualTopAmount = direction === 'top' || direction === 'both' ? topAmount : 0;
+    const actualBottomAmount = direction === 'bottom' || direction === 'both' ? bottomAmount : 0;
+    const totalAmount = actualTopAmount + actualBottomAmount;
 
     if (totalAmount < 10) {
         return Response.json({ error: '増築量が少なすぎます' }, { status: 400 });
@@ -70,7 +79,7 @@ export async function POST(
             return Response.json({ error: 'Section or image not found' }, { status: 404 });
         }
 
-        log.info(`Restoring section ${sectionId}: ${direction} +${topAmount}px top, +${bottomAmount}px bottom`);
+        log.info(`Restoring section ${sectionId}: ${direction} +${actualTopAmount}px top, +${actualBottomAmount}px bottom`);
 
         // 現在の画像を取得
         const imageResponse = await fetch(section.image.filePath);
@@ -86,102 +95,17 @@ export async function POST(
             return Response.json({ error: 'Google API key not configured' }, { status: 500 });
         }
 
-        // 新しい画像サイズ
+        // === 拡張キャンバス方式 ===
+        // 元画像を含む拡張キャンバスを作成し、拡張部分は白で埋める
+        // この1枚の画像をGeminiに渡して「白い部分を補完して」と指示
+
         const newWidth = imageMeta.width;
-        const actualTopAmount = direction === 'top' || direction === 'both' ? topAmount : 0;
-        const actualBottomAmount = direction === 'bottom' || direction === 'both' ? bottomAmount : 0;
         const newHeight = imageMeta.height + actualTopAmount + actualBottomAmount;
 
-        // コンテキスト用の画像部分を取得
-        const contextHeight = Math.min(150, Math.floor(imageMeta.height * 0.2));
+        log.info(`Creating extended canvas: ${newWidth}x${newHeight}px (original: ${imageMeta.width}x${imageMeta.height}px)`);
 
-        let topContext: Buffer | null = null;
-        let bottomContext: Buffer | null = null;
-
-        if (actualTopAmount > 0) {
-            // 上を増築する場合、現在の画像の上端をコンテキストとして使用
-            topContext = await sharp(imageBuffer)
-                .extract({
-                    left: 0,
-                    top: 0,
-                    width: imageMeta.width,
-                    height: contextHeight,
-                })
-                .toBuffer();
-        }
-
-        if (actualBottomAmount > 0) {
-            // 下を増築する場合、現在の画像の下端をコンテキストとして使用
-            bottomContext = await sharp(imageBuffer)
-                .extract({
-                    left: 0,
-                    top: imageMeta.height - contextHeight,
-                    width: imageMeta.width,
-                    height: contextHeight,
-                })
-                .toBuffer();
-        }
-
-        // 増築部分を生成
-        let topExtension: Buffer | null = null;
-        let bottomExtension: Buffer | null = null;
-
-        if (actualTopAmount > 0 && topContext) {
-            log.info(`Generating top extension: ${newWidth}x${actualTopAmount}px`);
-            topExtension = await generateExtension(
-                topContext,
-                newWidth,
-                actualTopAmount,
-                'top',
-                prompt,
-                referenceImageBase64,
-                googleApiKey
-            );
-        }
-
-        if (actualBottomAmount > 0 && bottomContext) {
-            log.info(`Generating bottom extension: ${newWidth}x${actualBottomAmount}px`);
-            bottomExtension = await generateExtension(
-                bottomContext,
-                newWidth,
-                actualBottomAmount,
-                'bottom',
-                prompt,
-                referenceImageBase64,
-                googleApiKey
-            );
-        }
-
-        // 画像を合成
-        const composites: sharp.OverlayOptions[] = [];
-
-        // 上の増築部分
-        if (topExtension) {
-            composites.push({
-                input: topExtension,
-                top: 0,
-                left: 0,
-            });
-        }
-
-        // 元の画像
-        composites.push({
-            input: imageBuffer,
-            top: actualTopAmount,
-            left: 0,
-        });
-
-        // 下の増築部分
-        if (bottomExtension) {
-            composites.push({
-                input: bottomExtension,
-                top: actualTopAmount + imageMeta.height,
-                left: 0,
-            });
-        }
-
-        // 新しい画像を作成
-        const newImageBuffer = await sharp({
+        // 拡張キャンバスを作成（白背景 + 元画像を配置）
+        const extendedCanvas = await sharp({
             create: {
                 width: newWidth,
                 height: newHeight,
@@ -189,7 +113,48 @@ export async function POST(
                 background: { r: 255, g: 255, b: 255, alpha: 1 },
             },
         })
-            .composite(composites)
+            .composite([
+                {
+                    input: imageBuffer,
+                    top: actualTopAmount,  // 上に増築する場合、元画像は下にずらす
+                    left: 0,
+                },
+            ])
+            .png()
+            .toBuffer();
+
+        log.info(`Extended canvas created, sending to Gemini for inpainting...`);
+
+        // Geminiに拡張キャンバスを渡して補完させる
+        const generatedBuffer = await inpaintExtendedCanvas(
+            extendedCanvas,
+            newWidth,
+            newHeight,
+            actualTopAmount,
+            actualBottomAmount,
+            prompt,
+            referenceImageBase64,
+            googleApiKey,
+            temperature
+        );
+
+        if (!generatedBuffer) {
+            return Response.json({ error: '復元に失敗しました' }, { status: 500 });
+        }
+
+        // === セーフガード ===
+        // Geminiが元画像部分を変更している可能性があるため、
+        // 元画像を強制的に上書きして確実に維持する
+        log.info(`Applying safeguard: preserving original image area...`);
+
+        const restoredBuffer = await sharp(generatedBuffer)
+            .composite([
+                {
+                    input: imageBuffer,
+                    top: actualTopAmount,
+                    left: 0,
+                },
+            ])
             .png()
             .toBuffer();
 
@@ -199,7 +164,7 @@ export async function POST(
 
         const { error: uploadError } = await supabase.storage
             .from('images')
-            .upload(filename, newImageBuffer, {
+            .upload(filename, restoredBuffer, {
                 contentType: 'image/png',
                 cacheControl: '3600',
                 upsert: false,
@@ -213,7 +178,7 @@ export async function POST(
         const newImageUrl = supabase.storage.from('images').getPublicUrl(filename).data.publicUrl;
 
         // MediaImage作成
-        const newMeta = await sharp(newImageBuffer).metadata();
+        const newMeta = await sharp(restoredBuffer).metadata();
         const newMedia = await prisma.mediaImage.create({
             data: {
                 filePath: newImageUrl,
@@ -236,7 +201,7 @@ export async function POST(
             endpoint: `/api/sections/${sectionId}/restore`,
             model: 'gemini-3-pro-image-preview',
             inputPrompt: prompt,
-            imageCount: (topExtension ? 1 : 0) + (bottomExtension ? 1 : 0),
+            imageCount: 1,
             status: 'succeeded',
             startTime,
         });
@@ -246,6 +211,7 @@ export async function POST(
         return Response.json({
             success: true,
             newImageUrl,
+            newImageId: newMedia.id,
             newWidth,
             newHeight,
             addedTop: actualTopAmount,
@@ -258,50 +224,64 @@ export async function POST(
     }
 }
 
-async function generateExtension(
-    contextBuffer: Buffer,
+/**
+ * 拡張キャンバス方式でインペイント
+ * - 白い部分（拡張領域）を元画像に合わせて補完
+ * - 元画像部分はそのまま維持
+ */
+async function inpaintExtendedCanvas(
+    extendedCanvasBuffer: Buffer,
     width: number,
     height: number,
-    position: 'top' | 'bottom',
+    topExtension: number,
+    bottomExtension: number,
     userPrompt: string,
     referenceBase64: string | undefined,
-    apiKey: string
+    apiKey: string,
+    temperature: number
 ): Promise<Buffer | null> {
-    const positionText = position === 'top' ? '上' : '下';
+    try {
+        // 拡張領域の説明を作成
+        let extensionDesc = '';
+        if (topExtension > 0 && bottomExtension > 0) {
+            extensionDesc = `上部${topExtension}pxと下部${bottomExtension}pxの白い領域`;
+        } else if (topExtension > 0) {
+            extensionDesc = `上部${topExtension}pxの白い領域`;
+        } else {
+            extensionDesc = `下部${bottomExtension}pxの白い領域`;
+        }
 
-    const prompt = `【重要】これは画像の「復元・修復」タスクです。
+        const prompt = `【画像補完タスク】
 
-添付した画像は、元々もっと大きな画像の一部でしたが、誤ってカット（切り取り）されてしまい、${positionText}側の部分が失われてしまいました。
+この画像には${extensionDesc}があります。
+この白い部分は、元々存在していた内容がカット（切り取り）されて失われた部分です。
 
-あなたのタスクは、失われた${positionText}側の部分を復元することです。
-
-【復元する内容（ユーザーからの説明）】
+【復元指示】
 ${userPrompt}
 
-【技術的な指示】
-- 出力サイズ: ${width}px × ${height}px（この通りに生成してください）
-- 添付画像の${position === 'top' ? '上端' : '下端'}と、生成画像の${position === 'top' ? '下端' : '上端'}が完全にシームレスに繋がるようにしてください
-- 添付画像のデザインスタイル、色調、フォント、レイアウトを正確に継続してください
-- 特に文字やUIコンポーネントがある場合は、それらを正確に復元してください
-- 日本語テキストは正確に、読みやすく生成してください
-${referenceBase64 ? '- 参考画像のスタイルも考慮してください' : ''}
+【重要なルール】
+1. 白い領域のみを補完してください
+2. 元画像部分（白くない部分）は絶対に変更しないでください
+3. 境界が自然に繋がるように補完してください
+4. 元画像のデザインスタイル、色使い、雰囲気を維持してください
+5. 画像全体を出力してください（同じサイズで）
 
-添付画像を注意深く観察し、失われた部分を自然に復元してください。`;
+白い領域を補完した完全な画像を生成してください。`;
 
-    try {
-        const parts: any[] = [
-            { inlineData: { mimeType: 'image/png', data: contextBuffer.toString('base64') } },
-            { text: `【添付画像】これが現在残っている画像の${positionText}端です。この${position === 'top' ? '上' : '下'}に、失われた部分を復元して追加してください。画像のスタイル、色、デザインを継続させてください。` },
-        ];
+        const parts: any[] = [];
 
+        // 参考画像（あれば）
         if (referenceBase64) {
             const cleanRef = referenceBase64.replace(/^data:image\/\w+;base64,/, '');
             parts.push({ inlineData: { mimeType: 'image/png', data: cleanRef } });
-            parts.push({ text: '【参考画像】この画像のスタイルや内容を参考にしてください。' });
+            parts.push({ text: '【参考画像】この画像のデザインスタイルを参考にしてください。' });
         }
 
+        // 拡張キャンバス（補完対象）
+        parts.push({ inlineData: { mimeType: 'image/png', data: extendedCanvasBuffer.toString('base64') } });
         parts.push({ text: prompt });
 
+        // Gemini 3.0 Pro（画像生成・編集に最適）を使用
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
             {
@@ -309,7 +289,10 @@ ${referenceBase64 ? '- 参考画像のスタイルも考慮してください' :
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ parts }],
-                    generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+                    generationConfig: {
+                        responseModalities: ["IMAGE", "TEXT"],
+                        temperature,
+                    },
                 }),
             }
         );
@@ -326,20 +309,54 @@ ${referenceBase64 ? '- 参考画像のスタイルも考慮してください' :
         for (const part of responseParts) {
             if (part.inlineData?.data) {
                 const generatedBuffer = Buffer.from(part.inlineData.data, 'base64');
+                const genMeta = await sharp(generatedBuffer).metadata();
 
-                // 指定サイズにリサイズ
-                const resizedBuffer = await sharp(generatedBuffer)
-                    .resize(width, height, { fit: 'cover', position: position === 'top' ? 'bottom' : 'top' })
-                    .png()
-                    .toBuffer();
+                log.info(`Gemini returned: ${genMeta.width}x${genMeta.height}px (expected: ${width}x${height}px)`);
 
-                return resizedBuffer;
+                // サイズが一致する場合はそのまま使用
+                if (genMeta.width === width && genMeta.height === height) {
+                    log.success(`Perfect size match!`);
+                    return generatedBuffer;
+                }
+
+                // サイズが異なる場合は調整（ただし歪みを最小限に）
+                if (genMeta.width && genMeta.height) {
+                    // アスペクト比がほぼ同じならリサイズ
+                    const expectedRatio = width / height;
+                    const actualRatio = genMeta.width / genMeta.height;
+                    const ratioDiff = Math.abs(expectedRatio - actualRatio);
+
+                    if (ratioDiff < 0.1) {
+                        // アスペクト比が近い場合、単純リサイズ
+                        log.info(`Aspect ratio close (diff: ${ratioDiff.toFixed(3)}), resizing...`);
+                        const resized = await sharp(generatedBuffer)
+                            .resize(width, height, { fit: 'fill' })
+                            .png()
+                            .toBuffer();
+                        return resized;
+                    } else {
+                        // アスペクト比が大きく異なる場合、containで対応
+                        log.info(`Aspect ratio different (diff: ${ratioDiff.toFixed(3)}), using contain...`);
+                        const resized = await sharp(generatedBuffer)
+                            .resize(width, height, {
+                                fit: 'contain',
+                                background: { r: 255, g: 255, b: 255, alpha: 1 },
+                            })
+                            .png()
+                            .toBuffer();
+                        return resized;
+                    }
+                }
+
+                return generatedBuffer;
             }
         }
 
+        log.error('No image in Gemini response');
         return null;
+
     } catch (error: any) {
-        log.error(`Generation error: ${error.message}`);
+        log.error(`Inpaint error: ${error.message}`);
         return null;
     }
 }

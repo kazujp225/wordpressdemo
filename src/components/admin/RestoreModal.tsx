@@ -8,7 +8,7 @@ interface Props {
     sectionId: string;
     imageUrl: string;
     onClose: () => void;
-    onSuccess: (newImageUrl: string) => void;
+    onSuccess: (newImageUrl: string, newImageId: number) => void;
 }
 
 type Direction = 'top' | 'bottom' | 'both';
@@ -20,6 +20,7 @@ export function RestoreModal({ sectionId, imageUrl, onClose, onSuccess }: Props)
     const [bottomAmount, setBottomAmount] = useState(100);
     const [prompt, setPrompt] = useState('');
     const [referenceImage, setReferenceImage] = useState<string | null>(null);
+    const [creativity, setCreativity] = useState<'low' | 'medium' | 'high'>('medium');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // プレビュー用
@@ -152,6 +153,7 @@ export function RestoreModal({ sectionId, imageUrl, onClose, onSuccess }: Props)
                     bottomAmount: direction === 'bottom' || direction === 'both' ? bottomAmount : 0,
                     prompt,
                     referenceImageBase64: referenceImage || undefined,
+                    creativity,
                 }),
             });
 
@@ -162,7 +164,7 @@ export function RestoreModal({ sectionId, imageUrl, onClose, onSuccess }: Props)
 
             const result = await response.json();
             toast.success('復元が完了しました');
-            onSuccess(result.newImageUrl);
+            onSuccess(result.newImageUrl, result.newImageId);
             onClose();
 
         } catch (error: any) {
@@ -310,6 +312,31 @@ export function RestoreModal({ sectionId, imageUrl, onClose, onSuccess }: Props)
                                 <p className="text-xs text-gray-400 mt-1">
                                     カットされた部分に何があったか、どう復元して欲しいかを伝えてください
                                 </p>
+                            </div>
+
+                            {/* 生成モード */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2">生成モード</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                        { value: 'low', label: '正確重視', desc: '元画像に忠実' },
+                                        { value: 'medium', label: 'バランス', desc: 'おすすめ' },
+                                        { value: 'high', label: '創造的', desc: '自由度高め' },
+                                    ].map(({ value, label, desc }) => (
+                                        <button
+                                            key={value}
+                                            onClick={() => setCreativity(value as 'low' | 'medium' | 'high')}
+                                            className={`flex flex-col items-center p-2 rounded-lg border-2 transition-all ${
+                                                creativity === value
+                                                    ? 'border-green-500 bg-green-50 text-green-700'
+                                                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                            }`}
+                                        >
+                                            <span className="text-xs font-medium">{label}</span>
+                                            <span className="text-[10px] text-gray-400">{desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* 参考画像 */}
