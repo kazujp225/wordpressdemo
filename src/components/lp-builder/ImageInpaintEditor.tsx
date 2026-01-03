@@ -1609,9 +1609,9 @@ export function ImageInpaintEditor({
                     )}
 
                     {/* Side Panel */}
-                    <div className="w-80 bg-background border-l border-border p-6 flex flex-col z-20 shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.05)]">
+                    <div className="w-80 bg-background border-l border-border flex flex-col z-20 shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.05)] overflow-hidden">
                         {editorMode === 'inpaint' ? (
-                            <>
+                            <div className="flex-1 overflow-y-auto p-6">
                                 {/* Inpaint Mode Content */}
                                 <div className="mb-6">
                                     <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-1">編集設定</h3>
@@ -1943,9 +1943,9 @@ export function ImageInpaintEditor({
                                         キャンセル
                                     </button>
                                 </div>
-                            </>
+                            </div>
                         ) : (
-                            <>
+                            <div className="flex-1 overflow-y-auto p-6">
                                 {/* Button Mode Content */}
                                 <div className="mb-6">
                                     <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-1">ボタン設定</h3>
@@ -2203,7 +2203,7 @@ export function ImageInpaintEditor({
                                         キャンセル
                                     </button>
                                 </div>
-                            </>
+                            </div>
                         )}
                     </div>
 
