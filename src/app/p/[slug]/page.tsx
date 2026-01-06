@@ -129,17 +129,10 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                     if (parsed.properties?.clickableAreas) {
                                         config.clickableAreas = parsed.properties.clickableAreas;
                                     }
+                                    // デバッグ用ログ
+                                    console.log(`Section ${section.role} clickableAreas:`, config.clickableAreas);
                                 }
                             } catch { }
-
-                            const positionClasses = {
-                                top: 'top-10 items-start',
-                                middle: 'top-1/2 -translate-y-1/2 items-center',
-                                bottom: 'bottom-10 items-end'
-                            }[config.position as 'top' | 'middle' | 'bottom'] || 'top-1/2 -translate-y-1/2 items-center';
-
-                            const colorClasses = config.textColor === 'black' ? 'text-black' : 'text-white';
-                            const shadowClasses = config.textColor === 'black' ? '' : 'drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]';
 
                             const imgStyle = {
                                 filter: `brightness(${config.brightness}%) grayscale(${config.grayscale}%)`,
@@ -147,14 +140,11 @@ export default async function PublicPage({ params }: { params: { slug: string } 
 
                             return (
                                 <>
-                                    <div className="absolute inset-0 z-10 pointer-events-none" style={{ backgroundColor: config.overlayColor, opacity: (config.overlayOpacity || 0) / 100 }}></div>
-                                    <div className={`absolute inset-x-0 z-20 px-8 flex flex-col pointer-events-none transition-all duration-700 ${positionClasses}`}>
-                                        {config.text && (
-                                            <div className={`max-w-xl text-center whitespace-pre-wrap text-2xl md:text-4xl font-black tracking-tight leading-tight ${colorClasses} ${shadowClasses}`}>
-                                                {config.text}
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* カラーオーバーレイ（背景色調整用） */}
+                                    {config.overlayOpacity > 0 && (
+                                        <div className="absolute inset-0 z-10 pointer-events-none" style={{ backgroundColor: config.overlayColor, opacity: config.overlayOpacity / 100 }}></div>
+                                    )}
+                                    {/* テキストオーバーレイは無効化 - 画像に直接焼き込む方式に変更 */}
 
                                     {section.image ? (
                                         // eslint-disable-next-line @next/next/no-img-element
