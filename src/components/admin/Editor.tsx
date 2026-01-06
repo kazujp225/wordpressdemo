@@ -4604,6 +4604,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         ctaLink: globalConfig.defaultUrl,
                         ctaText: globalConfig.defaultLabel,
                     }));
+                    // CTAエリアをデータベースに保存
+                    handleSave(updatedSections);
                 }}
             />
 

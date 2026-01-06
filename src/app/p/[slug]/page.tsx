@@ -156,14 +156,6 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                         )}
                                     </div>
 
-                                    {/* Clickable Areas Overlay (with form support) */}
-                                    {config.clickableAreas && config.clickableAreas.length > 0 && (
-                                        <InteractiveAreaOverlay
-                                            areas={config.clickableAreas}
-                                            pageSlug={params.slug}
-                                        />
-                                    )}
-
                                     {section.image ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img
@@ -177,6 +169,14 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                         <div className="flex h-48 items-center justify-center bg-gray-100 text-gray-400">
                                             セクション: {section.role} (画像なし)
                                         </div>
+                                    )}
+
+                                    {/* Clickable Areas Overlay (with form support) - 画像の後にレンダリング */}
+                                    {config.clickableAreas && config.clickableAreas.length > 0 && (
+                                        <InteractiveAreaOverlay
+                                            areas={config.clickableAreas}
+                                            pageSlug={params.slug}
+                                        />
                                     )}
                                 </>
                             );

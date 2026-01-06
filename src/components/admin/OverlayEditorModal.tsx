@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Plus, Trash2, Type, Link2, Palette, Move, GripVertical, MousePointer, Square, Circle } from 'lucide-react';
+import { X, Plus, Trash2, Type, Link2, Palette, Move, GripVertical, MousePointer, Square, Circle, Sparkles, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
