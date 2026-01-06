@@ -3940,59 +3940,13 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 プロンプトをコピー
                                             </button>
                                             <button
-                                                onClick={async () => {
-                                                    const prompt = extractPromptExample(msg.content);
-                                                    if (!prompt) return;
-
-                                                    // 新しいセクションとして画像生成
-                                                    const tempId = `temp-${Date.now()}`;
-                                                    const newSection = {
-                                                        id: tempId,
-                                                        role: 'ai-generated',
-                                                        order: sections.length,
-                                                        imageId: null,
-                                                        image: null,
-                                                        config: { prompt }
-                                                    };
-                                                    setSections(prev => [...prev, newSection]);
-                                                    setGeneratingImageSectionIds(prev => new Set(prev).add(tempId));
-
-                                                    try {
-                                                        const res = await fetch('/api/ai/generate-image', {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({
-                                                                prompt,
-                                                                taste: headerConfig.taste || 'シンプル・清潔',
-                                                                aspectRatio: '9:16',
-                                                                designDefinition
-                                                            })
-                                                        });
-
-                                                        if (!res.ok) throw new Error('画像生成に失敗しました');
-
-                                                        const imageData = await res.json();
-                                                        setSections(prev => prev.map(s =>
-                                                            s.id === tempId
-                                                                ? { ...s, imageId: imageData.id, image: imageData }
-                                                                : s
-                                                        ));
-                                                        toast.success('画像を生成しました！');
-                                                    } catch (err: any) {
-                                                        toast.error(err.message || '画像生成に失敗しました');
-                                                        setSections(prev => prev.filter(s => s.id !== tempId));
-                                                    } finally {
-                                                        setGeneratingImageSectionIds(prev => {
-                                                            const next = new Set(prev);
-                                                            next.delete(tempId);
-                                                            return next;
-                                                        });
-                                                    }
+                                                onClick={() => {
+                                                    setShowVideoModal(true);
                                                 }}
-                                                className="flex-1 py-1.5 px-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-bold rounded-lg hover:from-pink-600 hover:to-rose-600 transition-colors flex items-center justify-center gap-1"
+                                                className="flex-1 py-1.5 px-2 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-[10px] font-bold rounded-lg hover:from-indigo-600 hover:to-violet-700 transition-colors flex items-center justify-center gap-1"
                                             >
-                                                <Sparkles className="h-3 w-3" />
-                                                画像生成
+                                                <Video className="h-3 w-3" />
+                                                動画生成
                                             </button>
                                         </div>
                                     )}
