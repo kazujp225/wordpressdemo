@@ -1318,6 +1318,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             const method = pageId === 'new' ? 'POST' : 'PUT';
             const url = pageId === 'new' ? '/api/pages' : `/api/pages/${pageId}`;
 
+            // デバッグ: 保存前のデータを確認
+            const heroSection = sectionsToSave.find(s => s.role === 'hero');
+            console.log('handleSave - hero config:', heroSection?.config);
+            console.log('handleSave - hero clickableAreas:', heroSection?.config?.clickableAreas);
+
             const res = await fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
@@ -4598,6 +4603,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     defaultLabel: headerConfig.ctaText || 'お問い合わせ',
                 }}
                 onApply={(updatedSections, globalConfig) => {
+                    // デバッグ: CTAデータを確認
+                    console.log('CTA onApply - updatedSections:', updatedSections);
+                    console.log('CTA onApply - hero section config:', updatedSections.find(s => s.role === 'hero')?.config);
+
                     setSections(updatedSections);
                     setHeaderConfig((prev: any) => ({
                         ...prev,
@@ -4605,6 +4614,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         ctaText: globalConfig.defaultLabel,
                     }));
                     // CTAエリアをデータベースに保存
+                    console.log('CTA onApply - calling handleSave');
                     handleSave(updatedSections);
                 }}
             />
