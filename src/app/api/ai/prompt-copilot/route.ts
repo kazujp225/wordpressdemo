@@ -40,9 +40,9 @@ export async function POST(request: NextRequest) {
             }, { status: 500 });
         }
 
-        // Gemini 1.5 Flash 8B（最も安いモデル）でAPI呼び出し
+        // Gemini 2.0 Flash（高速・低コストモデル）でAPI呼び出し
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${ADMIN_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${ADMIN_API_KEY}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
             userId: null, // 管理者負担のため userId なし
             type: 'prompt-copilot',
             endpoint: '/api/ai/prompt-copilot',
-            model: 'gemini-1.5-flash-8b',
+            model: 'gemini-2.0-flash',
             inputPrompt,
             outputResult: text,
             status: 'succeeded',
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
             userId: null,
             type: 'prompt-copilot',
             endpoint: '/api/ai/prompt-copilot',
-            model: 'gemini-1.5-flash-8b',
+            model: 'gemini-2.0-flash',
             inputPrompt: inputPrompt || 'Error before input',
             status: 'failed',
             errorMessage: error.message,

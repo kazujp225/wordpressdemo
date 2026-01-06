@@ -18,11 +18,6 @@ export const GEMINI_PRICING = {
     output: 0.30,
     type: 'text' as const
   },
-  'gemini-1.5-flash-8b': {
-    input: 0.0375,  // Cheaper 8B model
-    output: 0.15,
-    type: 'text' as const
-  },
   // Image Models (per image)
   'gemini-3-pro-image-preview': {
     perImage: 0.04, // $0.04 per image
@@ -69,7 +64,6 @@ export function getModelDisplayName(model: string): string {
     'gemini-2.0-flash': 'Gemini 2.0 Flash',
     'gemini-1.5-flash': 'Gemini 1.5 Flash',
     'gemini-1.5-flash-latest': 'Gemini 1.5 Flash',
-    'gemini-1.5-flash-8b': 'Gemini 1.5 Flash 8B',
     'gemini-3-pro-image-preview': 'Gemini 3 Pro Image',
     'gemini-2.5-flash-preview-image-generation': 'Gemini 2.5 Flash Image',
   };

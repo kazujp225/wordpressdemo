@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        // Use Gemini 3 Flash Preview - fastest intelligent model with frontier intelligence
-        const model = genAI.getGenerativeModel({ model: "gemini-3.0-flash-preview" });
+        // Use Gemini 2.0 Flash - fast and cost-effective text model
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         if (!sections || sections.length === 0) {
             return NextResponse.json({ error: '画像がありません。' }, { status: 400 });
@@ -150,31 +150,15 @@ export async function POST(request: NextRequest) {
             ]
         `;
 
-        let result;
-        try {
-            result = await model.generateContent([
-                prompt,
-                {
-                    inlineData: {
-                        data: stitchedImage.toString('base64'),
-                        mimeType: "image/jpeg"
-                    }
+        const result = await model.generateContent([
+            prompt,
+            {
+                inlineData: {
+                    data: stitchedImage.toString('base64'),
+                    mimeType: "image/jpeg"
                 }
-            ]);
-        } catch (genError: any) {
-            console.warn('Gemini 3.0 Flash Preview failed, retrying with gemini-2.0-flash...', genError.message);
-            // Fallback to 2.0-flash which is stable and has separate quota
-            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-            result = await fallbackModel.generateContent([
-                prompt,
-                {
-                    inlineData: {
-                        data: stitchedImage.toString('base64'),
-                        mimeType: "image/jpeg"
-                    }
-                }
-            ]);
-        }
+            }
+        ]);
 
         const response = await result.response;
         const text = response.text();
@@ -186,7 +170,7 @@ export async function POST(request: NextRequest) {
                 userId: user.id,
                 type: 'copy',
                 endpoint: '/api/ai/generate-copy',
-                model: 'gemini-3.0-flash-preview',
+                model: 'gemini-2.0-flash',
                 inputPrompt: prompt,
                 outputResult: text,
                 status: 'failed',
@@ -203,7 +187,7 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             type: 'copy',
             endpoint: '/api/ai/generate-copy',
-            model: 'gemini-1.5-pro',
+            model: 'gemini-2.0-flash',
             inputPrompt: prompt,
             outputResult: JSON.stringify(resultData),
             status: 'succeeded',
@@ -217,7 +201,7 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             type: 'copy',
             endpoint: '/api/ai/generate-copy',
-            model: 'gemini-1.5-pro',
+            model: 'gemini-2.0-flash',
             inputPrompt: prompt || 'Error occurred before prompt finalization',
             status: 'failed',
             errorMessage: error.message,
