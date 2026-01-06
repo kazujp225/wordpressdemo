@@ -44,6 +44,8 @@ const regenerateSchema = z.object({
     // boundaryOffsetBottom: このセクションの下端をどれだけ下に拡張するか（ピクセル）
     boundaryOffsetTop: z.number().optional(),
     boundaryOffsetBottom: z.number().optional(),
+    // コピーテキスト（AIコピー生成で作成されたテキスト）
+    copyText: z.string().max(2000).optional(),
 });
 
 // スタイル定義
@@ -84,7 +86,7 @@ export async function POST(
         }, { status: 400 });
     }
 
-    const { style = 'professional', colorScheme, customPrompt, mode, contextStyle, designDefinition, styleReferenceUrl, extractedColors, targetImage, boundaryOffsetTop, boundaryOffsetBottom } = validation.data;
+    const { style = 'professional', colorScheme, customPrompt, mode, contextStyle, designDefinition, styleReferenceUrl, extractedColors, targetImage, boundaryOffsetTop, boundaryOffsetBottom, copyText } = validation.data;
 
     try {
         log.info(`========== Starting Regenerate for Section ${sectionId} ==========`);
@@ -316,7 +318,12 @@ ${contextInfo.length > 0 ? `4. 連続性：${contextInfo.join('。')}` : ''}
 
 ${tokenDescription}
 
-${customPrompt ? `【ユーザー指示】${customPrompt}` : ''}
+${copyText ? `【コピーテキスト - 必ず画像内に表示】
+以下のテキストをこのセクションの画像内に適切に配置してください：
+「${copyText}」
+※テキストは読みやすいフォント、適切なサイズ、背景とのコントラストを確保してください。
+
+` : ''}${customPrompt ? `【ユーザー指示】${customPrompt}` : ''}
 ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
 
 【出力】入力と同じサイズの高品質なWebデザイン画像を出力。`
@@ -338,7 +345,12 @@ ${contextInfo.length > 0 ? `3. 連続性：${contextInfo.join('。')}` : ''}
 
 ${tokenDescription}
 
-${customPrompt ? `【ユーザー指示】${customPrompt}` : ''}
+${copyText ? `【コピーテキスト - 必ず画像内に表示】
+以下のテキストをこのセクションの画像内に適切に配置してください：
+「${copyText}」
+※テキストは読みやすいフォント、適切なサイズ、背景とのコントラストを確保してください。
+
+` : ''}${customPrompt ? `【ユーザー指示】${customPrompt}` : ''}
 ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
 
 【出力】入力と同じサイズの高品質なWebデザイン画像を出力。`;

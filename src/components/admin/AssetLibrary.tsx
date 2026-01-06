@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 
 interface Asset {
     id: string;
-    type: 'lottie' | 'illustration' | 'icon' | 'photo';
+    type: 'lottie' | 'illustration' | 'icon' | 'photo' | 'button';
     title: string;
     thumbnailUrl: string;
     downloadUrl: string;
@@ -18,6 +18,8 @@ interface Asset {
 interface AssetLibraryProps {
     onAssetSelect: (asset: Asset, downloadedUrl: string) => void;
     onClose?: () => void;
+    onDragStart?: (asset: Asset) => void;
+    onDragEnd?: () => void;
 }
 
 const CATEGORIES = [
@@ -33,17 +35,62 @@ const SUGGESTED_SEARCHES = [
     'growth', 'support', 'mobile', 'presentation'
 ];
 
-export function AssetLibrary({ onAssetSelect, onClose }: AssetLibraryProps) {
+export function AssetLibrary({ onAssetSelect, onClose, onDragStart, onDragEnd }: AssetLibraryProps) {
     const [query, setQuery] = useState('');
     const [category, setCategory] = useState<string>('all');
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
     const [hasSearched, setHasSearched] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [draggingAsset, setDraggingAsset] = useState<Asset | null>(null);
+
+    // ドラッグ開始ハンドラー
+    const handleDragStart = (e: React.DragEvent, asset: Asset) => {
+        e.dataTransfer.setData('application/json', JSON.stringify(asset));
+        e.dataTransfer.effectAllowed = 'copy';
+        setDraggingAsset(asset);
+        onDragStart?.(asset);
+    };
+
+    // ドラッグ終了ハンドラー
+    const handleDragEnd = () => {
+        setDraggingAsset(null);
+        onDragEnd?.();
+    };
+
+    // 初期素材をロード
+    React.useEffect(() => {
+        const loadFeaturedAssets = async () => {
+            setIsSearching(true);
+            try {
+                const res = await fetch(`/api/assets/search?featured=true&category=${category}`);
+                const data = await res.json();
+                if (data.assets) {
+                    setAssets(data.assets);
+                }
+            } catch (error) {
+                console.error('Failed to load featured assets:', error);
+            } finally {
+                setIsSearching(false);
+                setIsInitialLoad(false);
+            }
+        };
+        loadFeaturedAssets();
+    }, [category]);
 
     const handleSearch = useCallback(async (searchQuery?: string) => {
         const q = searchQuery || query;
-        if (!q.trim()) return;
+        if (!q.trim()) {
+            // 空の検索の場合は人気素材を表示
+            const res = await fetch(`/api/assets/search?featured=true&category=${category}`);
+            const data = await res.json();
+            if (data.assets) {
+                setAssets(data.assets);
+            }
+            setHasSearched(false);
+            return;
+        }
 
         setIsSearching(true);
         setHasSearched(true);
@@ -180,12 +227,23 @@ export function AssetLibrary({ onAssetSelect, onClose }: AssetLibraryProps) {
                         {assets.map(asset => (
                             <div
                                 key={asset.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, asset)}
+                                onDragEnd={handleDragEnd}
                                 onClick={() => handleAssetClick(asset)}
                                 className={clsx(
-                                    "relative group cursor-pointer rounded-lg overflow-hidden border border-gray-200 hover:border-violet-400 hover:shadow-md transition-all",
-                                    downloadingId === asset.id && "opacity-50 pointer-events-none"
+                                    "relative group cursor-grab active:cursor-grabbing rounded-lg overflow-hidden border border-gray-200 hover:border-violet-400 hover:shadow-md transition-all",
+                                    downloadingId === asset.id && "opacity-50 pointer-events-none",
+                                    draggingAsset?.id === asset.id && "opacity-50 scale-95"
                                 )}
                             >
+                                {/* ドラッグハンドル */}
+                                <div className="absolute top-1 left-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="bg-white/90 backdrop-blur-sm p-0.5 rounded shadow-sm">
+                                        <GripVertical className="h-3 w-3 text-gray-400" />
+                                    </div>
+                                </div>
+
                                 {/* サムネイル */}
                                 <div className="aspect-square bg-gray-50 flex items-center justify-center p-2">
                                     {asset.type === 'icon' ? (
@@ -193,12 +251,14 @@ export function AssetLibrary({ onAssetSelect, onClose }: AssetLibraryProps) {
                                             src={asset.thumbnailUrl}
                                             alt={asset.title}
                                             className="w-12 h-12 object-contain"
+                                            draggable={false}
                                         />
                                     ) : (
                                         <img
                                             src={asset.thumbnailUrl}
                                             alt={asset.title}
                                             className="w-full h-full object-cover"
+                                            draggable={false}
                                             onError={(e) => {
                                                 (e.target as HTMLImageElement).src = '/placeholder.png';
                                             }}
@@ -211,9 +271,12 @@ export function AssetLibrary({ onAssetSelect, onClose }: AssetLibraryProps) {
                                     {downloadingId === asset.id ? (
                                         <Loader2 className="h-6 w-6 text-white animate-spin" />
                                     ) : (
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white px-2 py-1 rounded-full text-xs font-medium text-gray-700">
-                                            <Download className="h-3 w-3" />
-                                            追加
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center gap-1">
+                                            <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-xs font-medium text-gray-700">
+                                                <Download className="h-3 w-3" />
+                                                クリックで追加
+                                            </div>
+                                            <span className="text-[9px] text-white/80">またはドラッグ</span>
                                         </div>
                                     )}
                                 </div>
@@ -225,7 +288,8 @@ export function AssetLibrary({ onAssetSelect, onClose }: AssetLibraryProps) {
                                         asset.type === 'lottie' && "bg-purple-100 text-purple-700",
                                         asset.type === 'illustration' && "bg-blue-100 text-blue-700",
                                         asset.type === 'icon' && "bg-green-100 text-green-700",
-                                        asset.type === 'photo' && "bg-amber-100 text-amber-700"
+                                        asset.type === 'photo' && "bg-amber-100 text-amber-700",
+                                        asset.type === 'button' && "bg-indigo-100 text-indigo-700"
                                     )}>
                                         {asset.source}
                                     </span>
@@ -238,19 +302,13 @@ export function AssetLibrary({ onAssetSelect, onClose }: AssetLibraryProps) {
                             </div>
                         ))}
                     </div>
-                ) : hasSearched ? (
+                ) : hasSearched && assets.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                         <Search className="h-8 w-8 text-gray-300 mb-2" />
                         <p className="text-sm text-gray-500">素材が見つかりませんでした</p>
                         <p className="text-xs text-gray-400 mt-1">別のキーワードで検索してみてください</p>
                     </div>
-                ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <Sparkles className="h-8 w-8 text-violet-300 mb-2" />
-                        <p className="text-sm text-gray-500">素材を検索</p>
-                        <p className="text-xs text-gray-400 mt-1">キーワードを入力して<br/>イラストやアイコンを探しましょう</p>
-                    </div>
-                )}
+                ) : null}
             </div>
 
             {/* フッター */}

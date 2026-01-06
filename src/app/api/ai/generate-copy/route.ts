@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        // Use the high-accuracy "Nanobananapro" grade model: gemini-2.0-flash
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        // Use Gemini 3 Flash Preview - fastest intelligent model with frontier intelligence
+        const model = genAI.getGenerativeModel({ model: "gemini-3.0-flash-preview" });
 
         if (!sections || sections.length === 0) {
             return NextResponse.json({ error: '画像がありません。' }, { status: 400 });
@@ -162,9 +162,9 @@ export async function POST(request: NextRequest) {
                 }
             ]);
         } catch (genError: any) {
-            console.warn('Gemini 2.0 Flash failed, retrying with gemini-1.5-flash-latest...', genError.message);
-            // Fallback to 1.5-flash-latest which might have separate quota
-            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+            console.warn('Gemini 3.0 Flash Preview failed, retrying with gemini-2.0-flash...', genError.message);
+            // Fallback to 2.0-flash which is stable and has separate quota
+            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
             result = await fallbackModel.generateContent([
                 prompt,
                 {
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
                 userId: user.id,
                 type: 'copy',
                 endpoint: '/api/ai/generate-copy',
-                model: 'gemini-2.0-flash',
+                model: 'gemini-3.0-flash-preview',
                 inputPrompt: prompt,
                 outputResult: text,
                 status: 'failed',
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             type: 'copy',
             endpoint: '/api/ai/generate-copy',
-            model: 'gemini-2.0-flash',
+            model: 'gemini-1.5-pro',
             inputPrompt: prompt,
             outputResult: JSON.stringify(resultData),
             status: 'succeeded',
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             type: 'copy',
             endpoint: '/api/ai/generate-copy',
-            model: 'gemini-2.0-flash',
+            model: 'gemini-1.5-pro',
             inputPrompt: prompt || 'Error occurred before prompt finalization',
             status: 'failed',
             errorMessage: error.message,

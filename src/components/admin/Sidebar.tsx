@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Images, Settings, LogOut, FileText, Navigation, Crown, History, BarChart3 } from 'lucide-react';
+import { Images, Settings, LogOut, FileText, Navigation, Crown, History, BarChart3 } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -16,7 +16,6 @@ const navItems = [
     { name: 'API Usage', href: '/admin/api-usage', icon: BarChart3, prefetchUrl: '/api/admin/stats?days=30' },
     { name: 'History', href: '/admin/import-history', icon: History, prefetchUrl: null },
     { name: 'Navigation', href: '/admin/navigation', icon: Navigation, prefetchUrl: '/api/config/navigation' },
-    { name: 'Builder', href: '/admin/lp-builder', icon: LayoutDashboard, prefetchUrl: '/api/lp-builder' },
     { name: 'Settings', href: '/admin/settings', icon: Settings, prefetchUrl: '/api/admin/settings' },
 ] as const;
 

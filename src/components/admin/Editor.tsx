@@ -11,7 +11,16 @@ import { RestoreModal } from '@/components/admin/RestoreModal';
 import { DesignUnifyModal } from '@/components/admin/DesignUnifyModal';
 import { BackgroundUnifyModal } from '@/components/admin/BackgroundUnifyModal';
 import { AssetLibrary } from '@/components/admin/AssetLibrary';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, TestTube2, LayoutTemplate, Video, Lock, Crown, Image as ImageIcon } from 'lucide-react';
+import CopyEditModal from '@/components/admin/CopyEditModal';
+import CTAManagementModal from '@/components/admin/CTAManagementModal';
+import ColorPaletteModal from '@/components/admin/ColorPaletteModal';
+import MobileOptimizeModal from '@/components/admin/MobileOptimizeModal';
+import ABTestModal from '@/components/admin/ABTestModal';
+import StructureTemplateModal from '@/components/admin/StructureTemplateModal';
+import VideoInsertModal from '@/components/admin/VideoInsertModal';
+import SectionCropModal from '@/components/admin/SectionCropModal';
+import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, TestTube2, LayoutTemplate, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square } from 'lucide-react';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -93,6 +102,22 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // 右サイドバータブ
     const [sidebarTab, setSidebarTab] = useState<'tools' | 'assets'>('tools');
+
+    // ツールアコーディオン展開状態
+    const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set(['ai-assistant']));
+
+    // アコーディオントグル関数
+    const toggleTool = (toolId: string) => {
+        setExpandedTools(prev => {
+            const next = new Set(prev);
+            if (next.has(toolId)) {
+                next.delete(toolId);
+            } else {
+                next.add(toolId);
+            }
+            return next;
+        });
+    };
     const [selectedSectionsForDelete, setSelectedSectionsForDelete] = useState<Set<string>>(new Set());
 
     // 境界ドラッグ調整
@@ -127,6 +152,46 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [selectedSectionsForBackgroundUnify, setSelectedSectionsForBackgroundUnify] = useState<Set<string>>(new Set());
     const [showBackgroundUnifyModal, setShowBackgroundUnifyModal] = useState(false);
 
+    // コピー編集モーダル
+    const [showCopyEditModal, setShowCopyEditModal] = useState(false);
+    const [isCopyRegenerating, setIsCopyRegenerating] = useState(false);
+
+    // CTA管理モーダル
+    const [showCTAModal, setShowCTAModal] = useState(false);
+
+    // カラーパレットモーダル
+    const [showColorPaletteModal, setShowColorPaletteModal] = useState(false);
+    const [isColorPaletteRegenerating, setIsColorPaletteRegenerating] = useState(false);
+
+    // モバイル最適化モーダル
+    const [showMobileOptimizeModal, setShowMobileOptimizeModal] = useState(false);
+
+    // ABテストモーダル
+    const [showABTestModal, setShowABTestModal] = useState(false);
+
+    // 構成テンプレートモーダル
+    const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+    // 動画挿入モーダル
+    const [showVideoModal, setShowVideoModal] = useState(false);
+
+    // セクションクロップモーダル
+    const [showCropModal, setShowCropModal] = useState(false);
+    const [cropSectionId, setCropSectionId] = useState<string | null>(null);
+    const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
+
+    // オーバーレイエディターモーダル
+    const [showOverlayEditor, setShowOverlayEditor] = useState(false);
+    const [overlayEditSectionId, setOverlayEditSectionId] = useState<string | null>(null);
+    const [overlayEditImageUrl, setOverlayEditImageUrl] = useState<string | null>(null);
+
+    // インラインオーバーレイ編集状態
+    const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+    const [selectedOverlaySectionId, setSelectedOverlaySectionId] = useState<string | null>(null);
+    const [editingOverlayId, setEditingOverlayId] = useState<string | null>(null);
+    const [draggingOverlayId, setDraggingOverlayId] = useState<string | null>(null);
+    const [overlayDragStart, setOverlayDragStart] = useState<{ x: number; y: number; overlayX: number; overlayY: number } | null>(null);
+
     // HD高画質化モーダル
     const [show4KModal, setShow4KModal] = useState(false);
     const [is4KProcessing, setIs4KProcessing] = useState(false);
@@ -157,6 +222,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // デスクトップレイアウトプレビューモード
     const [showDesktopPreview, setShowDesktopPreview] = useState(false);
+    const [showPreviewPanel, setShowPreviewPanel] = useState(false);
 
     // 表示モード（デスクトップ/モバイル）
     const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
@@ -168,6 +234,68 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // API消費量メーター
     const [apiCost, setApiCost] = useState<{ todayCost: number; monthCost: number } | null>(null);
+
+    // 素材ドラッグ＆ドロップ状態
+    const [isDraggingAsset, setIsDraggingAsset] = useState(false);
+    const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
+    const [isProcessingAssetDrop, setIsProcessingAssetDrop] = useState(false);
+
+    // 素材ドロップハンドラー
+    const handleAssetDrop = async (e: React.DragEvent, targetSectionId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverSectionId(null);
+        setIsDraggingAsset(false);
+
+        try {
+            const assetData = e.dataTransfer.getData('application/json');
+            if (!assetData) return;
+
+            const asset = JSON.parse(assetData);
+            setIsProcessingAssetDrop(true);
+
+            // 素材をダウンロードしてSupabaseに保存
+            const res = await fetch('/api/assets/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: asset.downloadUrl,
+                    type: asset.type,
+                    title: asset.title
+                })
+            });
+
+            const data = await res.json();
+            if (data.error) {
+                toast.error(data.error);
+                return;
+            }
+
+            // ターゲットセクションの後ろに新しいセクションとして追加
+            const targetIndex = sections.findIndex(s => String(s.id) === String(targetSectionId));
+            const newSection = {
+                id: `temp-${Date.now()}`,
+                role: 'asset',
+                order: targetIndex + 1,
+                imageId: null,
+                image: { filePath: data.url },
+                config: { assetType: asset.type, assetTitle: asset.title }
+            };
+
+            setSections(prev => {
+                const updated = [...prev];
+                updated.splice(targetIndex + 1, 0, newSection);
+                // orderを再計算
+                return updated.map((s, i) => ({ ...s, order: i }));
+            });
+
+            toast.success(`素材を「${sections[targetIndex]?.role || `セクション ${targetIndex + 1}`}」の後に追加しました`);
+        } catch (error) {
+            toast.error('素材の追加に失敗しました');
+        } finally {
+            setIsProcessingAssetDrop(false);
+        }
+    };
 
     const analyzeCurrentDesign = async () => {
         setIsAnalyzing(true);
@@ -333,6 +461,50 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             window.removeEventListener('mouseup', handleMouseUp);
         };
     }, [draggingBoundaryIndex]); // 依存を最小限に
+
+    // オーバーレイドラッグ処理
+    useEffect(() => {
+        if (!draggingOverlayId || !overlayDragStart || !selectedOverlaySectionId) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const sectionEl = document.getElementById(`section-${selectedOverlaySectionId}`);
+            if (!sectionEl) return;
+
+            const rect = sectionEl.getBoundingClientRect();
+            const deltaX = ((e.clientX - overlayDragStart.x) / rect.width) * 100;
+            const deltaY = ((e.clientY - overlayDragStart.y) / rect.height) * 100;
+
+            const newX = Math.max(5, Math.min(95, overlayDragStart.overlayX + deltaX));
+            const newY = Math.max(5, Math.min(95, overlayDragStart.overlayY + deltaY));
+
+            setSections(prev => prev.map(s =>
+                String(s.id) === selectedOverlaySectionId
+                    ? {
+                        ...s,
+                        config: {
+                            ...s.config,
+                            overlays: s.config?.overlays?.map((o: any) =>
+                                o.id === draggingOverlayId ? { ...o, x: newX, y: newY } : o
+                            )
+                        }
+                    }
+                    : s
+            ));
+        };
+
+        const handleMouseUp = () => {
+            setDraggingOverlayId(null);
+            setOverlayDragStart(null);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [draggingOverlayId, overlayDragStart, selectedOverlaySectionId]);
 
     // API消費量を取得
     useEffect(() => {
@@ -1294,6 +1466,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     // 境界オフセット情報（ユーザーが調整した認識範囲）
                     boundaryOffsetTop: section.boundaryOffsetTop || undefined,
                     boundaryOffsetBottom: section.boundaryOffsetBottom || undefined,
+                    // コピーテキスト（AIコピー生成で作成されたテキスト）
+                    copyText: section.config?.text || undefined,
                 })
             });
 
@@ -1409,6 +1583,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         // 境界オフセット情報
                         boundaryOffsetTop: section.boundaryOffsetTop || undefined,
                         boundaryOffsetBottom: section.boundaryOffsetBottom || undefined,
+                        // コピーテキスト
+                        copyText: section.config?.text || undefined,
                     })
                 });
 
@@ -1741,13 +1917,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 {/* 履歴ボタン */}
                 <button
                     onClick={() => {
-                        // 履歴パネルを表示（セクション一覧から選択）
-                        const sectionsWithHistory = sections.filter(s => editHistory[s.id]?.length > 0);
-                        if (sectionsWithHistory.length > 0) {
-                            setRestoreSectionId(sectionsWithHistory[0].id);
-                            setShowRestoreModal(true);
+                        // セクションがあれば最初のセクションの履歴パネルを開く（サーバー履歴も含む）
+                        if (sections.length > 0) {
+                            handleOpenHistoryPanel(sections[0].id);
                         } else {
-                            toast('編集履歴がありません');
+                            toast('セクションがありません');
                         }
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
@@ -1758,6 +1932,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 </button>
 
                 <div className="w-px h-6 bg-gray-200" />
+
+                {/* プレビューボタン */}
+                <button
+                    onClick={() => setShowPreviewPanel(true)}
+                    className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm"
+                >
+                    <Eye className="h-4 w-4" />
+                    <span className="whitespace-nowrap">プレビュー</span>
+                </button>
 
                 {/* 保存ボタン */}
                 <button
@@ -1837,6 +2020,58 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         <>
                             {sections.map((section, sectionIndex) => (
                                 <React.Fragment key={section.id}>
+                                    {/* ドロップゾーンインジケーター（セクション上部） */}
+                                    {isDraggingAsset && sectionIndex === 0 && (
+                                        <div
+                                            className={clsx(
+                                                "h-16 border-2 border-dashed rounded-lg mx-2 transition-all flex items-center justify-center",
+                                                dragOverSectionId === `before-${section.id}`
+                                                    ? "border-violet-500 bg-violet-50"
+                                                    : "border-gray-300 bg-gray-50"
+                                            )}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                setDragOverSectionId(`before-${section.id}`);
+                                            }}
+                                            onDragLeave={() => setDragOverSectionId(null)}
+                                            onDrop={async (e) => {
+                                                e.preventDefault();
+                                                // 先頭に追加
+                                                const assetData = e.dataTransfer.getData('application/json');
+                                                if (!assetData) return;
+                                                const asset = JSON.parse(assetData);
+                                                setIsProcessingAssetDrop(true);
+                                                try {
+                                                    const res = await fetch('/api/assets/download', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ url: asset.downloadUrl, type: asset.type, title: asset.title })
+                                                    });
+                                                    const data = await res.json();
+                                                    if (data.url) {
+                                                        const newSection = {
+                                                            id: `temp-${Date.now()}`,
+                                                            role: 'asset',
+                                                            order: 0,
+                                                            imageId: null,
+                                                            image: { filePath: data.url },
+                                                            config: { assetType: asset.type, assetTitle: asset.title }
+                                                        };
+                                                        setSections(prev => [newSection, ...prev].map((s, i) => ({ ...s, order: i })));
+                                                        toast.success('素材を先頭に追加しました');
+                                                    }
+                                                } catch (error) {
+                                                    toast.error('素材の追加に失敗しました');
+                                                } finally {
+                                                    setIsProcessingAssetDrop(false);
+                                                    setDragOverSectionId(null);
+                                                    setIsDraggingAsset(false);
+                                                }
+                                            }}
+                                        >
+                                            <span className="text-xs text-gray-500">ここにドロップして先頭に追加</span>
+                                        </div>
+                                    )}
                                     <div
                                         id={`section-${section.id}`}
                                         className={clsx(
@@ -1844,8 +2079,77 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             batchRegenerateMode && batchReferenceSection === section.id && "ring-4 ring-blue-500",
                                             batchRegenerateMode && selectedSectionsForRegenerate.has(section.id) && batchReferenceSection !== section.id && "ring-4 ring-orange-500",
                                             backgroundUnifyMode && selectedSectionsForBackgroundUnify.has(section.id) && "ring-4 ring-amber-500",
-                                            sectionDeleteMode && selectedSectionsForDelete.has(section.id) && "ring-4 ring-red-500"
+                                            sectionDeleteMode && selectedSectionsForDelete.has(section.id) && "ring-4 ring-red-500",
+                                            isDraggingAsset && dragOverSectionId === `overlay-${section.id}` && "ring-4 ring-cyan-500 bg-cyan-500/10"
                                         )}
+                                        onDragOver={(e) => {
+                                            if (isDraggingAsset && section.image?.filePath) {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setDragOverSectionId(`overlay-${section.id}`);
+                                            }
+                                        }}
+                                        onDragLeave={(e) => {
+                                            if (dragOverSectionId === `overlay-${section.id}`) {
+                                                setDragOverSectionId(null);
+                                            }
+                                        }}
+                                        onDrop={async (e) => {
+                                            if (!isDraggingAsset || !section.image?.filePath) return;
+                                            e.preventDefault();
+                                            e.stopPropagation();
+
+                                            try {
+                                                const assetData = e.dataTransfer.getData('application/json');
+                                                if (!assetData) return;
+
+                                                const asset = JSON.parse(assetData);
+
+                                                // ドロップ位置を計算（セクション内での相対位置）
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                                const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+                                                // オーバーレイとして追加
+                                                const newOverlay = {
+                                                    id: `overlay-${Date.now()}`,
+                                                    type: 'button' as const,
+                                                    x: Math.max(5, Math.min(95, x)),
+                                                    y: Math.max(5, Math.min(95, y)),
+                                                    width: 30,
+                                                    height: 48,
+                                                    content: asset.name || 'ボタン',
+                                                    style: {
+                                                        backgroundColor: '#6366f1',
+                                                        textColor: '#ffffff',
+                                                        borderRadius: 8,
+                                                        fontSize: 16,
+                                                        fontWeight: 'bold',
+                                                        padding: '12px 24px',
+                                                    },
+                                                };
+
+                                                // セクションにオーバーレイを追加
+                                                setSections(prev => prev.map(s =>
+                                                    s.id === section.id
+                                                        ? {
+                                                            ...s,
+                                                            config: {
+                                                                ...(s.config || {}),
+                                                                overlays: [...(s.config?.overlays || []), newOverlay]
+                                                            }
+                                                        }
+                                                        : s
+                                                ));
+
+                                                toast.success(`「${asset.name}」をオーバーレイとして追加しました`);
+                                            } catch (error) {
+                                                console.error('Overlay drop error:', error);
+                                            } finally {
+                                                setDragOverSectionId(null);
+                                                setIsDraggingAsset(false);
+                                            }
+                                        }}
                                         onClick={() => {
                                             if (sectionDeleteMode) {
                                                 // セクション削除モード: 選択/解除
@@ -1913,6 +2217,169 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                         モバイル画像なし
                                                     </div>
                                                 )}
+                                                {/* オーバーレイ要素の表示（インタラクティブ） */}
+                                                {section.config?.overlays?.map((overlay: any) => (
+                                                    <div
+                                                        key={overlay.id}
+                                                        className={clsx(
+                                                            "absolute cursor-move z-40 transition-all",
+                                                            selectedOverlayId === overlay.id && selectedOverlaySectionId === String(section.id) && "ring-2 ring-cyan-500 ring-offset-2"
+                                                        )}
+                                                        style={{
+                                                            left: `${overlay.x}%`,
+                                                            top: `${overlay.y}%`,
+                                                            transform: 'translate(-50%, -50%)',
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedOverlayId(overlay.id);
+                                                            setSelectedOverlaySectionId(String(section.id));
+                                                        }}
+                                                        onDoubleClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingOverlayId(overlay.id);
+                                                        }}
+                                                        onMouseDown={(e) => {
+                                                            if (editingOverlayId === overlay.id) return;
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+                                                            if (!rect) return;
+                                                            setDraggingOverlayId(overlay.id);
+                                                            setSelectedOverlaySectionId(String(section.id));
+                                                            setOverlayDragStart({
+                                                                x: e.clientX,
+                                                                y: e.clientY,
+                                                                overlayX: overlay.x,
+                                                                overlayY: overlay.y
+                                                            });
+                                                        }}
+                                                    >
+                                                        {overlay.type === 'button' && (
+                                                            editingOverlayId === overlay.id ? (
+                                                                <input
+                                                                    type="text"
+                                                                    autoFocus
+                                                                    value={overlay.content}
+                                                                    onChange={(e) => {
+                                                                        setSections(prev => prev.map(s =>
+                                                                            s.id === section.id
+                                                                                ? {
+                                                                                    ...s,
+                                                                                    config: {
+                                                                                        ...s.config,
+                                                                                        overlays: s.config?.overlays?.map((o: any) =>
+                                                                                            o.id === overlay.id ? { ...o, content: e.target.value } : o
+                                                                                        )
+                                                                                    }
+                                                                                }
+                                                                                : s
+                                                                        ));
+                                                                    }}
+                                                                    onBlur={() => setEditingOverlayId(null)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') setEditingOverlayId(null);
+                                                                        if (e.key === 'Escape') setEditingOverlayId(null);
+                                                                    }}
+                                                                    className="whitespace-nowrap text-center outline-none"
+                                                                    style={{
+                                                                        backgroundColor: overlay.style?.backgroundColor || '#6366f1',
+                                                                        color: overlay.style?.textColor || '#fff',
+                                                                        borderRadius: `${overlay.style?.borderRadius || 8}px`,
+                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                        fontWeight: overlay.style?.fontWeight || 'bold',
+                                                                        padding: overlay.style?.padding || '12px 24px',
+                                                                        boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
+                                                                        minWidth: '80px',
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                <div
+                                                                    className="whitespace-nowrap"
+                                                                    style={{
+                                                                        backgroundColor: overlay.style?.backgroundColor || '#6366f1',
+                                                                        color: overlay.style?.textColor || '#fff',
+                                                                        borderRadius: `${overlay.style?.borderRadius || 8}px`,
+                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                        fontWeight: overlay.style?.fontWeight || 'bold',
+                                                                        padding: overlay.style?.padding || '12px 24px',
+                                                                        boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
+                                                                    }}
+                                                                >
+                                                                    {overlay.content}
+                                                                </div>
+                                                            )
+                                                        )}
+                                                        {overlay.type === 'text' && (
+                                                            editingOverlayId === overlay.id ? (
+                                                                <input
+                                                                    type="text"
+                                                                    autoFocus
+                                                                    value={overlay.content}
+                                                                    onChange={(e) => {
+                                                                        setSections(prev => prev.map(s =>
+                                                                            s.id === section.id
+                                                                                ? {
+                                                                                    ...s,
+                                                                                    config: {
+                                                                                        ...s.config,
+                                                                                        overlays: s.config?.overlays?.map((o: any) =>
+                                                                                            o.id === overlay.id ? { ...o, content: e.target.value } : o
+                                                                                        )
+                                                                                    }
+                                                                                }
+                                                                                : s
+                                                                        ));
+                                                                    }}
+                                                                    onBlur={() => setEditingOverlayId(null)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') setEditingOverlayId(null);
+                                                                    }}
+                                                                    className="outline-none bg-transparent"
+                                                                    style={{
+                                                                        color: overlay.style?.textColor || '#000',
+                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                        fontWeight: overlay.style?.fontWeight || 'normal',
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                <div
+                                                                    style={{
+                                                                        color: overlay.style?.textColor || '#000',
+                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                        fontWeight: overlay.style?.fontWeight || 'normal',
+                                                                    }}
+                                                                >
+                                                                    {overlay.content}
+                                                                </div>
+                                                            )
+                                                        )}
+                                                        {/* 選択時の削除ボタン */}
+                                                        {selectedOverlayId === overlay.id && selectedOverlaySectionId === String(section.id) && !editingOverlayId && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSections(prev => prev.map(s =>
+                                                                        s.id === section.id
+                                                                            ? {
+                                                                                ...s,
+                                                                                config: {
+                                                                                    ...s.config,
+                                                                                    overlays: s.config?.overlays?.filter((o: any) => o.id !== overlay.id)
+                                                                                }
+                                                                            }
+                                                                            : s
+                                                                    ));
+                                                                    setSelectedOverlayId(null);
+                                                                    toast.success('オーバーレイを削除しました');
+                                                                }}
+                                                                className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
                                                 {/* 一括再生成モード選択インジケーター */}
                                                 {batchRegenerateMode && (
                                                     <>
@@ -1976,6 +2443,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                         )}
                                                     </div>
                                                 )}
+                                                {/* アセットドラッグ中のオーバーレイ追加インジケーター */}
+                                                {isDraggingAsset && dragOverSectionId === `overlay-${section.id}` && (
+                                                    <div className="absolute inset-0 z-30 bg-cyan-500/30 flex items-center justify-center pointer-events-none">
+                                                        <div className="bg-cyan-600 text-white px-6 py-3 rounded-xl shadow-xl font-bold text-lg flex items-center gap-2">
+                                                            <Layers className="h-5 w-5" />
+                                                            ここにドロップしてオーバーレイ追加
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 {/* セクション削除モード選択インジケーター */}
                                                 {sectionDeleteMode && (
                                                     <div className={clsx(
@@ -2007,9 +2483,23 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                         (batchRegenerateMode || sectionDeleteMode || backgroundUnifyMode) ? "hidden" : "opacity-0 group-hover:opacity-100"
                                                     )}>
                                                         <div className="flex gap-3">
-                                                            <div className="h-14 w-14 rounded-full bg-white flex items-center justify-center shadow-xl">
-                                                                <Pencil className="h-6 w-6 text-gray-800" />
-                                                            </div>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
+                                                                        ? section.mobileImage.filePath
+                                                                        : section.image?.filePath;
+                                                                    if (imageUrl) {
+                                                                        setOverlayEditSectionId(String(section.id));
+                                                                        setOverlayEditImageUrl(imageUrl);
+                                                                        setShowOverlayEditor(true);
+                                                                    }
+                                                                }}
+                                                                className="h-14 w-14 rounded-full bg-cyan-600 flex items-center justify-center shadow-xl hover:bg-cyan-700 transition-colors"
+                                                                title="ボタン・テキストを重ねる"
+                                                            >
+                                                                <Layers className="h-6 w-6 text-white" />
+                                                            </button>
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
@@ -2057,8 +2547,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             </button>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <span className="text-white text-xs font-bold bg-black/60 px-3 py-1.5 rounded-full">
-                                                                編集
+                                                            <span className="text-white text-xs font-bold bg-cyan-600/80 px-3 py-1.5 rounded-full">
+                                                                重ねる
                                                             </span>
                                                             <span className="text-white text-xs font-bold bg-purple-600/80 px-3 py-1.5 rounded-full">
                                                                 再生成
@@ -2087,13 +2577,38 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                     <Undo2 className="h-3.5 w-3.5" />
                                                     <span>履歴</span>
                                                 </button>
-                                                {/* ローディング */}
+                                                {/* ローディングオーバーレイ */}
                                                 {(generatingImageSectionIds.has(section.id) || editingSectionIds.has(section.id) || regeneratingSectionIds.has(section.id)) && (
-                                                    <div className="absolute inset-0 bg-purple-600/80 flex flex-col items-center justify-center gap-2">
-                                                        <RefreshCw className="h-10 w-10 text-white animate-spin" />
+                                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600/90 to-indigo-700/90 flex flex-col items-center justify-center gap-4 backdrop-blur-sm">
+                                                        {/* パルスリング */}
+                                                        <div className="relative">
+                                                            <div className="absolute inset-0 rounded-full bg-white/20 animate-ping" style={{ animationDuration: '1.5s' }} />
+                                                            <div className="relative w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
+                                                                <Sparkles className="h-10 w-10 text-white animate-pulse" />
+                                                            </div>
+                                                        </div>
+                                                        {/* テキスト */}
+                                                        <div className="text-center">
+                                                            <p className="text-white text-lg font-bold">
+                                                                {regeneratingSectionIds.has(section.id) ? 'AI再生成中...' :
+                                                                 editingSectionIds.has(section.id) ? '編集処理中...' : '生成中...'}
+                                                            </p>
+                                                            <p className="text-white/70 text-sm mt-1">
+                                                                しばらくお待ちください
+                                                            </p>
+                                                        </div>
+                                                        {/* コスト目安 */}
                                                         {regeneratingSectionIds.has(section.id) && (
-                                                            <span className="text-white text-sm font-bold">再生成中...</span>
+                                                            <div className="bg-white/10 rounded-full px-4 py-1.5">
+                                                                <span className="text-white/80 text-xs">
+                                                                    💰 約1〜2円/回
+                                                                </span>
+                                                            </div>
                                                         )}
+                                                        {/* プログレスバー風アニメーション */}
+                                                        <div className="w-48 h-1 bg-white/20 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-white rounded-full animate-progress" />
+                                                        </div>
                                                     </div>
                                                 )}
                                             </>
@@ -2143,6 +2658,28 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                     </>
                                                 )}
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* ドロップゾーン（セクション後） */}
+                                    {isDraggingAsset && (
+                                        <div
+                                            className={clsx(
+                                                "h-16 border-2 border-dashed rounded-lg mx-2 my-1 transition-all flex items-center justify-center",
+                                                dragOverSectionId === `after-${section.id}`
+                                                    ? "border-violet-500 bg-violet-50"
+                                                    : "border-gray-300 bg-gray-50/50"
+                                            )}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                setDragOverSectionId(`after-${section.id}`);
+                                            }}
+                                            onDragLeave={() => setDragOverSectionId(null)}
+                                            onDrop={(e) => handleAssetDrop(e, String(section.id))}
+                                        >
+                                            <span className="text-xs text-gray-500">
+                                                {`ここにドロップ → ${section.role || `セクション${sectionIndex + 1}`}の後に追加`}
+                                            </span>
                                         </div>
                                     )}
                                 </React.Fragment>
@@ -3155,6 +3692,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             };
                             setSections(prev => [...prev, newSection]);
                         }}
+                        onDragStart={() => setIsDraggingAsset(true)}
+                        onDragEnd={() => {
+                            setIsDraggingAsset(false);
+                            setDragOverSectionId(null);
+                        }}
                     />
                 )}
 
@@ -3346,19 +3888,19 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         </div>
 
                         {/* 入力エリア */}
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                             <input
                                 type="text"
                                 value={chatInput}
                                 onChange={(e) => setChatInput(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendChat()}
                                 placeholder="商材やサービスについて教えてください..."
-                                className="flex-1 px-3 py-2 rounded-lg bg-white text-xs outline-none focus:ring-2 focus:ring-violet-300 border border-gray-200"
+                                className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-white text-xs outline-none focus:ring-2 focus:ring-violet-300 border border-gray-200"
                             />
                             <button
                                 onClick={handleSendChat}
                                 disabled={!chatInput.trim() || isChatLoading}
-                                className="px-3 py-2 rounded-lg bg-violet-500 text-white hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                className="shrink-0 px-3 py-2 rounded-lg bg-violet-500 text-white hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                                 <Send className="h-3.5 w-3.5" />
                             </button>
@@ -3372,33 +3914,104 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         </div>
                     </div>
 
-                    {/* セクション削除 */}
-                    <div className="bg-gradient-to-r from-red-50 to-rose-50 rounded-xl p-4 border border-red-100">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-md">
-                                <Trash2 className="h-4 w-4 text-white" />
-                            </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-gray-900">セクション削除</h4>
-                                <p className="text-[10px] text-gray-500">不要なセクションを削除</p>
-                            </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                            複数のセクションを選択して一括削除できます。
-                        </p>
+                    {/* セクションクロップ */}
+                    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-100 overflow-hidden">
                         <button
-                            onClick={() => {
-                                setSectionDeleteMode(true);
-                                setBatchRegenerateMode(false);
-                                setBackgroundUnifyMode(false);
-                                setBoundaryFixMode(false);
-                            }}
-                            disabled={sections.length === 0}
-                            className="w-full py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm font-bold rounded-lg hover:from-red-600 hover:to-rose-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            onClick={() => toggleTool('crop')}
+                            className="w-full flex items-center justify-between p-3 hover:bg-emerald-100/50 transition-colors"
                         >
-                            <Trash2 className="h-4 w-4" />
-                            セクション選択
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-md">
+                                    <Scissors className="h-4 w-4 text-white" />
+                                </div>
+                                <div className="text-left">
+                                    <h4 className="text-sm font-bold text-gray-900">セクションクロップ</h4>
+                                    <p className="text-[10px] text-gray-500">画像の一部を切り取り</p>
+                                </div>
+                            </div>
+                            {expandedTools.has('crop') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                         </button>
+                        {expandedTools.has('crop') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">
+                                    セクションの不要な部分を切り取り、必要な部分だけを残せます。
+                                </p>
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                    {sections.filter(s => s.image?.filePath).map((section, idx) => (
+                                        <button
+                                            key={section.id}
+                                            onClick={() => {
+                                                if (section?.image?.filePath) {
+                                                    setCropSectionId(String(section.id));
+                                                    setCropImageUrl(section.image.filePath);
+                                                    setShowCropModal(true);
+                                                }
+                                            }}
+                                            className="w-full flex items-center gap-3 p-2 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-all text-left group"
+                                        >
+                                            <div className="w-10 h-10 rounded-md bg-gray-100 overflow-hidden flex-shrink-0">
+                                                <img
+                                                    src={section.image.filePath}
+                                                    alt=""
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-medium text-gray-900 truncate">
+                                                    {section.role || `セクション ${idx + 1}`}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400">クリックでクロップ</p>
+                                            </div>
+                                            <Scissors className="h-3.5 w-3.5 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </button>
+                                    ))}
+                                    {sections.filter(s => s.image?.filePath).length === 0 && (
+                                        <p className="text-xs text-gray-400 text-center py-3">
+                                            画像のあるセクションがありません
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* セクション削除 */}
+                    <div className="bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-100 overflow-hidden">
+                        <button
+                            onClick={() => toggleTool('delete')}
+                            className="w-full flex items-center justify-between p-3 hover:bg-red-100/50 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-md">
+                                    <Trash2 className="h-4 w-4 text-white" />
+                                </div>
+                                <div className="text-left">
+                                    <h4 className="text-sm font-bold text-gray-900">セクション削除</h4>
+                                    <p className="text-[10px] text-gray-500">不要なセクションを削除</p>
+                                </div>
+                            </div>
+                            {expandedTools.has('delete') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
+                        </button>
+                        {expandedTools.has('delete') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">
+                                    複数のセクションを選択して一括削除できます。
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        setSectionDeleteMode(true);
+                                        setBatchRegenerateMode(false);
+                                        setBackgroundUnifyMode(false);
+                                        setBoundaryFixMode(false);
+                                    }}
+                                    disabled={sections.length === 0}
+                                    className="w-full py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm font-bold rounded-lg hover:from-red-600 hover:to-rose-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    セクション選択
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* 履歴機能 */}
@@ -3481,174 +4094,128 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider px-1">高度な機能</p>
 
                     {/* カラーパレット */}
-                    <div className="bg-gradient-to-r from-cyan-50 to-teal-50 rounded-xl p-4 border border-cyan-100">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center shadow-md">
-                                <Droplet className="h-4 w-4 text-white" />
+                    <div className="bg-gradient-to-r from-cyan-50 to-teal-50 rounded-xl border border-cyan-100 overflow-hidden">
+                        <button onClick={() => toggleTool('color-palette')} className="w-full flex items-center justify-between p-3 hover:bg-cyan-100/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center shadow-md"><Droplet className="h-4 w-4 text-white" /></div>
+                                <div className="text-left"><h4 className="text-sm font-bold text-gray-900">カラーパレット</h4><p className="text-[10px] text-gray-500">LP全体の配色を管理</p></div>
                             </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-gray-900">カラーパレット</h4>
-                                <p className="text-[10px] text-gray-500">LP全体の配色を管理</p>
-                            </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                            メインカラー、アクセントカラーを設定し、全セクションに適用します。
-                        </p>
-                        <button
-                            onClick={() => toast('カラーパレット機能は開発中です')}
-                            className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-sm font-bold rounded-lg hover:from-cyan-600 hover:to-teal-600 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Droplet className="h-4 w-4" />
-                            配色を設定
+                            {expandedTools.has('color-palette') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                         </button>
+                        {expandedTools.has('color-palette') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">メインカラー、アクセントカラーを設定し、全セクションに適用します。</p>
+                                <button onClick={() => setShowColorPaletteModal(true)} className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-sm font-bold rounded-lg hover:from-cyan-600 hover:to-teal-600 transition-all flex items-center justify-center gap-2"><Droplet className="h-4 w-4" />配色を設定</button>
+                            </div>
+                        )}
                     </div>
 
                     {/* コピー編集 */}
-                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-100">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-md">
-                                <Type className="h-4 w-4 text-white" />
+                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100 overflow-hidden">
+                        <button onClick={() => toggleTool('copy-edit')} className="w-full flex items-center justify-between p-3 hover:bg-emerald-100/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-md"><Type className="h-4 w-4 text-white" /></div>
+                                <div className="text-left"><h4 className="text-sm font-bold text-gray-900">コピー編集</h4><p className="text-[10px] text-gray-500">AIでキャッチコピー生成</p></div>
                             </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-gray-900">コピー編集</h4>
-                                <p className="text-[10px] text-gray-500">AIでキャッチコピー生成</p>
-                            </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                            セクションごとのテキストをAIで生成・編集します。
-                        </p>
-                        <button
-                            onClick={() => toast('コピー編集機能は開発中です')}
-                            className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-sm font-bold rounded-lg hover:from-emerald-600 hover:to-green-600 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Type className="h-4 w-4" />
-                            コピーを編集
+                            {expandedTools.has('copy-edit') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                         </button>
+                        {expandedTools.has('copy-edit') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">セクションごとのテキストをAIで生成・編集します。</p>
+                                <button onClick={() => setShowCopyEditModal(true)} className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-sm font-bold rounded-lg hover:from-emerald-600 hover:to-green-600 transition-all flex items-center justify-center gap-2"><Type className="h-4 w-4" />コピーを編集</button>
+                            </div>
+                        )}
                     </div>
 
                     {/* CTA配置 */}
-                    <div className="bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl p-4 border border-rose-100">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center shadow-md">
-                                <MousePointer className="h-4 w-4 text-white" />
+                    <div className="bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl border border-rose-100 overflow-hidden">
+                        <button onClick={() => toggleTool('cta')} className="w-full flex items-center justify-between p-3 hover:bg-rose-100/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center shadow-md"><MousePointer className="h-4 w-4 text-white" /></div>
+                                <div className="text-left"><h4 className="text-sm font-bold text-gray-900">CTA配置</h4><p className="text-[10px] text-gray-500">ボタン・リンク領域を設定</p></div>
                             </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-gray-900">CTA配置</h4>
-                                <p className="text-[10px] text-gray-500">ボタン・リンク領域を設定</p>
-                            </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                            クリック領域やボタンのリンク先URLを管理します。
-                        </p>
-                        <button
-                            onClick={() => toast('CTA配置機能は開発中です')}
-                            className="w-full py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-sm font-bold rounded-lg hover:from-rose-600 hover:to-pink-600 transition-all flex items-center justify-center gap-2"
-                        >
-                            <MousePointer className="h-4 w-4" />
-                            CTAを設定
+                            {expandedTools.has('cta') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                         </button>
+                        {expandedTools.has('cta') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">クリック領域やボタンのリンク先URLを管理します。</p>
+                                <button onClick={() => setShowCTAModal(true)} className="w-full py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-sm font-bold rounded-lg hover:from-rose-600 hover:to-pink-600 transition-all flex items-center justify-center gap-2"><MousePointer className="h-4 w-4" />CTAを設定</button>
+                            </div>
+                        )}
                     </div>
 
                     {/* モバイル最適化 */}
-                    <div className="bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl p-4 border border-sky-100">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center shadow-md">
-                                <Smartphone className="h-4 w-4 text-white" />
+                    <div className="bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl border border-sky-100 overflow-hidden">
+                        <button onClick={() => toggleTool('mobile')} className="w-full flex items-center justify-between p-3 hover:bg-sky-100/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center shadow-md"><Smartphone className="h-4 w-4 text-white" /></div>
+                                <div className="text-left"><h4 className="text-sm font-bold text-gray-900">モバイル最適化</h4><p className="text-[10px] text-gray-500">スマホ向け画像を自動生成</p></div>
                             </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-gray-900">モバイル最適化</h4>
-                                <p className="text-[10px] text-gray-500">スマホ向け画像を自動生成</p>
-                            </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                            モバイル専用画像を自動生成し、レスポンシブ対応します。
-                        </p>
-                        <button
-                            onClick={() => toast('モバイル最適化機能は開発中です')}
-                            className="w-full py-2.5 bg-gradient-to-r from-sky-500 to-blue-500 text-white text-sm font-bold rounded-lg hover:from-sky-600 hover:to-blue-600 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Smartphone className="h-4 w-4" />
-                            モバイル版を生成
+                            {expandedTools.has('mobile') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                         </button>
+                        {expandedTools.has('mobile') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">モバイル専用画像を自動生成し、レスポンシブ対応します。</p>
+                                <button onClick={() => setShowMobileOptimizeModal(true)} className="w-full py-2.5 bg-gradient-to-r from-sky-500 to-blue-500 text-white text-sm font-bold rounded-lg hover:from-sky-600 hover:to-blue-600 transition-all flex items-center justify-center gap-2"><Smartphone className="h-4 w-4" />モバイル版を生成</button>
+                            </div>
+                        )}
                     </div>
 
                     {/* ABテスト */}
-                    <div className="bg-gradient-to-r from-fuchsia-50 to-purple-50 rounded-xl p-4 border border-fuchsia-100">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-500 flex items-center justify-center shadow-md">
-                                <TestTube2 className="h-4 w-4 text-white" />
+                    <div className="bg-gradient-to-r from-fuchsia-50 to-purple-50 rounded-xl border border-fuchsia-100 overflow-hidden">
+                        <button onClick={() => toggleTool('abtest')} className="w-full flex items-center justify-between p-3 hover:bg-fuchsia-100/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-500 flex items-center justify-center shadow-md"><TestTube2 className="h-4 w-4 text-white" /></div>
+                                <div className="text-left"><h4 className="text-sm font-bold text-gray-900">ABテスト</h4><p className="text-[10px] text-gray-500">バリエーションを作成</p></div>
                             </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-gray-900">ABテスト</h4>
-                                <p className="text-[10px] text-gray-500">バリエーションを作成</p>
-                            </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                            ヘッドラインや色違いの複数パターンを生成します。
-                        </p>
-                        <button
-                            onClick={() => toast('ABテスト機能は開発中です')}
-                            className="w-full py-2.5 bg-gradient-to-r from-fuchsia-500 to-purple-500 text-white text-sm font-bold rounded-lg hover:from-fuchsia-600 hover:to-purple-600 transition-all flex items-center justify-center gap-2"
-                        >
-                            <TestTube2 className="h-4 w-4" />
-                            バリエーション作成
+                            {expandedTools.has('abtest') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                         </button>
+                        {expandedTools.has('abtest') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">ヘッドラインや色違いの複数パターンを生成します。</p>
+                                <button onClick={() => setShowABTestModal(true)} className="w-full py-2.5 bg-gradient-to-r from-fuchsia-500 to-purple-500 text-white text-sm font-bold rounded-lg hover:from-fuchsia-600 hover:to-purple-600 transition-all flex items-center justify-center gap-2"><TestTube2 className="h-4 w-4" />バリエーション作成</button>
+                            </div>
+                        )}
                     </div>
 
                     {/* 構成テンプレート - Premium以上 */}
-                    <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl p-4 border border-slate-200 relative">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-slate-600 to-gray-700 flex items-center justify-center shadow-md">
-                                <LayoutTemplate className="h-4 w-4 text-white" />
+                    <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-slate-200 overflow-hidden">
+                        <button onClick={() => toggleTool('template')} className="w-full flex items-center justify-between p-3 hover:bg-slate-100/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-slate-600 to-gray-700 flex items-center justify-center shadow-md"><LayoutTemplate className="h-4 w-4 text-white" /></div>
+                                <div className="text-left">
+                                    <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">構成テンプレート<span className="text-[9px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded font-bold">Premium</span></h4>
+                                    <p className="text-[10px] text-gray-500">業種別LP構成を適用</p>
+                                </div>
                             </div>
-                            <div className="flex-1">
-                                <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                                    構成テンプレート
-                                    <span className="text-[9px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded font-bold">Premium</span>
-                                </h4>
-                                <p className="text-[10px] text-gray-500">業種別LP構成を適用</p>
-                            </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                            ヒーロー→問題提起→解決策→CTAなど、効果的な構成を適用します。
-                        </p>
-                        <button
-                            onClick={() => toast('構成テンプレート機能は開発中です')}
-                            className="w-full py-2.5 bg-gradient-to-r from-slate-600 to-gray-700 text-white text-sm font-bold rounded-lg hover:from-slate-700 hover:to-gray-800 transition-all flex items-center justify-center gap-2"
-                        >
-                            <LayoutTemplate className="h-4 w-4" />
-                            テンプレートを選択
+                            {expandedTools.has('template') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                         </button>
+                        {expandedTools.has('template') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">ヒーロー→問題提起→解決策→CTAなど、効果的な構成を適用します。</p>
+                                <button onClick={() => setShowTemplateModal(true)} className="w-full py-2.5 bg-gradient-to-r from-slate-600 to-gray-700 text-white text-sm font-bold rounded-lg hover:from-slate-700 hover:to-gray-800 transition-all flex items-center justify-center gap-2"><LayoutTemplate className="h-4 w-4" />テンプレートを選択</button>
+                            </div>
+                        )}
                     </div>
 
                     {/* 動画挿入 - Max Plan限定 */}
-                    <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-xl p-4 border border-indigo-200 relative overflow-hidden">
-                        {/* Max限定バッジ */}
-                        <div className="absolute top-2 right-2">
-                            <span className="flex items-center gap-1 text-[9px] px-2 py-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-full font-bold shadow-sm">
-                                <Crown className="h-3 w-3" />
-                                Max限定
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md">
-                                <Video className="h-4 w-4 text-white" />
+                    <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-xl border border-indigo-200 overflow-hidden">
+                        <button onClick={() => toggleTool('video')} className="w-full flex items-center justify-between p-3 hover:bg-indigo-100/50 transition-colors relative">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md"><Video className="h-4 w-4 text-white" /></div>
+                                <div className="text-left">
+                                    <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">動画挿入<span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded font-bold"><Crown className="h-2.5 w-2.5" />Max</span></h4>
+                                    <p className="text-[10px] text-gray-500">LPに動画を追加</p>
+                                </div>
                             </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-gray-900">動画挿入</h4>
-                                <p className="text-[10px] text-gray-500">LPに動画を追加</p>
-                            </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                            背景動画やプロモーション動画をセクションに挿入できます。
-                        </p>
-                        <button
-                            onClick={() => toast('動画挿入機能はMax Planユーザー限定です')}
-                            className="w-full py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-sm font-bold rounded-lg hover:from-indigo-600 hover:to-violet-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                            <Video className="h-4 w-4" />
-                            動画を追加
+                            {expandedTools.has('video') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                         </button>
+                        {expandedTools.has('video') && (
+                            <div className="px-3 pb-3 pt-0">
+                                <p className="text-xs text-gray-600 mb-3">背景動画やプロモーション動画をセクションに挿入できます。</p>
+                                <button onClick={() => setShowVideoModal(true)} className="w-full py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-sm font-bold rounded-lg hover:from-indigo-600 hover:to-violet-700 transition-all flex items-center justify-center gap-2"><Video className="h-4 w-4" />動画を追加</button>
+                            </div>
+                        )}
                     </div>
 
                 </div>
@@ -3801,6 +4368,476 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     }}
                 />
             )}
+
+            {/* コピー編集モーダル */}
+            <CopyEditModal
+                isOpen={showCopyEditModal}
+                onClose={() => setShowCopyEditModal(false)}
+                sections={sections}
+                productInfo={aiProductInfo}
+                taste={aiTaste}
+                designDefinition={designDefinition}
+                onApply={(results) => {
+                    // 生成されたコピーを各セクションに適用
+                    setSections(prev => prev.map(section => {
+                        const result = results.find(r => String(r.id) === String(section.id));
+                        if (result) {
+                            return {
+                                ...section,
+                                config: {
+                                    ...section.config,
+                                    text: result.text,
+                                    dsl: result.dsl
+                                }
+                            };
+                        }
+                        return section;
+                    }));
+                }}
+                onApplyAndRegenerate={async (results) => {
+                    // まずコピーを適用
+                    const updatedSections = sections.map(section => {
+                        const result = results.find(r => String(r.id) === String(section.id));
+                        if (result) {
+                            return {
+                                ...section,
+                                config: {
+                                    ...section.config,
+                                    text: result.text,
+                                    dsl: result.dsl
+                                }
+                            };
+                        }
+                        return section;
+                    });
+
+                    setIsCopyRegenerating(true);
+                    setShowCopyEditModal(false);
+
+                    // 先にデータベースに保存してIDを確定させる
+                    toast.loading('コピーを保存中...', { id: 'copy-save' });
+                    let savedSections = updatedSections;
+                    try {
+                        const method = pageId === 'new' ? 'POST' : 'PUT';
+                        const url = pageId === 'new' ? '/api/pages' : `/api/pages/${pageId}`;
+                        const saveRes = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sections: updatedSections.map((s, i) => ({
+                                    ...s,
+                                    order: i,
+                                    config: s.config || {}
+                                })),
+                                headerConfig,
+                                status,
+                                designDefinition
+                            })
+                        });
+                        const saveData = await saveRes.json();
+                        if (saveRes.ok && saveData.sections) {
+                            savedSections = saveData.sections;
+                            setSections(savedSections);
+                            toast.dismiss('copy-save');
+                            toast.success('コピーを保存しました');
+                        } else {
+                            throw new Error(saveData.error || '保存失敗');
+                        }
+                    } catch (error: any) {
+                        toast.dismiss('copy-save');
+                        toast.error('保存に失敗しました: ' + error.message);
+                        setIsCopyRegenerating(false);
+                        return;
+                    }
+
+                    // 対象セクションを特定（保存後のIDを使用、orderでマッチング）
+                    const targetSections = savedSections.filter((s, idx) => {
+                        const originalSection = updatedSections[idx];
+                        return results.some(r => String(r.id) === String(originalSection?.id)) && s.image?.filePath;
+                    });
+
+                    if (targetSections.length === 0) {
+                        toast.error('再生成対象のセクションがありません');
+                        setIsCopyRegenerating(false);
+                        return;
+                    }
+
+                    // 再生成中のセクションをマーク
+                    const sectionIdSet = new Set(targetSections.map(s => String(s.id)));
+                    setRegeneratingSectionIds(prev => new Set([...prev, ...sectionIdSet]));
+
+                    let finalSections = [...savedSections];
+                    let successCount = 0;
+                    let errorCount = 0;
+
+                    // リトライ付き再生成
+                    const regenerateWithRetry = async (section: any, copyText: string, retries = 3): Promise<boolean> => {
+                        const dbSectionId = typeof section.id === 'string' && section.id.startsWith('temp-')
+                            ? null
+                            : parseInt(String(section.id));
+
+                        if (!dbSectionId) return false;
+
+                        for (let attempt = 1; attempt <= retries; attempt++) {
+                            try {
+                                const response = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        style: 'design-definition',
+                                        mode: 'light',
+                                        designDefinition,
+                                        copyText,
+                                    })
+                                });
+
+                                const data = await response.json();
+
+                                if (response.ok) {
+                                    // 履歴に追加
+                                    if (section.imageId && section.image) {
+                                        setEditHistory(prev => ({
+                                            ...prev,
+                                            [section.id]: [
+                                                { imageId: section.imageId, image: section.image, timestamp: Date.now() },
+                                                ...(prev[section.id] || [])
+                                            ].slice(0, 10)
+                                        }));
+                                    }
+
+                                    // セクション更新
+                                    finalSections = finalSections.map(s =>
+                                        s.id === section.id
+                                            ? { ...s, imageId: data.newImageId, image: data.media }
+                                            : s
+                                    );
+                                    return true;
+                                } else if (response.status === 500 && attempt < retries) {
+                                    await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+                                    continue;
+                                } else {
+                                    console.error(`Section ${section.id} regenerate failed:`, data.error);
+                                    return false;
+                                }
+                            } catch (error) {
+                                if (attempt < retries) {
+                                    await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+                                    continue;
+                                }
+                                console.error(`Section ${section.id} regenerate error:`, error);
+                                return false;
+                            }
+                        }
+                        return false;
+                    };
+
+                    // 順番に再生成（2秒間隔）
+                    for (let i = 0; i < targetSections.length; i++) {
+                        const section = targetSections[i];
+                        // 保存後のsectionには既にcopyTextが適用済み
+                        const copyText = section.config?.text || '';
+
+                        if (i > 0) {
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
+
+                        const success = await regenerateWithRetry(section, copyText);
+                        if (success) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                        }
+
+                        setRegeneratingSectionIds(prev => {
+                            const next = new Set(prev);
+                            next.delete(String(section.id));
+                            return next;
+                        });
+                    }
+
+                    setSections(finalSections);
+                    setIsCopyRegenerating(false);
+
+                    if (successCount > 0) {
+                        handleSave(finalSections);
+                        // リロードボタン付きトースト
+                        toast.custom((t) => (
+                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
+                                <div className="flex-1 w-0 p-4">
+                                    <div className="flex items-start">
+                                        <div className="flex-shrink-0 pt-0.5">
+                                            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                                                <Check className="h-6 w-6 text-green-600" />
+                                            </div>
+                                        </div>
+                                        <div className="ml-3 flex-1">
+                                            <p className="text-sm font-medium text-gray-900">
+                                                {successCount}セクションの再生成が完了
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                画像が変わらない場合はリロードしてください
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex border-l border-gray-200">
+                                    <button
+                                        onClick={() => {
+                                            toast.dismiss(t.id);
+                                            window.location.reload();
+                                        }}
+                                        className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50 focus:outline-none"
+                                    >
+                                        リロード
+                                    </button>
+                                </div>
+                            </div>
+                        ), { duration: 10000 });
+                    }
+                    if (errorCount > 0) {
+                        toast.error(`${errorCount}セクションの再生成に失敗しました`);
+                    }
+                }}
+                isRegenerating={isCopyRegenerating}
+            />
+
+            {/* CTA管理モーダル */}
+            <CTAManagementModal
+                isOpen={showCTAModal}
+                onClose={() => setShowCTAModal(false)}
+                sections={sections}
+                globalCTAConfig={{
+                    defaultUrl: headerConfig.ctaLink || '#contact',
+                    defaultLabel: headerConfig.ctaText || 'お問い合わせ',
+                }}
+                onApply={(updatedSections, globalConfig) => {
+                    setSections(updatedSections);
+                    setHeaderConfig((prev: any) => ({
+                        ...prev,
+                        ctaLink: globalConfig.defaultUrl,
+                        ctaText: globalConfig.defaultLabel,
+                    }));
+                }}
+            />
+
+            {/* カラーパレットモーダル */}
+            <ColorPaletteModal
+                isOpen={showColorPaletteModal}
+                onClose={() => setShowColorPaletteModal(false)}
+                sections={sections}
+                currentPalette={designDefinition?.colorPalette}
+                designDefinition={designDefinition}
+                onApply={(palette) => {
+                    setDesignDefinition((prev: any) => ({
+                        ...prev,
+                        colorPalette: palette,
+                    }));
+                }}
+                onApplyAndRegenerate={async (palette) => {
+                    // カラーパレットを保存
+                    const updatedDesignDef = {
+                        ...designDefinition,
+                        colorPalette: palette,
+                    };
+                    setDesignDefinition(updatedDesignDef);
+
+                    setIsColorPaletteRegenerating(true);
+                    setShowColorPaletteModal(false);
+
+                    // 先にデータベースに保存してセクションIDを確定させる
+                    toast.loading('設定を保存中...', { id: 'color-save' });
+                    let savedSections = sections;
+                    try {
+                        const method = pageId === 'new' ? 'POST' : 'PUT';
+                        const url = pageId === 'new' ? '/api/pages' : `/api/pages/${pageId}`;
+                        const saveRes = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sections: sections.map((s, i) => ({
+                                    ...s,
+                                    order: i,
+                                    config: s.config || {}
+                                })),
+                                headerConfig,
+                                status,
+                                designDefinition: updatedDesignDef
+                            })
+                        });
+                        const saveData = await saveRes.json();
+                        if (saveRes.ok && saveData.sections) {
+                            savedSections = saveData.sections;
+                            setSections(savedSections);
+                        }
+                        toast.dismiss('color-save');
+                    } catch (error) {
+                        toast.dismiss('color-save');
+                        toast.error('保存に失敗しました');
+                        setIsColorPaletteRegenerating(false);
+                        return;
+                    }
+
+                    // 画像があるセクションのみ対象（保存後のIDを使用）
+                    const sectionsWithImages = savedSections.filter(s => s.image?.filePath);
+                    if (sectionsWithImages.length === 0) {
+                        toast.error('再生成対象のセクションがありません');
+                        setIsColorPaletteRegenerating(false);
+                        return;
+                    }
+
+                    // すべてのセクションIDを再生成中としてマーク
+                    const sectionIdSet = new Set(sectionsWithImages.map(s => String(s.id)));
+                    setRegeneratingSectionIds(prev => new Set([...prev, ...sectionIdSet]));
+
+                    let updatedSections = [...savedSections];
+                    let successCount = 0;
+                    let errorCount = 0;
+
+                    // リトライ付き再生成関数
+                    const regenerateWithRetry = async (section: any, retries = 3): Promise<boolean> => {
+                        const dbSectionId = typeof section.id === 'string' && section.id.startsWith('temp-')
+                            ? null
+                            : parseInt(String(section.id));
+
+                        if (!dbSectionId) return false;
+
+                        for (let attempt = 1; attempt <= retries; attempt++) {
+                            try {
+                                const response = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        style: 'design-definition',
+                                        mode: 'light',
+                                        designDefinition: {
+                                            ...designDefinition,
+                                            colorPalette: palette,
+                                        },
+                                        extractedColors: palette,
+                                        // コピーテキストがあれば渡す
+                                        copyText: section.config?.text || undefined,
+                                    })
+                                });
+
+                                const data = await response.json();
+
+                                if (response.ok) {
+                                    // 履歴に追加
+                                    if (section.imageId && section.image) {
+                                        setEditHistory(prev => ({
+                                            ...prev,
+                                            [section.id]: [
+                                                { imageId: section.imageId, image: section.image, timestamp: Date.now() },
+                                                ...(prev[section.id] || [])
+                                            ].slice(0, 10)
+                                        }));
+                                    }
+
+                                    // セクション更新
+                                    updatedSections = updatedSections.map(s =>
+                                        s.id === section.id
+                                            ? { ...s, imageId: data.newImageId, image: data.media }
+                                            : s
+                                    );
+                                    return true;
+                                } else if (response.status === 500 && attempt < retries) {
+                                    // 500エラーの場合、待機してリトライ
+                                    console.log(`Section ${section.id} attempt ${attempt} failed (500), retrying in ${attempt * 3}s...`);
+                                    await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+                                    continue;
+                                } else {
+                                    console.error(`Section ${section.id} regenerate failed:`, data.error);
+                                    return false;
+                                }
+                            } catch (error) {
+                                if (attempt < retries) {
+                                    console.log(`Section ${section.id} attempt ${attempt} error, retrying...`);
+                                    await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+                                    continue;
+                                }
+                                console.error(`Section ${section.id} regenerate error:`, error);
+                                return false;
+                            }
+                        }
+                        return false;
+                    };
+
+                    // 順番に再生成（API負荷軽減のため2秒間隔）
+                    for (let i = 0; i < sectionsWithImages.length; i++) {
+                        const section = sectionsWithImages[i];
+
+                        // 最初のセクション以外は2秒待機
+                        if (i > 0) {
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
+
+                        const success = await regenerateWithRetry(section);
+                        if (success) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                        }
+
+                        // 完了したセクションを再生成中から除外
+                        setRegeneratingSectionIds(prev => {
+                            const next = new Set(prev);
+                            next.delete(String(section.id));
+                            return next;
+                        });
+                    }
+
+                    setSections(updatedSections);
+                    setIsColorPaletteRegenerating(false);
+
+                    if (successCount > 0) {
+                        handleSave(updatedSections);
+                        // カスタムトーストでリロードボタン表示
+                        toast.custom((t) => (
+                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
+                                <div className="flex-1 w-0 p-4">
+                                    <div className="flex items-start">
+                                        <div className="flex-shrink-0 pt-0.5">
+                                            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                                                <Check className="h-6 w-6 text-green-600" />
+                                            </div>
+                                        </div>
+                                        <div className="ml-3 flex-1">
+                                            <p className="text-sm font-medium text-gray-900">
+                                                {successCount}セクションの再生成が完了
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                画像が変わらない場合はリロードしてください
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex border-l border-gray-200">
+                                    <button
+                                        onClick={() => {
+                                            toast.dismiss(t.id);
+                                            window.location.reload();
+                                        }}
+                                        className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-violet-600 hover:text-violet-500 hover:bg-violet-50 focus:outline-none"
+                                    >
+                                        リロード
+                                    </button>
+                                </div>
+                            </div>
+                        ), { duration: 10000 });
+                    }
+                    if (errorCount > 0) {
+                        toast.error(`${errorCount}セクションの再生成に失敗しました`);
+                    }
+                }}
+                isRegenerating={isColorPaletteRegenerating}
+                onAutoDetect={async () => {
+                    // analyzeCurrentDesignを呼び出し
+                    if (typeof analyzeCurrentDesign === 'function') {
+                        await analyzeCurrentDesign();
+                    }
+                    return designDefinition?.colorPalette || null;
+                }}
+            />
 
             {/* 4Kアップスケールモーダル */}
             {show4KModal && (
@@ -4561,6 +5598,256 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     onClose={() => setShowDualImportModal(false)}
                     onImport={handleDualImport}
                 />
+            )}
+
+            {/* モバイル最適化モーダル */}
+            <MobileOptimizeModal
+                isOpen={showMobileOptimizeModal}
+                onClose={() => setShowMobileOptimizeModal(false)}
+                sections={sections}
+                onOptimize={async (sectionIds, strategy) => {
+                    // モバイル画像生成ロジック
+                    for (const sectionId of sectionIds) {
+                        const section = sections.find(s => String(s.id) === sectionId);
+                        if (!section?.image?.filePath) continue;
+
+                        try {
+                            const response = await fetch('/api/ai/generate-mobile', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    pageId,
+                                    sectionId,
+                                    strategy,
+                                    sourceImageUrl: section.image.filePath
+                                })
+                            });
+
+                            if (!response.ok) throw new Error('モバイル画像生成に失敗しました');
+
+                            const data = await response.json();
+                            setSections(prev => prev.map(s =>
+                                String(s.id) === sectionId
+                                    ? { ...s, mobileImage: data.mobileImage }
+                                    : s
+                            ));
+                        } catch (error) {
+                            console.error('Mobile optimization error:', error);
+                        }
+                    }
+                }}
+            />
+
+            {/* ABテストモーダル */}
+            <ABTestModal
+                isOpen={showABTestModal}
+                onClose={() => setShowABTestModal(false)}
+                sections={sections}
+                onGenerate={async (sectionId, type, count) => {
+                    const response = await fetch('/api/ai/generate-variants', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pageId,
+                            sectionId,
+                            variantType: type,
+                            count
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('バリエーション生成に失敗しました');
+
+                    const data = await response.json();
+                    return data.variants || [];
+                }}
+            />
+
+            {/* 構成テンプレートモーダル */}
+            <StructureTemplateModal
+                isOpen={showTemplateModal}
+                onClose={() => setShowTemplateModal(false)}
+                onApply={(template) => {
+                    // テンプレートの構成をセクションに適用
+                    toast.success(`テンプレート「${template.name}」を適用しました`);
+                    // 実際の適用ロジックはここに実装
+                }}
+                userPlan="premium"
+            />
+
+            {/* 動画挿入モーダル */}
+            <VideoInsertModal
+                isOpen={showVideoModal}
+                onClose={() => setShowVideoModal(false)}
+                sections={sections}
+                onInsert={async (sectionId, videoData) => {
+                    // 動画挿入ロジック
+                    const response = await fetch('/api/sections/video', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pageId,
+                            sectionId,
+                            videoData
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('動画の挿入に失敗しました');
+                }}
+                userPlan="max"
+            />
+
+            {/* セクションクロップモーダル */}
+            {showCropModal && cropImageUrl && cropSectionId && (
+                <SectionCropModal
+                    isOpen={showCropModal}
+                    onClose={() => {
+                        setShowCropModal(false);
+                        setCropSectionId(null);
+                        setCropImageUrl(null);
+                    }}
+                    imageUrl={cropImageUrl}
+                    sectionId={cropSectionId}
+                    onCrop={async (sectionId, cropData) => {
+                        // クロップ処理（キャンバスで実行）
+                        const section = sections.find(s => String(s.id) === sectionId);
+                        if (!section?.image?.filePath) return;
+
+                        // 画像を読み込んでクロップ
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        await new Promise((resolve, reject) => {
+                            img.onload = resolve;
+                            img.onerror = reject;
+                            img.src = section.image.filePath;
+                        });
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) throw new Error('Canvas not supported');
+
+                        const startY = Math.round(img.height * cropData.startY);
+                        const endY = Math.round(img.height * cropData.endY);
+                        const cropHeight = endY - startY;
+
+                        canvas.width = img.width;
+                        canvas.height = cropHeight;
+
+                        ctx.drawImage(img, 0, startY, img.width, cropHeight, 0, 0, img.width, cropHeight);
+
+                        // Base64に変換
+                        const croppedBase64 = canvas.toDataURL('image/png');
+
+                        // サーバーに保存
+                        const response = await fetch('/api/sections/crop', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                pageId,
+                                sectionId,
+                                croppedImage: croppedBase64,
+                                cropData
+                            })
+                        });
+
+                        if (!response.ok) throw new Error('クロップに失敗しました');
+
+                        const data = await response.json();
+
+                        // セクションを更新
+                        setSections(prev => prev.map(s =>
+                            String(s.id) === sectionId
+                                ? { ...s, image: data.image }
+                                : s
+                        ));
+                    }}
+                />
+            )}
+
+            {/* オーバーレイエディターモーダル */}
+            {showOverlayEditor && overlayEditImageUrl && overlayEditSectionId && (
+                <OverlayEditorModal
+                    isOpen={showOverlayEditor}
+                    onClose={() => {
+                        setShowOverlayEditor(false);
+                        setOverlayEditSectionId(null);
+                        setOverlayEditImageUrl(null);
+                    }}
+                    imageUrl={overlayEditImageUrl}
+                    sectionId={overlayEditSectionId}
+                    initialOverlays={
+                        sections.find(s => String(s.id) === overlayEditSectionId)?.config?.overlays || []
+                    }
+                    onSave={(overlays) => {
+                        // セクションのconfigにオーバーレイを保存
+                        setSections(prev => prev.map(s =>
+                            String(s.id) === overlayEditSectionId
+                                ? {
+                                    ...s,
+                                    config: {
+                                        ...(s.config || {}),
+                                        overlays
+                                    }
+                                }
+                                : s
+                        ));
+                        toast.success('オーバーレイを保存しました');
+                        setShowOverlayEditor(false);
+                        setOverlayEditSectionId(null);
+                        setOverlayEditImageUrl(null);
+                    }}
+                />
+            )}
+
+            {/* 右サイドプレビューパネル */}
+            {showPreviewPanel && (
+                <div className="fixed inset-0 z-[100] flex">
+                    {/* オーバーレイ背景 */}
+                    <div
+                        className="flex-1 bg-black/50 backdrop-blur-sm"
+                        onClick={() => setShowPreviewPanel(false)}
+                    />
+                    {/* プレビューパネル */}
+                    <div className="w-[500px] bg-white shadow-2xl flex flex-col animate-slide-in-right">
+                        {/* ヘッダー */}
+                        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-emerald-500 to-emerald-600">
+                            <div className="flex items-center gap-3">
+                                <Eye className="h-5 w-5 text-white" />
+                                <span className="font-bold text-white">プレビュー</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {/* 新しいタブで開く */}
+                                <button
+                                    onClick={() => window.open(`/p/${pageId}`, '_blank')}
+                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                                    title="新しいタブで開く"
+                                >
+                                    <Link2 className="h-4 w-4 text-white" />
+                                </button>
+                                {/* 閉じる */}
+                                <button
+                                    onClick={() => setShowPreviewPanel(false)}
+                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                                >
+                                    <X className="h-5 w-5 text-white" />
+                                </button>
+                            </div>
+                        </div>
+                        {/* プレビューコンテンツ（iframe） */}
+                        <div className="flex-1 overflow-hidden bg-gray-100">
+                            <iframe
+                                src={`/p/${pageId}`}
+                                className="w-full h-full border-0"
+                                title="ページプレビュー"
+                            />
+                        </div>
+                        {/* フッター */}
+                        <div className="p-3 border-t bg-gray-50 text-center">
+                            <p className="text-xs text-gray-500">
+                                URL: <code className="bg-gray-200 px-2 py-0.5 rounded">/p/{pageId}</code>
+                            </p>
+                        </div>
+                    </div>
+                </div>
             )}
 
         </div>
