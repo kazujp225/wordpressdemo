@@ -10,7 +10,8 @@ import { BoundaryDesignModal } from '@/components/admin/BoundaryDesignModal';
 import { RestoreModal } from '@/components/admin/RestoreModal';
 import { DesignUnifyModal } from '@/components/admin/DesignUnifyModal';
 import { BackgroundUnifyModal } from '@/components/admin/BackgroundUnifyModal';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, TestTube2, LayoutTemplate, Video, Lock, Crown } from 'lucide-react';
+import { AssetLibrary } from '@/components/admin/AssetLibrary';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, TestTube2, LayoutTemplate, Video, Lock, Crown, Image as ImageIcon } from 'lucide-react';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -89,6 +90,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // セクション削除モード
     const [sectionDeleteMode, setSectionDeleteMode] = useState(false);
+
+    // 右サイドバータブ
+    const [sidebarTab, setSidebarTab] = useState<'tools' | 'assets'>('tools');
     const [selectedSectionsForDelete, setSelectedSectionsForDelete] = useState<Set<string>>(new Set());
 
     // 境界ドラッグ調整
@@ -3106,22 +3110,56 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 </div>
             )}
 
-            {/* 右サイドバー - 補助ツール */}
+            {/* 右サイドバー - 補助ツール / 素材ライブラリ */}
             <div className="fixed right-0 top-0 h-full w-[360px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col">
-                {/* ヘッダー */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-slate-50">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-600 to-gray-700 flex items-center justify-center shadow-lg">
-                            <Wand2 className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-900">補助ツール</h3>
-                            <p className="text-[10px] text-gray-500 font-medium">編集をサポート</p>
-                        </div>
-                    </div>
+                {/* タブ切り替えヘッダー */}
+                <div className="flex border-b border-gray-200">
+                    <button
+                        onClick={() => setSidebarTab('tools')}
+                        className={clsx(
+                            "flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-all",
+                            sidebarTab === 'tools'
+                                ? "bg-white text-gray-900 border-b-2 border-violet-500"
+                                : "bg-gray-50 text-gray-500 hover:text-gray-700"
+                        )}
+                    >
+                        <Wand2 className="h-4 w-4" />
+                        補助ツール
+                    </button>
+                    <button
+                        onClick={() => setSidebarTab('assets')}
+                        className={clsx(
+                            "flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-all",
+                            sidebarTab === 'assets'
+                                ? "bg-white text-gray-900 border-b-2 border-violet-500"
+                                : "bg-gray-50 text-gray-500 hover:text-gray-700"
+                        )}
+                    >
+                        <ImageIcon className="h-4 w-4" />
+                        素材
+                    </button>
                 </div>
 
+                {/* 素材ライブラリタブ */}
+                {sidebarTab === 'assets' && (
+                    <AssetLibrary
+                        onAssetSelect={(asset, downloadedUrl) => {
+                            // 新しいセクションとして追加
+                            const newSection = {
+                                id: `temp-${Date.now()}`,
+                                role: 'asset',
+                                order: sections.length,
+                                imageId: null,
+                                image: { filePath: downloadedUrl },
+                                config: { assetType: asset.type, assetTitle: asset.title }
+                            };
+                            setSections(prev => [...prev, newSection]);
+                        }}
+                    />
+                )}
+
                 {/* ツールメニュー */}
+                {sidebarTab === 'tools' && (
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     {/* 基本操作 */}
                     <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
@@ -3614,6 +3652,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                 </div>
+                )}
             </div>
 
             {/* インペインティング（部分編集）モーダル */}
