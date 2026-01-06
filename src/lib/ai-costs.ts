@@ -26,6 +26,11 @@ export const GEMINI_PRICING = {
   'gemini-2.5-flash-preview-image-generation': {
     perImage: 0.02, // $0.02 per image
     type: 'image' as const
+  },
+  // Video Models (per second)
+  'veo-2.0-generate-001': {
+    perSecond: 0.35, // $0.35 per second of video
+    type: 'video' as const
   }
 } as const;
 
@@ -50,6 +55,13 @@ export function estimateImageCost(model: string, imageCount: number): number {
   return imageCount * pricing.perImage;
 }
 
+export function estimateVideoCost(model: string, durationSeconds: number): number {
+  const pricing = GEMINI_PRICING[model as ModelName];
+  if (!pricing || pricing.type !== 'video') return 0;
+
+  return durationSeconds * pricing.perSecond;
+}
+
 // Rough token estimation (4 chars = 1 token for English, 2 chars = 1 token for Japanese)
 export function estimateTokens(text: string): number {
   if (!text) return 0;
@@ -66,6 +78,7 @@ export function getModelDisplayName(model: string): string {
     'gemini-1.5-flash-latest': 'Gemini 1.5 Flash',
     'gemini-3-pro-image-preview': 'Gemini 3 Pro Image',
     'gemini-2.5-flash-preview-image-generation': 'Gemini 2.5 Flash Image',
+    'veo-2.0-generate-001': 'Veo 2 Video',
   };
   return displayNames[model] || model;
 }

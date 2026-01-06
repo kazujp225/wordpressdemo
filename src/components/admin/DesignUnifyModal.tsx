@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Loader2, Wand2, MousePointer2, Eraser, RotateCcw, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Loader2, Wand2, MousePointer2, Eraser, RotateCcw, Check, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { GEMINI_PRICING } from '@/lib/ai-costs';
 
 interface MaskArea {
     x: number;
@@ -408,43 +409,59 @@ export function DesignUnifyModal({ sections, targetSectionId, onClose, onSuccess
 
                 {/* フッター */}
                 {step !== 'processing' && (
-                    <div className="flex items-center justify-between px-5 py-4 border-t bg-gray-50">
-                        <button
-                            onClick={() => {
-                                if (step === 'draw-mask') {
-                                    setStep('select-reference');
-                                    setMasks([]);
-                                } else {
-                                    onClose();
-                                }
-                            }}
-                            className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                            {step === 'draw-mask' ? '戻る' : 'キャンセル'}
-                        </button>
-
-                        {step === 'select-reference' && (
-                            <button
-                                onClick={() => setStep('draw-mask')}
-                                disabled={!referenceSectionId}
-                                className="flex items-center gap-1 px-5 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                次へ
-                                <ChevronRight className="h-4 w-4" />
-                            </button>
+                    <div className="px-5 py-4 border-t bg-gray-50">
+                        {/* API課金費用の表示（draw-maskステップ時） */}
+                        {step === 'draw-mask' && masks.length === 1 && (
+                            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-amber-600" />
+                                    <span className="text-xs font-bold text-amber-800">
+                                        この作業のAPI課金費用: 約${GEMINI_PRICING['gemini-3-pro-image-preview'].perImage.toFixed(2)}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-amber-600 mt-1 ml-6">
+                                    画像1枚 × $0.04（Gemini 3 Pro Image）
+                                </p>
+                            </div>
                         )}
-
-                        {step === 'draw-mask' && (
+                        <div className="flex items-center justify-between">
                             <button
-                                onClick={handleExecute}
-                                disabled={masks.length === 0 || masks.length > 1}
-                                className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => {
+                                    if (step === 'draw-mask') {
+                                        setStep('select-reference');
+                                        setMasks([]);
+                                    } else {
+                                        onClose();
+                                    }
+                                }}
+                                className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
                             >
-                                <Wand2 className="h-4 w-4" />
-                                {masks.length > 1 ? '1箇所だけ選択してください' : 'デザイン統一を実行'}
+                                <ChevronLeft className="h-4 w-4" />
+                                {step === 'draw-mask' ? '戻る' : 'キャンセル'}
                             </button>
-                        )}
+
+                            {step === 'select-reference' && (
+                                <button
+                                    onClick={() => setStep('draw-mask')}
+                                    disabled={!referenceSectionId}
+                                    className="flex items-center gap-1 px-5 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    次へ
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            )}
+
+                            {step === 'draw-mask' && (
+                                <button
+                                    onClick={handleExecute}
+                                    disabled={masks.length === 0 || masks.length > 1}
+                                    className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Wand2 className="h-4 w-4" />
+                                    {masks.length > 1 ? '1箇所だけ選択してください' : 'デザイン統一を実行'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

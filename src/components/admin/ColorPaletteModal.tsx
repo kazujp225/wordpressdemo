@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Droplet, Sparkles, RefreshCw, Check, Palette, Eye } from 'lucide-react';
+import { X, Droplet, Sparkles, RefreshCw, Check, Palette, Eye, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { GEMINI_PRICING } from '@/lib/ai-costs';
 
 interface ColorPalette {
     primary: string;
@@ -260,8 +261,14 @@ export default function ColorPaletteModal({
                 <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
                     {/* コスト説明 */}
                     <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <p className="text-xs text-amber-700">
-                            💰 <strong>再生成コスト目安:</strong> 約1〜2円/セクション × {sections.filter(s => s.image?.filePath).length}セクション = 約{1 * sections.filter(s => s.image?.filePath).length}〜{2 * sections.filter(s => s.image?.filePath).length}円
+                        <div className="flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-amber-600" />
+                            <span className="text-xs font-bold text-amber-800">
+                                「適用して再生成」のAPI課金費用: 約${(sections.filter(s => s.image?.filePath).length * GEMINI_PRICING['gemini-3-pro-image-preview'].perImage).toFixed(2)}
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-amber-600 mt-1 ml-6">
+                            {sections.filter(s => s.image?.filePath).length}件 × $0.04（Gemini 3 Pro Image）
                         </p>
                     </div>
 

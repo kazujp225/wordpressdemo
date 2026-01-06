@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
-import { X, Loader2, Palette, Check, Sparkles, Eye } from 'lucide-react';
+import { X, Loader2, Palette, Check, Sparkles, Eye, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { GEMINI_PRICING } from '@/lib/ai-costs';
 
 interface Section {
     id: string;
@@ -416,39 +417,55 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
 
                 {/* フッター */}
                 {!isProcessing && (
-                    <div className="flex items-center justify-between px-5 py-4 border-t bg-gray-50">
-                        <button
-                            onClick={() => {
-                                if (step === 'configure') {
-                                    setStep('select-reference');
-                                    setDetectedColor(null);
-                                } else {
-                                    onClose();
-                                }
-                            }}
-                            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
-                        >
-                            {step === 'configure' ? '戻る' : 'キャンセル'}
-                        </button>
-
-                        {step === 'select-reference' ? (
-                            <button
-                                onClick={() => setStep('configure')}
-                                disabled={!referenceSectionId}
-                                className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                次へ
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleExecute}
-                                disabled={selectedSections.filter(s => s.id !== referenceSectionId).length === 0}
-                                className="flex items-center gap-2 px-5 py-2 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Palette className="h-4 w-4" />
-                                {selectedSections.filter(s => s.id !== referenceSectionId).length}件の背景色を変更
-                            </button>
+                    <div className="px-5 py-4 border-t bg-gray-50">
+                        {/* API課金費用の表示（configureステップ時） */}
+                        {step === 'configure' && selectedSections.filter(s => s.id !== referenceSectionId).length > 0 && (
+                            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-amber-600" />
+                                    <span className="text-xs font-bold text-amber-800">
+                                        この作業のAPI課金費用: 約${(selectedSections.filter(s => s.id !== referenceSectionId).length * GEMINI_PRICING['gemini-3-pro-image-preview'].perImage).toFixed(2)}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-amber-600 mt-1 ml-6">
+                                    {selectedSections.filter(s => s.id !== referenceSectionId).length}件 × $0.04（Gemini 3 Pro Image）
+                                </p>
+                            </div>
                         )}
+                        <div className="flex items-center justify-between">
+                            <button
+                                onClick={() => {
+                                    if (step === 'configure') {
+                                        setStep('select-reference');
+                                        setDetectedColor(null);
+                                    } else {
+                                        onClose();
+                                    }
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+                            >
+                                {step === 'configure' ? '戻る' : 'キャンセル'}
+                            </button>
+
+                            {step === 'select-reference' ? (
+                                <button
+                                    onClick={() => setStep('configure')}
+                                    disabled={!referenceSectionId}
+                                    className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    次へ
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleExecute}
+                                    disabled={selectedSections.filter(s => s.id !== referenceSectionId).length === 0}
+                                    className="flex items-center gap-2 px-5 py-2 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Palette className="h-4 w-4" />
+                                    {selectedSections.filter(s => s.id !== referenceSectionId).length}件の背景色を変更
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

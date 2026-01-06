@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Smartphone, RefreshCw, Check, Sparkles, Monitor } from 'lucide-react';
+import { X, Smartphone, RefreshCw, Check, Sparkles, Monitor, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { GEMINI_PRICING } from '@/lib/ai-costs';
 
 interface Section {
     id: string | number;
@@ -186,18 +187,41 @@ export default function MobileOptimizeModal({
 
                 {/* Footer */}
                 {!isOptimizing && (
-                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-between">
-                        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">
-                            キャンセル
-                        </button>
-                        <button
-                            onClick={handleOptimize}
-                            disabled={selectedSections.size === 0}
-                            className="px-6 py-2 bg-gradient-to-r from-sky-500 to-blue-500 text-white text-sm font-bold rounded-lg hover:from-sky-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                        >
-                            <Sparkles className="h-4 w-4" />
-                            モバイル版を生成
-                        </button>
+                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+                        {/* API課金費用の表示（AI再生成の場合のみ） */}
+                        {strategy === 'regenerate' && selectedSections.size > 0 && (
+                            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-amber-600" />
+                                    <span className="text-xs font-bold text-amber-800">
+                                        この作業のAPI課金費用: 約${(selectedSections.size * GEMINI_PRICING['gemini-3-pro-image-preview'].perImage).toFixed(2)}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-amber-600 mt-1 ml-6">
+                                    {selectedSections.size}件 × $0.04（Gemini 3 Pro Image）
+                                </p>
+                            </div>
+                        )}
+                        {strategy !== 'regenerate' && selectedSections.size > 0 && (
+                            <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <p className="text-xs text-green-700">
+                                    この方法はAPIコスト無料です（ローカル処理）
+                                </p>
+                            </div>
+                        )}
+                        <div className="flex justify-between">
+                            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">
+                                キャンセル
+                            </button>
+                            <button
+                                onClick={handleOptimize}
+                                disabled={selectedSections.size === 0}
+                                className="px-6 py-2 bg-gradient-to-r from-sky-500 to-blue-500 text-white text-sm font-bold rounded-lg hover:from-sky-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                モバイル版を生成
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

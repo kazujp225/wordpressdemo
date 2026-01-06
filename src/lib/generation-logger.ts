@@ -22,7 +22,8 @@ export type GenerationType =
   | 'background-unify'
   | 'ocr'
   | 'text-fix'
-  | 'upscale';
+  | 'upscale'
+  | 'video-generate';
 
 export interface LogGenerationParams {
   userId?: string | null;

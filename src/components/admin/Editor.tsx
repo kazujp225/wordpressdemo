@@ -15,17 +15,16 @@ import CopyEditModal from '@/components/admin/CopyEditModal';
 import CTAManagementModal from '@/components/admin/CTAManagementModal';
 import ColorPaletteModal from '@/components/admin/ColorPaletteModal';
 import MobileOptimizeModal from '@/components/admin/MobileOptimizeModal';
-import ABTestModal from '@/components/admin/ABTestModal';
-import StructureTemplateModal from '@/components/admin/StructureTemplateModal';
 import VideoInsertModal from '@/components/admin/VideoInsertModal';
 import SectionCropModal from '@/components/admin/SectionCropModal';
 import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
-import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, TestTube2, LayoutTemplate, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, Sparkles, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, Wand2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square } from 'lucide-react';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
+import { GEMINI_PRICING } from '@/lib/ai-costs';
 
 interface EditorProps {
     pageId: string;
@@ -166,11 +165,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // モバイル最適化モーダル
     const [showMobileOptimizeModal, setShowMobileOptimizeModal] = useState(false);
 
-    // ABテストモーダル
-    const [showABTestModal, setShowABTestModal] = useState(false);
 
-    // 構成テンプレートモーダル
-    const [showTemplateModal, setShowTemplateModal] = useState(false);
 
     // 動画挿入モーダル
     const [showVideoModal, setShowVideoModal] = useState(false);
@@ -4152,43 +4147,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         )}
                     </div>
 
-                    {/* ABテスト */}
-                    <div className="bg-gradient-to-r from-fuchsia-50 to-purple-50 rounded-xl border border-fuchsia-100 overflow-hidden">
-                        <button onClick={() => toggleTool('abtest')} className="w-full flex items-center justify-between p-3 hover:bg-fuchsia-100/50 transition-colors">
-                            <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-500 flex items-center justify-center shadow-md"><TestTube2 className="h-4 w-4 text-white" /></div>
-                                <div className="text-left"><h4 className="text-sm font-bold text-gray-900">ABテスト</h4><p className="text-[10px] text-gray-500">バリエーションを作成</p></div>
-                            </div>
-                            {expandedTools.has('abtest') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
-                        </button>
-                        {expandedTools.has('abtest') && (
-                            <div className="px-3 pb-3 pt-0">
-                                <p className="text-xs text-gray-600 mb-3">ヘッドラインや色違いの複数パターンを生成します。</p>
-                                <button onClick={() => setShowABTestModal(true)} className="w-full py-2.5 bg-gradient-to-r from-fuchsia-500 to-purple-500 text-white text-sm font-bold rounded-lg hover:from-fuchsia-600 hover:to-purple-600 transition-all flex items-center justify-center gap-2"><TestTube2 className="h-4 w-4" />バリエーション作成</button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 構成テンプレート - Premium以上 */}
-                    <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-slate-200 overflow-hidden">
-                        <button onClick={() => toggleTool('template')} className="w-full flex items-center justify-between p-3 hover:bg-slate-100/50 transition-colors">
-                            <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-slate-600 to-gray-700 flex items-center justify-center shadow-md"><LayoutTemplate className="h-4 w-4 text-white" /></div>
-                                <div className="text-left">
-                                    <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">構成テンプレート<span className="text-[9px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded font-bold">Premium</span></h4>
-                                    <p className="text-[10px] text-gray-500">業種別LP構成を適用</p>
-                                </div>
-                            </div>
-                            {expandedTools.has('template') ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
-                        </button>
-                        {expandedTools.has('template') && (
-                            <div className="px-3 pb-3 pt-0">
-                                <p className="text-xs text-gray-600 mb-3">ヒーロー→問題提起→解決策→CTAなど、効果的な構成を適用します。</p>
-                                <button onClick={() => setShowTemplateModal(true)} className="w-full py-2.5 bg-gradient-to-r from-slate-600 to-gray-700 text-white text-sm font-bold rounded-lg hover:from-slate-700 hover:to-gray-800 transition-all flex items-center justify-center gap-2"><LayoutTemplate className="h-4 w-4" />テンプレートを選択</button>
-                            </div>
-                        )}
-                    </div>
-
                     {/* 動画挿入 - Max Plan限定 */}
                     <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-xl border border-indigo-200 overflow-hidden">
                         <button onClick={() => toggleTool('video')} className="w-full flex items-center justify-between p-3 hover:bg-indigo-100/50 transition-colors relative">
@@ -5287,7 +5245,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 </div>
                             </div>
 
-                            <div className="mt-8 flex gap-3">
+                            {/* API課金費用の表示 */}
+                            <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                                <div className="flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-amber-600" />
+                                    <span className="text-xs font-bold text-amber-800">
+                                        この作業のAPI課金費用: 約${GEMINI_PRICING['gemini-3-pro-image-preview'].perImage.toFixed(2)}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-amber-600 mt-1 ml-6">
+                                    画像1枚 × $0.04（Gemini 3 Pro Image）
+                                </p>
+                            </div>
+
+                            <div className="mt-4 flex gap-3">
                                 <button
                                     onClick={() => setShowRegenerateModal(false)}
                                     className="flex-1 rounded-2xl py-3.5 text-sm font-bold text-gray-400 hover:bg-gray-50 transition-all"
@@ -5565,6 +5536,32 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             </div>
                         )}
 
+                        {/* API課金費用の表示（フッター固定） */}
+                        {!isBatchRegenerating && (
+                            <div className="flex-shrink-0 px-5 py-3 border-t bg-amber-50">
+                                {(() => {
+                                    const baseCount = batchReferenceSection
+                                        ? selectedSectionsForRegenerate.size - (selectedSectionsForRegenerate.has(batchReferenceSection) && !regenerateReferenceAlso ? 1 : 0)
+                                        : selectedSectionsForRegenerate.size;
+                                    const totalImages = includeMobileInBatch ? baseCount * 2 : baseCount;
+                                    const totalCost = totalImages * GEMINI_PRICING['gemini-3-pro-image-preview'].perImage;
+                                    return (
+                                        <div className="flex items-center gap-2">
+                                            <DollarSign className="h-4 w-4 text-amber-600" />
+                                            <div>
+                                                <span className="text-xs font-bold text-amber-800">
+                                                    この作業のAPI課金費用: 約${totalCost.toFixed(2)}
+                                                </span>
+                                                <p className="text-[10px] text-amber-600">
+                                                    {baseCount}件{includeMobileInBatch ? ' × 2（PC+モバイル）' : ''} × $0.04
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
                         {/* 実行ボタン（フッター固定） */}
                         {!isBatchRegenerating && (
                             <div className="flex-shrink-0 px-5 py-4 border-t bg-gray-50 flex gap-3">
@@ -5637,42 +5634,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 }}
             />
 
-            {/* ABテストモーダル */}
-            <ABTestModal
-                isOpen={showABTestModal}
-                onClose={() => setShowABTestModal(false)}
-                sections={sections}
-                onGenerate={async (sectionId, type, count) => {
-                    const response = await fetch('/api/ai/generate-variants', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            pageId,
-                            sectionId,
-                            variantType: type,
-                            count
-                        })
-                    });
-
-                    if (!response.ok) throw new Error('バリエーション生成に失敗しました');
-
-                    const data = await response.json();
-                    return data.variants || [];
-                }}
-            />
-
-            {/* 構成テンプレートモーダル */}
-            <StructureTemplateModal
-                isOpen={showTemplateModal}
-                onClose={() => setShowTemplateModal(false)}
-                onApply={(template) => {
-                    // テンプレートの構成をセクションに適用
-                    toast.success(`テンプレート「${template.name}」を適用しました`);
-                    // 実際の適用ロジックはここに実装
-                }}
-                userPlan="premium"
-            />
-
             {/* 動画挿入モーダル */}
             <VideoInsertModal
                 isOpen={showVideoModal}
@@ -5692,7 +5653,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                     if (!response.ok) throw new Error('動画の挿入に失敗しました');
                 }}
-                userPlan="max"
             />
 
             {/* セクションクロップモーダル */}

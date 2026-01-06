@@ -135,3 +135,21 @@ model SectionImageHistory {
   @@index([userId])
   @@index([createdAt])
 }
+
+model MediaVideo {
+  id            Int      @id @default(autoincrement())
+  userId        String?  // Supabase Auth user ID
+  filePath      String   // 動画ファイルのURL
+  thumbnailPath String?  // サムネイル画像のURL
+  duration      Int?     // 動画の長さ（秒）
+  width         Int?
+  height        Int?
+  mime          String   // video/mp4, video/webm など
+  fileSize      Int?     // ファイルサイズ（バイト）
+  prompt        String?  // AI生成の場合のプロンプト
+  sourceType    String   @default("upload") // "upload" | "youtube" | "vimeo" | "ai-generate"
+  sourceUrl     String?  // YouTube/VimeoのURL
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}

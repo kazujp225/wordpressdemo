@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Type, Sparkles, Copy, Check, RefreshCw, Wand2 } from 'lucide-react';
+import { X, Type, Sparkles, Copy, Check, RefreshCw, Wand2, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { GEMINI_PRICING } from '@/lib/ai-costs';
 
 interface Section {
     id: string | number;
@@ -343,11 +344,32 @@ export default function CopyEditModal({
 
                 {/* Footer */}
                 <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+                    {/* コスト説明（configステップ時） */}
+                    {step === 'config' && (
+                        <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-amber-600" />
+                                <span className="text-xs font-bold text-amber-800">
+                                    この作業のAPI課金費用: 約$0.01未満
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-amber-600 mt-1 ml-6">
+                                テキスト生成（Gemini Flash）- 非常に低コスト
+                            </p>
+                        </div>
+                    )}
+
                     {/* コスト説明（reviewステップ時のみ） */}
                     {step === 'review' && onApplyAndRegenerate && (
                         <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                            <p className="text-xs text-amber-700">
-                                💰 <strong>再生成コスト目安:</strong> 約1〜2円/セクション × {generatedCopy.length}セクション = 約{1 * generatedCopy.length}〜{2 * generatedCopy.length}円
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-amber-600" />
+                                <span className="text-xs font-bold text-amber-800">
+                                    「適用して再生成」のAPI課金費用: 約${(generatedCopy.length * GEMINI_PRICING['gemini-3-pro-image-preview'].perImage).toFixed(2)}
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-amber-600 mt-1 ml-6">
+                                {generatedCopy.length}件 × $0.04（Gemini 3 Pro Image）
                             </p>
                         </div>
                     )}
