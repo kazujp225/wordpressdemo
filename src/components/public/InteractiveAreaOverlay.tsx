@@ -50,6 +50,8 @@ export function InteractiveAreaOverlay({ areas, pageSlug }: InteractiveAreaOverl
                     }
 
                     // その他のタイプはリンクとして表示
+                    // デバッグ用: 赤い枠線で可視化
+                    console.log('Rendering CTA area:', area.id, area.actionValue, `${area.x * 100}%`, `${area.y * 100}%`);
                     return (
                         <a
                             key={area.id}
@@ -57,7 +59,7 @@ export function InteractiveAreaOverlay({ areas, pageSlug }: InteractiveAreaOverl
                             target={area.actionType === 'url' && !area.actionValue.startsWith('#') && !area.actionValue.startsWith('/') ? '_blank' : undefined}
                             rel={area.actionType === 'url' && !area.actionValue.startsWith('#') && !area.actionValue.startsWith('/') ? 'noopener noreferrer' : undefined}
                             title={area.label}
-                            className="absolute block cursor-pointer transition-all duration-200 hover:bg-white/10 hover:ring-2 hover:ring-white/50 rounded-sm"
+                            className="absolute block cursor-pointer transition-all duration-200 hover:bg-blue-500/30 rounded-sm border-2 border-red-500 bg-red-500/20"
                             style={{
                                 left: `${area.x * 100}%`,
                                 top: `${area.y * 100}%`,
