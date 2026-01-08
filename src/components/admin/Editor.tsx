@@ -217,7 +217,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // デスクトップレイアウトプレビューモード
     const [showDesktopPreview, setShowDesktopPreview] = useState(false);
-    const [showPreviewPanel, setShowPreviewPanel] = useState(false);
 
     // 表示モード（デスクトップ/モバイル）
     const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
@@ -1933,9 +1932,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                 <div className="w-px h-6 bg-gray-200" />
 
-                {/* プレビューボタン */}
+                {/* プレビューボタン - 新規タブでフルスクリーン表示 */}
                 <button
-                    onClick={() => setShowPreviewPanel(true)}
+                    onClick={() => window.open(`/preview/page/${pageId}?mode=${viewMode}`, '_blank')}
                     className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm"
                 >
                     <Eye className="h-4 w-4" />
@@ -5946,57 +5945,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 />
             )}
 
-            {/* 右サイドプレビューパネル */}
-            {showPreviewPanel && (
-                <div className="fixed inset-0 z-[100] flex">
-                    {/* オーバーレイ背景 */}
-                    <div
-                        className="flex-1 bg-black/50 backdrop-blur-sm"
-                        onClick={() => setShowPreviewPanel(false)}
-                    />
-                    {/* プレビューパネル */}
-                    <div className="w-[500px] bg-white shadow-2xl flex flex-col animate-slide-in-right">
-                        {/* ヘッダー */}
-                        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-emerald-500 to-emerald-600">
-                            <div className="flex items-center gap-3">
-                                <Eye className="h-5 w-5 text-white" />
-                                <span className="font-bold text-white">プレビュー</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {/* 新しいタブで開く */}
-                                <button
-                                    onClick={() => window.open(`/p/${initialSlug || pageId}`, '_blank')}
-                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                                    title="新しいタブで開く"
-                                >
-                                    <Link2 className="h-4 w-4 text-white" />
-                                </button>
-                                {/* 閉じる */}
-                                <button
-                                    onClick={() => setShowPreviewPanel(false)}
-                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                                >
-                                    <X className="h-5 w-5 text-white" />
-                                </button>
-                            </div>
-                        </div>
-                        {/* プレビューコンテンツ（iframe） */}
-                        <div className="flex-1 overflow-hidden bg-gray-100">
-                            <iframe
-                                src={`/p/${initialSlug || pageId}`}
-                                className="w-full h-full border-0"
-                                title="ページプレビュー"
-                            />
-                        </div>
-                        {/* フッター */}
-                        <div className="p-3 border-t bg-gray-50 text-center">
-                            <p className="text-xs text-gray-500">
-                                URL: <code className="bg-gray-200 px-2 py-0.5 rounded">/p/{initialSlug || pageId}</code>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
 
         </div>
     );

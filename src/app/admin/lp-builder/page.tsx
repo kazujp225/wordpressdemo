@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Save, Eye, Plus, X, FolderOpen, FileText, ChevronDown, Sparkles, Layout, Settings, Type, ExternalLink, Box, Trash2, Clock, MonitorPlay, MousePointer } from 'lucide-react';
@@ -85,7 +85,6 @@ function DroppableTemplate({ template, onAdd }: { template: SectionTemplate; onA
 export default function LPBuilderPage() {
     const [sections, setSections] = useState<LPSection[]>([]);
     const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
-    const [showPreview, setShowPreview] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [showPageSelector, setShowPageSelector] = useState(false);
     const [existingPages, setExistingPages] = useState<ExistingPage[]>([]);
@@ -435,7 +434,11 @@ export default function LPBuilderPage() {
                             </a>
                         )}
                         <button
-                            onClick={() => setShowPreview(true)}
+                            onClick={() => {
+                                // Save sections to localStorage and open preview in new tab
+                                localStorage.setItem('lp-builder-preview', JSON.stringify({ sections }));
+                                window.open('/preview/lp-builder', '_blank');
+                            }}
                             className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all"
                         >
                             <Eye className="h-3 w-3" />
@@ -680,74 +683,6 @@ export default function LPBuilderPage() {
                 />
             )}
 
-            {/* Preview Modal */}
-            <AnimatePresence>
-                {showPreview && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 lg:p-12"
-                    >
-                        <div className="relative h-full w-full max-w-7xl overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col">
-                            <div className="flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
-                                <h3 className="font-bold text-gray-900">Preview Mode</h3>
-                                <button
-                                    onClick={() => setShowPreview(false)}
-                                    className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200 transition-colors"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto bg-white">
-                                <div className="mx-auto max-w-full">
-                                    {sections.map((section) => {
-                                        const clickableAreas = (section.properties.clickableAreas as ClickableArea[] | undefined) || [];
-                                        return (
-                                            <div
-                                                key={section.id}
-                                                className="px-6 py-20 lg:px-20 text-center relative"
-                                                style={{
-                                                    backgroundColor: section.properties.backgroundColor,
-                                                    color: section.properties.textColor,
-                                                }}
-                                            >
-                                                <div className="max-w-4xl mx-auto">
-                                                    <h2 className="text-4xl lg:text-5xl font-bold mb-6 tracking-tight">{section.properties.title}</h2>
-                                                    <p className="text-xl opacity-80 mb-8 font-light">{section.properties.subtitle}</p>
-                                                    <p className="max-w-2xl mx-auto leading-relaxed opacity-90">{section.properties.description}</p>
-                                                </div>
-
-                                                {/* Clickable Areas Preview */}
-                                                {clickableAreas.length > 0 && (
-                                                    <div className="absolute inset-0 pointer-events-none">
-                                                        {clickableAreas.map((area, idx) => (
-                                                            <div
-                                                                key={area.id}
-                                                                className="absolute border-2 border-dashed border-blue-400 bg-blue-500/10 rounded flex items-center justify-center"
-                                                                style={{
-                                                                    left: `${area.x * 100}%`,
-                                                                    top: `${area.y * 100}%`,
-                                                                    width: `${area.width * 100}%`,
-                                                                    height: `${area.height * 100}%`,
-                                                                }}
-                                                            >
-                                                                <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded font-bold shadow">
-                                                                    {area.label || `Button ${idx + 1}`}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </div>
     );
 }

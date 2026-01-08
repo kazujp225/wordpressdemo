@@ -2,6 +2,51 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { pageUpdateSchema, pageSectionsUpdateSchema, validateRequest } from '@/lib/validations';
 
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+    const id = parseInt(params.id);
+
+    if (isNaN(id)) {
+        return NextResponse.json({ error: 'Invalid page ID' }, { status: 400 });
+    }
+
+    try {
+        const page = await prisma.page.findUnique({
+            where: { id },
+            include: {
+                sections: {
+                    include: { image: true, mobileImage: true },
+                    orderBy: { order: 'asc' },
+                },
+            },
+        });
+
+        if (!page) {
+            return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+        }
+
+        return NextResponse.json({
+            id: page.id,
+            title: page.title,
+            slug: page.slug,
+            sections: page.sections.map(s => ({
+                id: s.id.toString(),
+                role: s.role,
+                order: s.order,
+                imageId: s.imageId,
+                mobileImageId: s.mobileImageId,
+                image: s.image,
+                mobileImage: s.mobileImage,
+                config: s.config,
+                boundaryOffsetTop: s.boundaryOffsetTop || 0,
+                boundaryOffsetBottom: s.boundaryOffsetBottom || 0,
+            }))
+        });
+    } catch (error) {
+        console.error('Failed to fetch page:', error);
+        return NextResponse.json({ error: 'Failed to fetch page' }, { status: 500 });
+    }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
     const id = parseInt(params.id);
 

@@ -151,16 +151,23 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                             };
                             try {
                                 if (section.config) {
-                                    const parsed = JSON.parse(section.config);
+                                    // configが文字列の場合はパース、オブジェクトの場合はそのまま使用
+                                    const parsed = typeof section.config === 'string'
+                                        ? JSON.parse(section.config)
+                                        : section.config;
                                     config = { ...config, ...parsed };
-                                    // LP Builderからの保存形式: properties.clickableAreas
+                                    // LP Builderからの保存形式: properties.clickableAreas または clickableAreas
                                     if (parsed.properties?.clickableAreas) {
                                         config.clickableAreas = parsed.properties.clickableAreas;
+                                    } else if (parsed.clickableAreas) {
+                                        config.clickableAreas = parsed.clickableAreas;
                                     }
                                     // デバッグ用ログ
-                                    console.log(`Section ${section.role} clickableAreas:`, config.clickableAreas);
+                                    console.log(`[Public] Section ${section.role} clickableAreas:`, config.clickableAreas);
                                 }
-                            } catch { }
+                            } catch (e) {
+                                console.error(`[Public] Failed to parse config for section ${section.role}:`, e);
+                            }
 
                             const imgStyle = {
                                 filter: `brightness(${config.brightness}%) grayscale(${config.grayscale}%)`,
