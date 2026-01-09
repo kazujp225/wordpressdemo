@@ -1,6 +1,7 @@
 "use client";
 
-import { Sidebar } from '@/components/admin/Sidebar';
+import { useState } from 'react';
+import { Sidebar, MobileMenuButton } from '@/components/admin/Sidebar';
 import { SWRProvider } from '@/components/providers/SWRProvider';
 
 export default function AdminLayout({
@@ -8,11 +9,22 @@ export default function AdminLayout({
 }: {
     children: React.ReactNode;
 }) {
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
     return (
         <SWRProvider>
             <div className="flex min-h-screen bg-gray-50">
-                <Sidebar />
-                <main className="flex-1 overflow-y-auto">
+                {/* モバイル用メニューボタン */}
+                <MobileMenuButton onClick={() => setSidebarOpen(true)} />
+
+                {/* サイドバー */}
+                <Sidebar
+                    isOpen={sidebarOpen}
+                    onClose={() => setSidebarOpen(false)}
+                />
+
+                {/* メインコンテンツ */}
+                <main className="flex-1 overflow-y-auto lg:ml-0 pt-16 lg:pt-0">
                     {children}
                 </main>
             </div>

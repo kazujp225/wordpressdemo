@@ -2,10 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Images, Settings, LogOut, FileText, Navigation, Crown, History, BarChart3 } from 'lucide-react';
+import { Images, Settings, LogOut, FileText, Navigation, Crown, History, BarChart3, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
 import { useUserSettings } from '@/lib/hooks/useAdminData';
 
@@ -22,21 +21,20 @@ const navItems = [
 // データプリフェッチ用のキャッシュ
 const prefetchCache = new Set<string>();
 
-export function Sidebar() {
+interface SidebarProps {
+    isOpen?: boolean;
+    onClose?: () => void;
+}
+
+export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const [user, setUser] = useState<any>(null);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     // SWRでユーザー設定を取得（キャッシュ済み）
     const { data: userSettings } = useUserSettings();
     const plan = userSettings?.plan || 'normal';
-
-    // ユーザー情報取得
-    useEffect(() => {
-        const supabase = createClient();
-        supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
-    }, []);
+    const username = userSettings?.username || 'Admin User';
 
     // データプリフェッチ（ホバー時）
     const handleMouseEnter = useCallback((prefetchUrl: string | null) => {
@@ -59,8 +57,7 @@ export function Sidebar() {
     const handleLogout = useCallback(async () => {
         setIsLoggingOut(true);
         try {
-            const supabase = createClient();
-            await supabase.auth.signOut();
+            await fetch('/api/auth/logout', { method: 'POST' });
             toast.success('ログアウトしました');
             router.push('/');
             router.refresh();
@@ -77,73 +74,115 @@ export function Sidebar() {
         return navItems.find(item => pathname.startsWith(item.href))?.href;
     }, [pathname]);
 
+    // リンククリック時にモバイルメニューを閉じる
+    const handleLinkClick = useCallback(() => {
+        if (onClose) onClose();
+    }, [onClose]);
+
     return (
-        <div className="flex h-screen w-64 flex-col border-r border-border bg-background">
-            <div className="flex h-16 items-center px-6 border-b border-border">
-                <div className="flex items-center gap-3">
-                    <div className="h-6 w-6 bg-primary rounded-sm" />
-                    <span className="text-lg font-bold tracking-tight text-foreground">LP Builder</span>
-                </div>
-            </div>
+        <>
+            {/* モバイル用オーバーレイ */}
+            {isOpen && onClose && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={onClose}
+                />
+            )}
 
-            <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto">
-                <div className="mb-4 px-3 text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Menu</div>
-                {navItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeItem === item.href;
-                    return (
-                        <Link
-                            key={item.name}
-                            href={item.href}
-                            prefetch={true}
-                            onMouseEnter={() => {
-                                handleRouteMouseEnter(item.href);
-                                handleMouseEnter(item.prefetchUrl);
-                            }}
-                            className={clsx(
-                                'group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200',
-                                isActive
-                                    ? 'bg-primary/5 text-primary'
-                                    : 'text-muted-foreground hover:bg-surface-100 hover:text-foreground'
-                            )}
+            {/* サイドバー本体 */}
+            <div className={clsx(
+                "flex h-screen w-64 flex-col border-r border-border bg-background",
+                "fixed lg:static z-50 transition-transform duration-300 ease-in-out",
+                isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+            )}>
+                <div className="flex h-16 items-center justify-between px-6 border-b border-border">
+                    <div className="flex items-center gap-3">
+                        <div className="h-6 w-6 bg-primary rounded-sm" />
+                        <span className="text-lg font-bold tracking-tight text-foreground">LP Builder</span>
+                    </div>
+                    {/* モバイル用閉じるボタン */}
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="lg:hidden p-2 rounded-md hover:bg-gray-100"
                         >
-                            <Icon className={clsx(
-                                'h-4 w-4 transition-colors',
-                                isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
-                            )} />
-                            {item.name}
-                        </Link>
-                    );
-                })}
-            </nav>
-
-            <div className="border-t border-border p-4 space-y-3">
-                <div className="flex items-center gap-3 rounded-md border border-border bg-surface-50 p-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded bg-primary text-xs font-bold text-primary-foreground">
-                        {user?.email?.[0]?.toUpperCase() || 'U'}
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                        <div className="truncate text-xs font-bold text-foreground">
-                            {user?.email?.split('@')[0] || 'Admin User'}
-                        </div>
-                        <div className={clsx(
-                            "truncate text-[10px] font-medium flex items-center gap-1",
-                            plan === 'premium' ? "text-primary" : "text-muted-foreground"
-                        )}>
-                            {plan === 'premium' && <Crown className="h-3 w-3" />}
-                            {plan === 'premium' ? 'Premium' : 'Standard'}
-                        </div>
-                    </div>
+                            <X className="h-5 w-5" />
+                        </button>
+                    )}
                 </div>
-                <button
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                    className="w-full flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50"
-                >
-                    <LogOut className="h-4 w-4" />
-                    {isLoggingOut ? 'ログアウト中...' : 'ログアウト'}
-                </button>
+
+                <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto">
+                    <div className="mb-4 px-3 text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Menu</div>
+                    {navItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeItem === item.href;
+                        return (
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                prefetch={true}
+                                onClick={handleLinkClick}
+                                onMouseEnter={() => {
+                                    handleRouteMouseEnter(item.href);
+                                    handleMouseEnter(item.prefetchUrl);
+                                }}
+                                className={clsx(
+                                    'group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200',
+                                    isActive
+                                        ? 'bg-primary/5 text-primary'
+                                        : 'text-muted-foreground hover:bg-surface-100 hover:text-foreground'
+                                )}
+                            >
+                                <Icon className={clsx(
+                                    'h-4 w-4 transition-colors',
+                                    isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                                )} />
+                                {item.name}
+                            </Link>
+                        );
+                    })}
+                </nav>
+
+                <div className="border-t border-border p-4 space-y-3">
+                    <div className="flex items-center gap-3 rounded-md border border-border bg-surface-50 p-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded bg-primary text-xs font-bold text-primary-foreground">
+                            {username?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            <div className="truncate text-xs font-bold text-foreground">
+                                {username}
+                            </div>
+                            <div className={clsx(
+                                "truncate text-[10px] font-medium flex items-center gap-1",
+                                plan === 'premium' ? "text-primary" : "text-muted-foreground"
+                            )}>
+                                {plan === 'premium' && <Crown className="h-3 w-3" />}
+                                {plan === 'premium' ? 'Premium' : 'Standard'}
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className="w-full flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        {isLoggingOut ? 'ログアウト中...' : 'ログアウト'}
+                    </button>
+                </div>
             </div>
-        </div>
+        </>
+    );
+}
+
+// モバイル用ハンバーガーメニューボタン
+export function MobileMenuButton({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className="lg:hidden fixed top-4 left-4 z-30 p-2 rounded-md bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+        >
+            <Menu className="h-6 w-6" />
+        </button>
     );
 }
