@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const ALLOWED_VIDEO_TYPES = [
@@ -17,9 +17,10 @@ const FALLBACK_BUCKET = 'images';
 
 export async function POST(request: NextRequest) {
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
         // DBレコード作成
         const video = await prisma.mediaVideo.create({
             data: {
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
                 filePath: publicUrl,
                 mime: file.type,
                 fileSize: file.size,

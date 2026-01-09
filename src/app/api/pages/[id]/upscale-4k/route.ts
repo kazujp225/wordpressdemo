@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import sharp from 'sharp';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 
@@ -58,9 +58,10 @@ export async function POST(
         return Response.json({ error: 'Invalid page ID' }, { status: 400 });
     }
 
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -135,7 +136,7 @@ export async function POST(
             total,
         });
 
-        const googleApiKey = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const googleApiKey = await getGoogleApiKeyForUser(user.id);
         if (!googleApiKey) {
             throw new Error('Google API key not configured');
         }
@@ -297,7 +298,7 @@ export async function POST(
                 });
 
                 await logGeneration({
-                    userId: (session.user?.username || 'anonymous'),
+                    userId: user.id,
                     type: '4k-upscale',
                     endpoint: `/api/pages/${pageId}/upscale-4k`,
                     model: 'gemini-3-pro-image-preview',

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
     try {
         // ユーザー認証
-        const session = await getSession();
+        const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
         const searchParams = request.nextUrl.searchParams;
         const limit = parseInt(searchParams.get('limit') || '20');
@@ -15,8 +16,8 @@ export async function GET(request: NextRequest) {
         const where: any = {};
 
         // ユーザーがログインしている場合はそのユーザーの履歴のみ
-        if (session?.user?.username) {
-            where.userId = session.user.username;
+        if (user?.id) {
+            where.userId = user.id;
         }
 
         // 特定の元画像の履歴を取得する場合

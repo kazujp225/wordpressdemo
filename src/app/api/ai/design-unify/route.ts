@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { prisma } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import sharp from 'sharp';
@@ -31,9 +31,10 @@ export async function POST(request: NextRequest) {
     const startTime = createTimer();
 
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'マスク領域を指定してください' }, { status: 400 });
         }
 
-        const GOOGLE_API_KEY = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id);
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({
                 error: 'Google API key is not configured'
@@ -215,7 +216,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
         const finalMeta = await sharp(finalBuffer).metadata();
         const newMedia = await prisma.mediaImage.create({
             data: {
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
                 filePath: newImageUrl,
                 mime: 'image/png',
                 width: finalMeta.width || 0,
@@ -241,7 +242,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
             await prisma.sectionImageHistory.create({
                 data: {
                     sectionId: targetSectionId,
-                    userId: (session.user?.username || 'anonymous'),
+                    userId: user.id,
                     previousImageId: currentSection.imageId,
                     newImageId: newMedia.id,
                     actionType: 'design-unify',
@@ -252,7 +253,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
 
         // ログ記録
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'design-unify',
             endpoint: '/api/ai/design-unify',
             model: 'gemini-3-pro-image-preview',

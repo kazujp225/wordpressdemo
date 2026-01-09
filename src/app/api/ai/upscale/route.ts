@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { supabase } from '@/lib/supabase';
 import { prisma } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 
 // Real-ESRGAN (UpscalerJS) を動的インポート（TensorFlow.js対応）
@@ -33,9 +33,10 @@ export async function POST(request: NextRequest) {
     const startTime = createTimer();
 
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
         // DB保存
         const media = await prisma.mediaImage.create({
             data: {
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
                 filePath: publicUrl,
                 mime: 'image/png',
                 width: newWidth,
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
 
         // ログ記録
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'upscale',
             endpoint: '/api/ai/upscale',
             model: modelName,
@@ -194,7 +195,7 @@ export async function POST(request: NextRequest) {
         console.error('Upscale Error:', error);
 
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'upscale',
             endpoint: '/api/ai/upscale',
             model: 'real-esrgan-thick',

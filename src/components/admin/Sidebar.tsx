@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { useUserSettings } from '@/lib/hooks/useAdminData';
+import { createClient } from '@/lib/supabase/client';
 
 // ナビゲーションアイテムをコンポーネント外で定義（再生成防止）
 const navItems = [
@@ -30,11 +31,18 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [user, setUser] = useState<any>(null);
+    const supabase = createClient();
+
+    // ユーザー情報取得
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    }, []);
 
     // SWRでユーザー設定を取得（キャッシュ済み）
     const { data: userSettings } = useUserSettings();
     const plan = userSettings?.plan || 'normal';
-    const username = userSettings?.username || 'Admin User';
+    const username = user?.email?.split('@')[0] || 'User';
 
     // データプリフェッチ（ホバー時）
     const handleMouseEnter = useCallback((prefetchUrl: string | null) => {
@@ -57,7 +65,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     const handleLogout = useCallback(async () => {
         setIsLoggingOut(true);
         try {
-            await fetch('/api/auth/logout', { method: 'POST' });
+            await supabase.auth.signOut();
             toast.success('ログアウトしました');
             router.push('/');
             router.refresh();
@@ -67,7 +75,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         } finally {
             setIsLoggingOut(false);
         }
-    }, [router]);
+    }, [router, supabase.auth]);
 
     // アクティブ状態の計算をメモ化
     const activeItem = useMemo(() => {

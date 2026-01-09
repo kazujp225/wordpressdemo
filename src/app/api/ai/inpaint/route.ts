@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { prisma } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { estimateImageCost } from '@/lib/ai-costs';
@@ -54,9 +54,10 @@ export async function POST(request: NextRequest) {
     let inpaintPrompt = '';
 
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
         // 複数選択か単一選択か判定
         const allMasks: MaskArea[] = masks && masks.length > 0 ? masks : (mask ? [mask] : []);
 
-        const GOOGLE_API_KEY = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id);
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({
                 error: 'Google API key is not configured. 設定画面でAPIキーを設定してください。'
@@ -256,14 +257,14 @@ Generate the complete edited image with pixel-perfect quality now.`;
 
         const result = await processInpaintResponse(
             data,
-            (session.user?.username || 'anonymous'),
+            user.id,
             { model: modelUsed, estimatedCost, durationMs },
             historyData
         );
 
         // ログ記録（成功）
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'inpaint',
             endpoint: '/api/ai/inpaint',
             model: modelUsed,
@@ -280,7 +281,7 @@ Generate the complete edited image with pixel-perfect quality now.`;
 
         // ログ記録（エラー）
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'inpaint',
             endpoint: '/api/ai/inpaint',
             model: 'gemini-3-pro-image-preview',

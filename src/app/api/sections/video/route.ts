@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
         const page = await prisma.page.findFirst({
             where: {
                 id: parseInt(pageId, 10),
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
             },
         });
 
@@ -101,9 +102,10 @@ export async function POST(request: NextRequest) {
 // 動画を削除
 export async function DELETE(request: NextRequest) {
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -130,7 +132,7 @@ export async function DELETE(request: NextRequest) {
             },
         });
 
-        if (!section || section.page.userId !== (session.user?.username || 'anonymous')) {
+        if (!section || section.page.userId !== user.id) {
             return NextResponse.json({ error: 'Section not found' }, { status: 404 });
         }
 

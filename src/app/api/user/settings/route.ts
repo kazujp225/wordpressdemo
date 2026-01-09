@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
 
 // プレミアムユーザーのユーザー名
@@ -34,13 +34,14 @@ async function getOrCreateUserSettings(userId: string) {
 
 // ユーザー設定を取得
 export async function GET() {
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user?.username || 'anonymous';
+    const userId = user.id;
     const settings = await getOrCreateUserSettings(userId);
 
     return NextResponse.json({
@@ -52,13 +53,14 @@ export async function GET() {
 
 // ユーザー設定を保存
 export async function POST(request: NextRequest) {
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user?.username || 'anonymous';
+    const userId = user.id;
     const { googleApiKey } = await request.json();
 
     await prisma.userSettings.upsert({

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 
 const log = {
@@ -14,9 +14,10 @@ interface ExtractBackgroundColorRequest {
 
 export async function POST(request: NextRequest) {
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: '画像URLが必要です' }, { status: 400 });
         }
 
-        const GOOGLE_API_KEY = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id);
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({
                 error: 'Google API key is not configured'

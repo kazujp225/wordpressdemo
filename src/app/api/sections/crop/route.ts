@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { createClient } from '@supabase/supabase-js';
-import { getSession } from '@/lib/auth';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseStorage = createServiceClient(supabaseUrl, supabaseServiceKey);
 
 interface CropData {
     startY: number;
@@ -15,9 +15,10 @@ interface CropData {
 
 export async function POST(request: NextRequest) {
     // JWT認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
         const filePath = `sections/${pageId}/${fileName}`;
 
         // Supabaseにアップロード
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await supabaseStorage.storage
             .from('images')
             .upload(filePath, buffer, {
                 contentType: 'image/png',
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 公開URLを取得
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = supabaseStorage.storage
             .from('images')
             .getPublicUrl(filePath);
 
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
             await prisma.sectionImageHistory.create({
                 data: {
                     sectionId: numericSectionId,
-                    userId: session.user?.username || 'anonymous',
+                    userId: user.id,
                     previousImageId: section.imageId,
                     newImageId: newMedia.id,
                     actionType: 'crop',

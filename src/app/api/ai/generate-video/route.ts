@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
@@ -17,9 +17,10 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now();
 
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Google API Keyを取得
-        const googleApiKey = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const googleApiKey = await getGoogleApiKeyForUser(user.id);
         if (!googleApiKey) {
             return NextResponse.json(
                 { error: 'Google API Keyが設定されていません。設定ページでAPIキーを登録してください。' },
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
 
             // エラーログを記録
             await logGeneration({
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
                 type: 'video-generate',
                 endpoint: '/api/ai/generate-video',
                 model: VEO_MODEL,
@@ -222,7 +223,7 @@ export async function POST(request: NextRequest) {
         // DBに保存
         await prisma.mediaVideo.create({
             data: {
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
                 filePath: videoUrl,
                 mime: 'video/mp4',
                 duration: videoDuration,
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
         // 成功ログを記録
         const estimatedCost = videoDuration * COST_PER_SECOND;
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'video-generate',
             endpoint: '/api/ai/generate-video',
             model: VEO_MODEL,
@@ -257,7 +258,7 @@ export async function POST(request: NextRequest) {
 
         // エラーログを記録
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'video-generate',
             endpoint: '/api/ai/generate-video',
             model: VEO_MODEL,

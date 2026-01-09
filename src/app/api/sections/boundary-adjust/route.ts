@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
 import sharp from 'sharp';
 import { supabase } from '@/lib/supabase';
@@ -19,9 +19,10 @@ const log = {
 };
 
 export async function POST(request: NextRequest) {
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -154,8 +155,8 @@ export async function POST(request: NextRequest) {
 
         // 新しい画像をSupabaseにアップロード
         const timestamp = Date.now();
-        const upperFilename = `${(session.user?.username || 'anonymous')}/boundary-adj-upper-${timestamp}.png`;
-        const lowerFilename = `${(session.user?.username || 'anonymous')}/boundary-adj-lower-${timestamp}.png`;
+        const upperFilename = `${user.id}/boundary-adj-upper-${timestamp}.png`;
+        const lowerFilename = `${user.id}/boundary-adj-lower-${timestamp}.png`;
 
         const [upperUpload, lowerUpload] = await Promise.all([
             supabase.storage.from('images').upload(upperFilename, newUpperBuffer, {
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
         const [newUpperImage, newLowerImage] = await Promise.all([
             prisma.mediaImage.create({
                 data: {
-                    userId: (session.user?.username || 'anonymous'),
+                    userId: user.id,
                     filePath: upperPublicUrl,
                     width: upperMeta.width,
                     height: newUpperHeight,
@@ -194,7 +195,7 @@ export async function POST(request: NextRequest) {
             }),
             prisma.mediaImage.create({
                 data: {
-                    userId: (session.user?.username || 'anonymous'),
+                    userId: user.id,
                     filePath: lowerPublicUrl,
                     width: lowerMeta.width,
                     height: newLowerHeight,

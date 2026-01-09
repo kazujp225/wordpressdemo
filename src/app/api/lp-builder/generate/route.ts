@@ -7,7 +7,7 @@ import {
 } from '@/lib/gemini-prompts';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { businessInfoSchema, validateRequest } from '@/lib/validations';
@@ -452,9 +452,10 @@ export async function POST(req: NextRequest) {
     let prompt = '';
 
     // ユーザー認証を確認してAPIキーを取得
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -477,7 +478,7 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        const GOOGLE_API_KEY = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id);
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({
                 error: 'Google API key is not configured. 設定画面でAPIキーを設定してください。'
@@ -611,7 +612,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
                 section.type,
                 businessInfo,
                 GOOGLE_API_KEY,
-                (session.user?.username || 'anonymous'),
+                user.id,
                 3, // maxRetries
                 styleAnchorBase64 || undefined,  // Style Anchor（色・質感の基準）
                 seamReference,                    // Seam Reference（境界接続用）
@@ -656,7 +657,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
 
         // ログ記録（テキスト生成）
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'lp-generate',
             endpoint: '/api/lp-builder/generate',
             model: MODELS.TEXT,
@@ -669,7 +670,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
         // ログ記録（画像生成サマリー）
         if (successCount > 0) {
             await logGeneration({
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
                 type: 'lp-generate',
                 endpoint: '/api/lp-builder/generate',
                 model: MODELS.IMAGE_PRIMARY,
@@ -714,7 +715,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
 
         // ログ記録（エラー）
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'lp-generate',
             endpoint: '/api/lp-builder/generate',
             model: MODELS.TEXT,

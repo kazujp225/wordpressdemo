@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import sharp from 'sharp';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 // design-tokens.ts のインポートは不要になりました（editOptions方式に移行）
@@ -400,9 +400,10 @@ export async function POST(
         return Response.json({ error: 'Invalid page ID' }, { status: 400 });
     }
 
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -476,7 +477,7 @@ export async function POST(
         log.info(`Found ${desktopCount} desktop sections${includeMobile ? ` + ${mobileCount} mobile sections` : ''}`);
 
         // API キーを取得
-        const googleApiKey = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const googleApiKey = await getGoogleApiKeyForUser(user.id);
         if (!googleApiKey) {
             throw new Error('Google API key is not configured');
         }
@@ -685,7 +686,7 @@ export async function POST(
                     i,
                     totalSegments,
                     googleApiKey,
-                    (session.user?.username || 'anonymous'),
+                    user.id,
                     styleReference,
                     designDefinition
                 );
@@ -921,7 +922,7 @@ export async function POST(
                         i,
                         sectionsWithMobile.length,
                         googleApiKey,
-                        (session.user?.username || 'anonymous'),
+                        user.id,
                         styleReference,
                         designDefinition
                     );

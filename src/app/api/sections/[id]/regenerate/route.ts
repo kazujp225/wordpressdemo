@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import sharp from 'sharp';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import {
@@ -69,9 +69,10 @@ export async function POST(
         return Response.json({ error: 'Invalid section ID' }, { status: 400 });
     }
 
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -132,7 +133,7 @@ export async function POST(
         }
 
         // API キーを取得
-        const googleApiKey = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const googleApiKey = await getGoogleApiKeyForUser(user.id);
         if (!googleApiKey) {
             return Response.json({ error: 'Google API key is not configured' }, { status: 400 });
         }
@@ -614,7 +615,7 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
         }
 
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'import-arrange',
             endpoint: '/api/sections/[id]/regenerate',
             model: 'gemini-3-pro-image-preview',
@@ -666,7 +667,7 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
             await prisma.sectionImageHistory.create({
                 data: {
                     sectionId: sectionId,
-                    userId: (session.user?.username || 'anonymous'),
+                    userId: user.id,
                     previousImageId: previousImageId,
                     newImageId: newMedia.id,
                     actionType: `regenerate-${mode}-${targetImage}`,

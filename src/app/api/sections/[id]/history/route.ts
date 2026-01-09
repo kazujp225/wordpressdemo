@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 const log = (msg: string, data?: any) => {
     console.log(`[History API] ${msg}`, data ? JSON.stringify(data) : '');
@@ -21,9 +21,10 @@ export async function GET(
         return Response.json({ error: 'Invalid section ID' }, { status: 400 });
     }
 
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         log('Unauthorized');
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -59,7 +60,7 @@ export async function GET(
         if (currentImageId) {
             historyByImageId = await prisma.sectionImageHistory.findMany({
                 where: {
-                    userId: (session.user?.username || 'anonymous'),
+                    userId: user.id,
                     OR: [
                         { previousImageId: currentImageId },
                         { newImageId: currentImageId },
@@ -125,7 +126,7 @@ export async function GET(
         for (const ts of timestamps) {
             const images = await prisma.mediaImage.findMany({
                 where: {
-                    userId: (session.user?.username || 'anonymous'),
+                    userId: user.id,
                     filePath: { contains: `${ts}-seg-${segNumber}` }
                 },
                 orderBy: { createdAt: 'desc' },
@@ -169,9 +170,10 @@ export async function POST(
         return Response.json({ error: 'Invalid section ID' }, { status: 400 });
     }
 
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -210,7 +212,7 @@ export async function POST(
             await prisma.sectionImageHistory.create({
                 data: {
                     sectionId: sectionId,
-                    userId: (session.user?.username || 'anonymous'),
+                    userId: user.id,
                     previousImageId: currentImageId,
                     newImageId: imageId,
                     actionType: 'revert',
@@ -250,9 +252,10 @@ export async function PUT(
         return Response.json({ error: 'Invalid section ID' }, { status: 400 });
     }
 
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -268,7 +271,7 @@ export async function PUT(
         await prisma.sectionImageHistory.create({
             data: {
                 sectionId: sectionId,
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
                 previousImageId,
                 newImageId,
                 actionType: actionType || 'manual',

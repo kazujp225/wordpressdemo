@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
     try {
-        const session = await getSession();
+        const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-        if (!session) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const searchParams = request.nextUrl.searchParams;
         const days = parseInt(searchParams.get('days') || '30');
-        const targetUserId = searchParams.get('userId') || (session.user?.username || 'anonymous');
+        const targetUserId = searchParams.get('userId') || user.id;
 
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);

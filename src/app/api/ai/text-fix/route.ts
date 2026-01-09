@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { prisma } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { estimateImageCost } from '@/lib/ai-costs';
@@ -27,9 +27,10 @@ export async function POST(request: NextRequest) {
     let textFixPrompt = '';
 
     // ユーザー認証
-    const session = await getSession();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
         // 複数選択か単一選択か判定
         const allMasks: MaskArea[] = masks && masks.length > 0 ? masks : (mask ? [mask] : []);
 
-        const GOOGLE_API_KEY = await getGoogleApiKeyForUser((session.user?.username || 'anonymous'));
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id);
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({
                 error: 'Google API key is not configured. 設定画面でAPIキーを設定してください。'
@@ -233,7 +234,7 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
         // DB保存
         const media = await prisma.mediaImage.create({
             data: {
-                userId: (session.user?.username || 'anonymous'),
+                userId: user.id,
                 filePath: publicUrl,
                 mime: 'image/png',
                 width: 0,
@@ -244,7 +245,7 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
 
         // ログ記録
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'text-fix',
             endpoint: '/api/ai/text-fix',
             model: modelUsed,
@@ -270,7 +271,7 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
 
         // ログ記録（エラー）
         await logGeneration({
-            userId: (session.user?.username || 'anonymous'),
+            userId: user.id,
             type: 'text-fix',
             endpoint: '/api/ai/text-fix',
             model: 'gemini-3-pro-image-preview',
