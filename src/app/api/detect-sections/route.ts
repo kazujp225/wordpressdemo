@@ -359,7 +359,7 @@ export async function POST(request: NextRequest) {
             where: { userId: user.id }
         });
 
-        const apiKey = userSettings?.googleApiKey || process.env.GOOGLE_API_KEY;
+        const apiKey = userSettings?.googleApiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY;
 
         if (apiKey) {
             try {
