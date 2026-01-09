@@ -1,31 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
-// プレミアムユーザーのメールアドレス
-const PREMIUM_EMAILS = ['renrenfujiwara@gmail.com'];
+// プレミアムユーザーのユーザー名
+const PREMIUM_USERS = ['ZettAI'];
 
 // ユーザー設定を取得（なければ自動作成）
-async function getOrCreateUserSettings(userId: string, email: string | undefined) {
+async function getOrCreateUserSettings(userId: string) {
     let settings = await prisma.userSettings.findUnique({
         where: { userId }
     });
 
     if (!settings) {
-        // 新規ユーザー: プレミアムメールかどうかでプランを決定
-        const plan = email && PREMIUM_EMAILS.includes(email) ? 'premium' : 'normal';
+        // 新規ユーザー: プレミアムユーザーかどうかでプランを決定
+        const plan = PREMIUM_USERS.includes(userId) ? 'premium' : 'normal';
         settings = await prisma.userSettings.create({
             data: {
                 userId,
-                email: email || null,
+                email: null,
                 plan
             }
         });
-    } else if (email && PREMIUM_EMAILS.includes(email) && settings.plan !== 'premium') {
-        // 既存ユーザーでもプレミアムメールならプレミアムに
+    } else if (PREMIUM_USERS.includes(userId) && settings.plan !== 'premium') {
+        // 既存ユーザーでもプレミアムならプレミアムに
         settings = await prisma.userSettings.update({
             where: { userId },
-            data: { plan: 'premium', email }
+            data: { plan: 'premium' }
         });
     }
 
@@ -34,43 +34,42 @@ async function getOrCreateUserSettings(userId: string, email: string | undefined
 
 // ユーザー設定を取得
 export async function GET() {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const session = await getSession();
 
-    if (!user) {
+    if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const settings = await getOrCreateUserSettings(user.id, user.email);
+    const userId = session.user?.username || 'anonymous';
+    const settings = await getOrCreateUserSettings(userId);
 
     return NextResponse.json({
         plan: settings.plan,
         hasApiKey: !!settings.googleApiKey,
-        email: user.email
+        username: userId
     });
 }
 
 // ユーザー設定を保存
 export async function POST(request: NextRequest) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const session = await getSession();
 
-    if (!user) {
+    if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const userId = session.user?.username || 'anonymous';
     const { googleApiKey } = await request.json();
 
     await prisma.userSettings.upsert({
-        where: { userId: user.id },
+        where: { userId },
         update: {
-            googleApiKey: googleApiKey || undefined,
-            email: user.email || undefined
+            googleApiKey: googleApiKey || undefined
         },
         create: {
-            userId: user.id,
-            email: user.email || null,
-            plan: user.email && PREMIUM_EMAILS.includes(user.email) ? 'premium' : 'normal',
+            userId,
+            email: null,
+            plan: PREMIUM_USERS.includes(userId) ? 'premium' : 'normal',
             googleApiKey: googleApiKey || null
         }
     });

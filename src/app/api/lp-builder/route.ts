@@ -2,20 +2,20 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth";
 
 // 既存LP一覧を取得
 export async function GET() {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const session = await getSession();
 
-        if (!user) {
+        if (!session) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const userId = session.user?.username || 'anonymous';
         const pages = await prisma.page.findMany({
-            where: { userId: user.id },
+            where: { userId },
             select: {
                 id: true,
                 title: true,
@@ -53,12 +53,13 @@ export async function GET() {
 // LPを保存/更新
 export async function POST(request: Request) {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const session = await getSession();
 
-        if (!user) {
+        if (!session) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        const userId = session.user?.username || 'anonymous';
 
         const body = await request.json();
         const { pageId, title, sections } = body;
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
             const slug = `lp-${Date.now()}`;
             const newPage = await prisma.page.create({
                 data: {
-                    userId: user.id,
+                    userId,
                     title: title || 'Untitled Page',
                     slug: slug,
                     status: 'draft',
