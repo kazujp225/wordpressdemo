@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createClient } from '@supabase/supabase-js';
-import { createClient as createSupabaseAuth } from '@/lib/supabase/server';
+import { getSession } from '@/lib/auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -14,11 +14,10 @@ interface CropData {
 }
 
 export async function POST(request: NextRequest) {
-    // ユーザー認証
-    const supabaseAuth = await createSupabaseAuth();
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    // JWT認証
+    const session = await getSession();
 
-    if (!user) {
+    if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -99,7 +98,7 @@ export async function POST(request: NextRequest) {
             await prisma.sectionImageHistory.create({
                 data: {
                     sectionId: numericSectionId,
-                    userId: user.id,
+                    userId: session.user?.username || 'anonymous',
                     previousImageId: section.imageId,
                     newImageId: newMedia.id,
                     actionType: 'crop',
