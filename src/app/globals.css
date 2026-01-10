@@ -113,12 +113,14 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-400 dark:bg-gray-600;
 }
+
 /* Slide-in animation for panels */
 @keyframes slide-in-right {
   from {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -135,10 +137,12 @@
     width: 0%;
     margin-left: 0%;
   }
+
   50% {
     width: 30%;
     margin-left: 35%;
   }
+
   100% {
     width: 0%;
     margin-left: 100%;
@@ -147,4 +151,37 @@
 
 .animate-progress {
   animation: progress 2s ease-in-out infinite;
+}
+
+/* Toast Animations */
+@keyframes enter {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes leave {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+
+.animate-enter {
+  animation: enter 0.2s ease-out forwards;
+}
+
+.animate-leave {
+  animation: leave 0.15s ease-in forwards;
 }

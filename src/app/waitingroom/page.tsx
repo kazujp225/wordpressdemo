@@ -167,30 +167,31 @@ export default function WaitingRoomPage() {
 
                 <div className="relative z-10 flex flex-col lg:flex-row min-h-screen">
                     {/* Left Panel: Brand & Vision */}
+                    {/* Left Panel: Brand & Vision */}
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                        className="w-full lg:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-100 bg-white/50 backdrop-blur-sm relative overflow-hidden"
+                        className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-100 bg-white/50 backdrop-blur-sm relative overflow-hidden justify-center"
                     >
-                        <header className="relative z-20 mb-8">
+                        <header className="relative lg:absolute lg:top-0 lg:left-0 lg:w-full z-30 p-8 md:p-12 lg:p-12">
                             <a href="/" className="inline-block group">
-                                <h1 className="text-2xl font-black tracking-tighter transition-colors group-hover:text-amber-600">
+                                <h1 className="text-xl font-black tracking-tighter transition-colors group-hover:text-amber-600">
                                     LP Builder
                                 </h1>
                             </a>
                         </header>
 
-                        {/* Top aligned content */}
-                        <div className="relative z-20 flex-1 flex flex-col justify-start pt-24">
-                            <div className="flex items-center mb-6">
-                                <span className="text-amber-600 font-bold tracking-widest uppercase text-xs">
+                        {/* Main Content - Centered */}
+                        <div className="relative z-20 flex flex-col justify-center px-8 md:px-12 lg:px-20 py-12 lg:py-0 h-full">
+                            <div className="flex items-center mb-8">
+                                <span className="text-amber-600 font-bold tracking-widest uppercase text-xs border border-amber-200 px-3 py-1 rounded-full bg-amber-50">
                                     AI-Powered LP Creation
                                 </span>
                             </div>
 
                             {/* Lottie Animation */}
-                            <div className="w-[100px] h-[100px] mb-4">
+                            <div className="w-40 h-40 mb-6">
                                 <dotlottie-wc
                                     src="https://lottie.host/bef0c297-c293-4e57-a030-24ff0c5cb2f0/xZUAd4jXZg.lottie"
                                     autoplay={true}
@@ -200,59 +201,66 @@ export default function WaitingRoomPage() {
                             </div>
 
                             {/* Typography */}
-                            <h2 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tighter leading-[1.1] mb-6">
+                            <h2 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter leading-[1.05] mb-8">
                                 LP制作を、<br />
                                 <span className="text-amber-600">AIの力で</span>革新する。
                             </h2>
                             {/* Paragraph */}
-                            <p className="text-black font-bold text-sm md:text-base leading-relaxed max-w-md mb-8">
-                                URLから取り込み、AI画像生成、<br />
-                                インペイント編集、リスタイル...<br />
-                                <span className="text-amber-600 whitespace-nowrap">すべてが一つのツールで。</span>
+                            <p className="text-gray-600 font-medium text-base md:text-lg leading-relaxed max-w-lg mb-10">
+                                URLから取り込み、AI画像生成、インペイント編集...<br />
+                                <span className="text-black font-bold">すべてが一つのツールで完結します。</span>
                             </p>
 
                             {/* Feature Highlights */}
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-6 max-w-md">
-                                <div className="bg-white/80 border border-gray-100 rounded-xl p-4 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Globe className="w-4 h-4 text-amber-500" />
-                                        <span className="text-xs font-bold text-gray-500">URL取り込み</span>
+                            <div className="grid grid-cols-2 gap-4 max-w-lg">
+                                <div className="bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                                            <Globe className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-800">URL取り込み</span>
                                     </div>
-                                    <p className="text-xs text-gray-600">既存LPを瞬時に解析</p>
+                                    <p className="text-xs text-gray-500 font-medium pl-1">既存LPを瞬時に解析</p>
                                 </div>
-                                <div className="bg-white/80 border border-gray-100 rounded-xl p-4 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Sparkles className="w-4 h-4 text-amber-500" />
-                                        <span className="text-xs font-bold text-gray-500">AI画像生成</span>
+                                <div className="bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                                            <Sparkles className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-800">AI画像生成</span>
                                     </div>
-                                    <p className="text-xs text-gray-600">プロンプトから画像作成</p>
+                                    <p className="text-xs text-gray-500 font-medium pl-1">プロンプトから作成</p>
                                 </div>
-                                <div className="bg-white/80 border border-gray-100 rounded-xl p-4 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Wand2 className="w-4 h-4 text-amber-500" />
-                                        <span className="text-xs font-bold text-gray-500">インペイント</span>
+                                <div className="bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                                            <Wand2 className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-800">インペイント</span>
                                     </div>
-                                    <p className="text-xs text-gray-600">部分編集で自然に修正</p>
+                                    <p className="text-xs text-gray-500 font-medium pl-1">部分編集で自然に修正</p>
                                 </div>
-                                <div className="bg-white/80 border border-gray-100 rounded-xl p-4 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Download className="w-4 h-4 text-amber-500" />
-                                        <span className="text-xs font-bold text-gray-500">HTMLエクスポート</span>
+                                <div className="bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                                            <Download className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-800">HTML出力</span>
                                     </div>
-                                    <p className="text-xs text-gray-600">どこでも公開可能</p>
+                                    <p className="text-xs text-gray-500 font-medium pl-1">どこでも公開可能</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="hidden lg:block relative z-20 mt-auto pt-8">
-                            <p className="text-xs font-bold text-gray-400 tracking-widest">
-                                © 2026 ZettAI Inc.
+                        <div className="hidden lg:block absolute bottom-0 left-0 w-full z-20 p-12">
+                            <p className="text-[10px] font-bold text-gray-300 tracking-[0.2em]">
+                                © 2026 ZETTAI INC.
                             </p>
                         </div>
                     </motion.div>
 
                     {/* Right Panel: Form & Pricing */}
-                    <div className="w-full lg:w-1/2 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-white relative">
+                    <div className="w-full lg:w-1/2 p-8 md:p-12 lg:p-24 flex flex-col justify-center bg-white/50 backdrop-blur-sm relative">
                         <AnimatePresence mode='wait'>
                             {step === 1 ? (
                                 <motion.div
@@ -403,6 +411,19 @@ export default function WaitingRoomPage() {
 
                                         <div className="space-y-1">
                                             <label className="text-sm font-bold text-gray-700">
+                                                電話番号 <span className="text-gray-400 text-xs font-normal">（任意）</span>
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                value={formData.phone}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                placeholder="03-1234-5678"
+                                                className="w-full bg-white border border-gray-200 rounded-lg py-3 px-4 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all font-medium"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-bold text-gray-700">
                                                 備考 <span className="text-gray-400 text-xs font-normal">（任意）</span>
                                             </label>
                                             <textarea
@@ -434,7 +455,7 @@ export default function WaitingRoomPage() {
                                                 )}
                                             </button>
                                             <p className="mt-4 text-xs text-gray-400 leading-relaxed text-center">
-                                                ご登録いただくことで、<a href="#" className="underline hover:text-amber-600">利用規約</a>および<a href="#" className="underline hover:text-amber-600">プライバシーポリシー</a>に同意したものとみなされます。
+                                                ご登録いただくことで、<a href="/terms" target="_blank" className="underline hover:text-amber-600">利用規約</a>および<a href="/privacy" target="_blank" className="underline hover:text-amber-600">プライバシーポリシー</a>に同意したものとみなされます。
                                             </p>
                                         </div>
                                     </form>
@@ -472,7 +493,7 @@ export default function WaitingRoomPage() {
                                         onClick={() => setStep(1)}
                                         className="text-sm font-bold text-gray-400 hover:text-amber-600 transition-colors"
                                     >
-                                        トップに戻る
+                                        フォームに戻る
                                     </button>
                                 </motion.div>
                             )}
@@ -482,7 +503,7 @@ export default function WaitingRoomPage() {
             </div>
 
             {/* Features Section */}
-            <section className="py-16 px-6 md:px-12 lg:px-20 bg-gray-50 border-t border-gray-100">
+            <section className="py-24 px-6 md:px-12 lg:px-20 bg-gray-50 border-t border-gray-100">
                 <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -498,7 +519,7 @@ export default function WaitingRoomPage() {
                             </span>
                             <span className="inline-block w-8 h-[2px] bg-amber-500"></span>
                         </div>
-                        <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-6">
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-8">
                             Lp Builderでできること
                         </h2>
                         <p className="text-gray-600 max-w-2xl mx-auto text-lg leading-relaxed">
@@ -531,7 +552,7 @@ export default function WaitingRoomPage() {
             </section>
 
             {/* How It Works Section */}
-            <section className="py-16 px-6 md:px-12 lg:px-20 bg-white">
+            <section className="py-24 px-6 md:px-12 lg:px-20 bg-white">
                 <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -547,7 +568,7 @@ export default function WaitingRoomPage() {
                             </span>
                             <span className="inline-block w-8 h-[2px] bg-amber-500"></span>
                         </div>
-                        <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-6">
                             3ステップで完成
                         </h2>
                     </motion.div>
@@ -613,7 +634,7 @@ export default function WaitingRoomPage() {
                         viewport={{ once: true }}
                         transition={{ duration: 0.6 }}
                     >
-                        <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-6">
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-8">
                             LP制作をもっとシンプルに。<br />
                             もっとクリエイティブに。
                         </h2>
