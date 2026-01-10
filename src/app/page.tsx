@@ -2,12 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Loader2, Mail, Lock, UserPlus } from 'lucide-react';
+import { ArrowRight, Loader2, Mail, Lock, UserPlus, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+
+// 特別アカウント: ZettAI → team@zettai.co.jp
+const SPECIAL_ACCOUNTS: Record<string, string> = {
+  'ZettAI': 'team@zettai.co.jp',
+  'zettai': 'team@zettai.co.jp',
+};
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,6 +22,9 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // IDかメールアドレスかを判定
+  const isEmail = identifier.includes('@');
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -23,8 +32,18 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // 特別アカウントの場合はメールアドレスに変換
+      let loginEmail = identifier;
+      if (!isEmail && SPECIAL_ACCOUNTS[identifier]) {
+        loginEmail = SPECIAL_ACCOUNTS[identifier];
+      } else if (!isEmail) {
+        setError('このIDは登録されていません');
+        setLoading(false);
+        return;
+      }
+
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: loginEmail,
         password,
       });
 
@@ -55,6 +74,12 @@ export default function LoginPage() {
     setError('');
     setSuccess('');
 
+    // 登録はメールアドレスのみ
+    if (!isEmail) {
+      setError('登録にはメールアドレスを入力してください');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('パスワードが一致しません');
       return;
@@ -69,7 +94,7 @@ export default function LoginPage() {
 
     try {
       const { data, error: authError } = await supabase.auth.signUp({
-        email,
+        email: identifier,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -91,7 +116,7 @@ export default function LoginPage() {
           setError('このメールアドレスは既に登録されています');
         } else if (!data.session) {
           setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。');
-          setEmail('');
+          setIdentifier('');
           setPassword('');
           setConfirmPassword('');
         } else {
@@ -194,18 +219,22 @@ export default function LoginPage() {
 
           <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-6">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-bold text-foreground">
-                ID または メールアドレス
+              <label htmlFor="identifier" className="text-sm font-bold text-foreground">
+                {mode === 'login' ? 'ID または メールアドレス' : 'メールアドレス'}
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                {isEmail ? (
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                )}
                 <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="identifier"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  placeholder="ZettAI または email@example.com"
+                  placeholder={mode === 'login' ? 'ZettAI または email@example.com' : 'email@example.com'}
                   required
                   autoFocus
                 />
