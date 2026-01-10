@@ -3065,7 +3065,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                 }`}>
                                                                 {item.actionType === 'design-unify' ? '🎨 デザイン統一' :
                                                                     item.actionType === 'background-unify' ? '🎨 背景色統一' :
-                                                                        item.actionType === 'inpaint' ? '✏️ 部分編集' :
+                                                                        item.actionType === 'inpaint' ? '✏️ AI編集' :
                                                                             item.actionType === 'regenerate' ? '🔄 再生成' :
                                                                                 item.actionType === 'regenerate-heavy-mobile' ? '🔄 モバイル再生成' :
                                                                                     item.actionType === 'restore-canvas' ? '📐 キャンバス復元' :

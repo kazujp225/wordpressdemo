@@ -1359,8 +1359,8 @@ export function ImageInpaintEditor({
                             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center border border-green-200">
                                 <Check className="w-8 h-8" />
                             </div>
-                            <h3 className="text-xl font-bold text-foreground mb-2">編集完了</h3>
-                            <p className="text-muted-foreground text-sm mb-6">画像を保存して閉じています...</p>
+                            <h3 className="text-xl font-bold text-foreground mb-2">完了!</h3>
+                            <p className="text-muted-foreground text-sm mb-6">変更を保存中...</p>
 
                             {costInfo && (
                                 <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-border">
@@ -1398,16 +1398,16 @@ export function ImageInpaintEditor({
                             </div>
                             <div>
                                 <h2 className="text-lg font-bold text-foreground">
-                                    {editorMode === 'inpaint' ? '画像部分編集'
-                                     : editorMode === 'text-fix' ? '文字化け修正'
+                                    {editorMode === 'inpaint' ? 'AI画像編集'
+                                     : editorMode === 'text-fix' ? '文字修正'
                                      : 'ボタン設定'}
                                 </h2>
                                 <p className="text-xs text-muted-foreground font-medium">
                                     {editorMode === 'inpaint'
-                                        ? '画像の一部を選択してAIで編集・修正します（複数選択可）'
+                                        ? '変更したい部分を囲んでAIで修正（複数選択OK）'
                                         : editorMode === 'text-fix'
-                                        ? '文字化けした部分を選択してOCR→AI修正します'
-                                        : '画像上にクリッカブルなボタン領域を設定します'}
+                                        ? '文字化けした部分を囲んでAIで修正'
+                                        : '画像上にクリックできるボタン領域を設定'}
                                 </p>
                             </div>
                         </div>
@@ -1675,8 +1675,8 @@ export function ImageInpaintEditor({
                             <div className="flex-1 overflow-y-auto p-6">
                                 {/* Inpaint Mode Content */}
                                 <div className="mb-6">
-                                    <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-1">編集設定</h3>
-                                    <p className="text-xs text-muted-foreground">編集したい領域を選択してください。</p>
+                                    <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-1">AI編集</h3>
+                                    <p className="text-xs text-muted-foreground">変更したい部分を囲んでください</p>
                                 </div>
 
                                 {/* Selections List - Show based on active viewport */}
@@ -1738,7 +1738,7 @@ export function ImageInpaintEditor({
                                                 <Plus className="w-5 h-5 text-muted-foreground" />
                                             </div>
                                             <p className="text-sm font-bold text-foreground">範囲を選択</p>
-                                            <p className="text-xs text-muted-foreground mt-1">画像上をドラッグして<br />編集エリアを指定します。</p>
+                                            <p className="text-xs text-muted-foreground mt-1">画像上をドラッグして<br />変更したい部分を囲む</p>
                                         </div>
                                     );
                                 })()}
@@ -1854,7 +1854,7 @@ export function ImageInpaintEditor({
                                     {/* Edit Type Selector */}
                                     <div>
                                         <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-2">
-                                            編集タイプ
+                                            何をしたい？
                                         </label>
                                         <div className="flex flex-wrap gap-1.5">
                                             {(Object.keys(editTypeConfig) as EditType[]).map((type) => (
@@ -1951,7 +1951,7 @@ export function ImageInpaintEditor({
                                     {referenceDesign && (
                                         <p className="text-[10px] text-primary flex items-center gap-1">
                                             <Sparkles className="w-3 h-3" />
-                                            参考デザインのスタイルが編集に反映されます
+                                            参考デザインに寄せて仕上げます
                                         </p>
                                     )}
                                 </div>
