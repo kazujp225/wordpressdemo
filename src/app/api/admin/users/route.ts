@@ -5,20 +5,13 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { PLANS, PlanType } from '@/lib/plans';
 import { getUserUsage } from '@/lib/usage';
 
-// 管理者メールアドレス（環境変数で設定可能）
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'team@zettai.co.jp').split(',').map(e => e.trim());
-
-// 管理者かどうかをチェック
+// 管理者かどうかをチェック（DBのroleフィールドで判定）
 async function isAdmin(userId: string): Promise<boolean> {
-    const supabaseAdmin = createSupabaseAdmin(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
-    if (!user?.email) return false;
-
-    return ADMIN_EMAILS.includes(user.email);
+    const userSettings = await prisma.userSettings.findUnique({
+        where: { userId },
+        select: { role: true }
+    });
+    return userSettings?.role === 'admin';
 }
 
 // GET: ユーザー一覧を取得

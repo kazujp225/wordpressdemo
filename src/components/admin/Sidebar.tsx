@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Images, Settings, LogOut, FileText, Navigation, Crown, History, BarChart3, Menu, X, Shield, Zap } from 'lucide-react';
+import { Images, Settings, LogOut, FileText, Navigation, Crown, History, BarChart3, Menu, X, Shield, Zap, Inbox } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
@@ -26,6 +26,7 @@ const navItems = [
     { name: 'Navigation', href: '/admin/navigation', icon: Navigation, prefetchUrl: '/api/config/navigation' },
     { name: 'Settings', href: '/admin/settings', icon: Settings, prefetchUrl: '/api/admin/settings' },
     { name: 'Users', href: '/admin/users', icon: Shield, prefetchUrl: null },
+    { name: 'Waitingroom', href: '/admin/waitingroom', icon: Inbox, prefetchUrl: '/api/admin/waitingroom' },
 ] as const;
 
 // データプリフェッチ用のキャッシュ
@@ -52,6 +53,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     const { data: userSettings } = useUserSettings();
     const plan = userSettings?.plan || 'normal';
     const username = user?.email?.split('@')[0] || 'User';
+    const isAdmin = userSettings?.role === 'admin';
 
     // データプリフェッチ（ホバー時）
     const handleMouseEnter = useCallback((prefetchUrl: string | null) => {
@@ -166,8 +168,14 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                             {username?.[0]?.toUpperCase() || 'U'}
                         </div>
                         <div className="flex-1 overflow-hidden">
-                            <div className="truncate text-xs font-bold text-foreground">
+                            <div className="truncate text-xs font-bold text-foreground flex items-center gap-2">
                                 {username}
+                                {isAdmin && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100 text-red-700 text-[9px] font-bold rounded">
+                                        <Shield className="h-2.5 w-2.5" />
+                                        Admin
+                                    </span>
+                                )}
                             </div>
                             <div className={clsx(
                                 "truncate text-[10px] font-medium flex items-center gap-1",

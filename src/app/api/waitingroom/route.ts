@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { resend, FROM_EMAIL, ADMIN_EMAIL } from '@/lib/resend';
-import {
-    getWaitingRoomConfirmationEmail,
-    getWaitingRoomAdminNotificationEmail
-} from '@/lib/email-templates/waitingroom';
 
 interface WaitingRoomRequest {
     accountType: 'individual' | 'corporate';
@@ -78,51 +73,6 @@ export async function POST(request: NextRequest) {
         if (phone) console.log('電話:', phone);
         if (remarks) console.log('備考:', remarks);
         console.log('========================');
-
-        // メール送信（非同期で実行、エラーがあってもレスポンスには影響させない）
-        const sendEmails = async () => {
-            try {
-                // 1. ユーザーへの確認メール
-                const confirmationEmail = getWaitingRoomConfirmationEmail({
-                    name,
-                    accountType,
-                    companyName: companyName || undefined,
-                });
-
-                await resend.emails.send({
-                    from: FROM_EMAIL,
-                    to: email,
-                    subject: confirmationEmail.subject,
-                    html: confirmationEmail.html,
-                });
-                console.log('✅ ユーザー確認メール送信完了:', email);
-
-                // 2. 管理者への通知メール
-                const adminEmail = getWaitingRoomAdminNotificationEmail({
-                    name,
-                    email,
-                    accountType,
-                    companyName: companyName || undefined,
-                    phone: phone || undefined,
-                    remarks: remarks || undefined,
-                    createdAt: entry.createdAt.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
-                });
-
-                await resend.emails.send({
-                    from: FROM_EMAIL,
-                    to: ADMIN_EMAIL,
-                    subject: adminEmail.subject,
-                    html: adminEmail.html,
-                });
-                console.log('✅ 管理者通知メール送信完了:', ADMIN_EMAIL);
-
-            } catch (emailError) {
-                console.error('❌ メール送信エラー:', emailError);
-            }
-        };
-
-        // メール送信を非同期で実行（レスポンスを待たせない）
-        sendEmails();
 
         return NextResponse.json({
             success: true,

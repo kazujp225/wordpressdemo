@@ -181,9 +181,8 @@ export default function LoginPage() {
       <div className="flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8">
           <div className="lg:hidden mb-8 text-center">
-            <div className="inline-flex items-center gap-3">
-              <div className="h-8 w-8 bg-primary rounded-sm" />
-              <span className="text-xl font-bold tracking-tight">LP Builder</span>
+            <div className="inline-flex items-center gap-2">
+              <span className="text-lg font-black tracking-tighter">LP Builder</span>
             </div>
           </div>
 
@@ -208,11 +207,10 @@ export default function LoginPage() {
                 setSuccess('');
                 setInvitePassword('');
               }}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                mode === 'login'
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${mode === 'login'
                   ? 'bg-white text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
-              }`}
+                }`}
             >
               ログイン
             </button>
@@ -223,11 +221,10 @@ export default function LoginPage() {
                 setError('');
                 setSuccess('');
               }}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                mode === 'register'
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${mode === 'register'
                   ? 'bg-white text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
-              }`}
+                }`}
             >
               新規登録
             </button>
@@ -245,7 +242,7 @@ export default function LoginPage() {
                   type="email"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-base md:text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   placeholder="email@example.com"
                   required
                   autoFocus
@@ -264,7 +261,7 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-base md:text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   placeholder="6文字以上"
                   required
                   minLength={6}
@@ -285,7 +282,7 @@ export default function LoginPage() {
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-base md:text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                       placeholder="パスワードを再入力"
                       required
                       minLength={6}
@@ -304,7 +301,7 @@ export default function LoginPage() {
                       type="password"
                       value={invitePassword}
                       onChange={(e) => setInvitePassword(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-md text-base md:text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                       placeholder="招待パスワードを入力"
                       required
                     />

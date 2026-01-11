@@ -66,7 +66,7 @@ export default function LPBuilderIntroPage() {
       </header>
 
       {/* Typographic Hero Section */}
-      <section className="pt-48 pb-32 px-6 md:px-12 max-w-[1400px] mx-auto">
+      <section className="pt-32 md:pt-48 pb-16 md:pb-32 px-6 md:px-12 max-w-[1400px] mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
 
           {/* Main Title Area */}
@@ -74,7 +74,7 @@ export default function LPBuilderIntroPage() {
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-6xl md:text-8xl lg:text-[7rem] font-bold leading-[0.9] tracking-tighter mb-12"
+              className="text-5xl md:text-8xl lg:text-[7rem] font-bold leading-[0.9] tracking-tighter mb-12"
             >
               Words become<br />
               <span className="text-gray-400">Interface.</span>
@@ -174,7 +174,7 @@ export default function LPBuilderIntroPage() {
       </section>
 
       {/* Feature List (Editorial Style) */}
-      <section className="py-32 border-t border-black/5">
+      <section className="py-16 md:py-32 border-t border-black/5">
         <div className="max-w-[1400px] mx-auto px-6 md:px-12">
           <div className="grid md:grid-cols-3 gap-x-12 gap-y-16">
             {[

@@ -35,6 +35,7 @@ export async function GET() {
 
     return NextResponse.json({
         plan: settings.plan,
+        role: settings.role,
         hasApiKey: !!settings.googleApiKey,
         userId: user.id
     });

@@ -99,6 +99,7 @@ model UserSettings {
   id           Int       @id @default(autoincrement())
   userId       String    @unique
   email        String?
+  role         String    @default("user") // 'user' | 'admin'
   plan         String    @default("free")
   googleApiKey String?
   isApproved   Boolean   @default(false)
@@ -180,18 +181,36 @@ model FormSubmission {
 }
 
 model WaitingRoomEntry {
-  id          Int      @id @default(autoincrement())
-  accountType String   // 'individual' or 'corporate'
+  id          Int                  @id @default(autoincrement())
+  accountType String               // 'individual' or 'corporate'
   companyName String?
   name        String
   email       String
   phone       String?
   remarks     String?
-  status      String   @default("pending") // pending, invited, registered
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      String               @default("pending") // pending, approved, rejected, invited, registered
+  adminNotes  String?              // 管理者用メモ
+  processedAt DateTime?            // 処理日時
+  processedBy String?              // 処理した管理者のID
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  replies     WaitingRoomReply[]
 
   @@index([email])
   @@index([status])
+  @@index([createdAt])
+}
+
+model WaitingRoomReply {
+  id        Int              @id @default(autoincrement())
+  entryId   Int
+  message   String           // 返信メッセージ
+  adminId   String           // 返信した管理者のID
+  adminName String?          // 管理者名（表示用）
+  isRead    Boolean          @default(false) // 申請者が読んだかどうか
+  createdAt DateTime         @default(now())
+  entry     WaitingRoomEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
   @@index([createdAt])
 }

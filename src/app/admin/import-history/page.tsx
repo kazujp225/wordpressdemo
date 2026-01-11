@@ -12,7 +12,7 @@ export default async function ImportHistoryPage() {
     const imports = await prisma.mediaImage.findMany({
         where: {
             sourceType: 'import',
-            ...(user?.id ? { userId: user.id } : {}),
+            userId: user?.id ?? 'no-user', // 未認証時は何も返さない
         },
         orderBy: { createdAt: 'desc' },
     });

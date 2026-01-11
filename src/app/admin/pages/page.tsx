@@ -1,12 +1,19 @@
 import { prisma } from '@/lib/db';
 import { PagesHeader } from '@/components/admin/PagesHeader';
 import { PagesContainer } from '@/components/admin/PagesContainer';
+import { createClient } from '@/lib/supabase/server';
 import type { PageListItem, PageStatus } from '@/types';
 
 export default async function PagesPage() {
+    // ユーザー認証
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
     let pages: any[] = [];
     try {
+        // ログインユーザーのページのみ取得
         pages = await prisma.page.findMany({
+            where: user ? { userId: user.id } : { id: -1 }, // 未認証時は何も返さない
             orderBy: [
                 { isFavorite: 'desc' },
                 { updatedAt: 'desc' }
