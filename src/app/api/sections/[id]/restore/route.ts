@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseAdmin } from '@/lib/supabase';
 import sharp from 'sharp';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
@@ -171,7 +171,7 @@ export async function POST(
         const timestamp = Date.now();
         const filename = `section-restored-${sectionId}-${timestamp}.png`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabaseAdmin.storage
             .from('images')
             .upload(filename, restoredBuffer, {
                 contentType: 'image/png',
@@ -184,7 +184,7 @@ export async function POST(
             return Response.json({ error: 'Upload failed' }, { status: 500 });
         }
 
-        const newImageUrl = supabase.storage.from('images').getPublicUrl(filename).data.publicUrl;
+        const newImageUrl = supabaseAdmin.storage.from('images').getPublicUrl(filename).data.publicUrl;
 
         // MediaImage作成
         const newMeta = await sharp(restoredBuffer).metadata();

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { prisma } from '@/lib/db';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseAdmin } from '@/lib/supabase';
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
@@ -948,11 +948,11 @@ export async function POST(request: NextRequest) {
                 }
             }
 
-            // Upload to Supabase
+            // Upload to Supabase (use admin client to bypass RLS)
             log.info(`Segment ${i + 1}: Starting upload to Supabase...`);
             const filename = `import-${Date.now()}-seg-${i}.png`;
 
-            const { error: uploadError } = await supabase
+            const { error: uploadError } = await supabaseAdmin
                 .storage
                 .from('images')
                 .upload(filename, buffer, {
@@ -966,7 +966,7 @@ export async function POST(request: NextRequest) {
                 throw uploadError;
             }
 
-            const { data: { publicUrl } } = supabase
+            const { data: { publicUrl } } = supabaseAdmin
                 .storage
                 .from('images')
                 .getPublicUrl(filename);

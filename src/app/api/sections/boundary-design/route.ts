@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseAdmin } from '@/lib/supabase';
 import sharp from 'sharp';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
@@ -310,24 +310,24 @@ export async function POST(request: NextRequest) {
 
                 // 1. カット後の上セクション画像をアップロード
                 const upperFilename = `section-cut-upper-${timestamp}-${i}.png`;
-                await supabase.storage.from('images').upload(upperFilename, result.newUpperBuffer, {
+                await supabaseAdmin.storage.from('images').upload(upperFilename, result.newUpperBuffer, {
                     contentType: 'image/png', cacheControl: '3600', upsert: false
                 });
-                const newUpperUrl = supabase.storage.from('images').getPublicUrl(upperFilename).data.publicUrl;
+                const newUpperUrl = supabaseAdmin.storage.from('images').getPublicUrl(upperFilename).data.publicUrl;
 
                 // 2. カット後の下セクション画像をアップロード
                 const lowerFilename = `section-cut-lower-${timestamp}-${i}.png`;
-                await supabase.storage.from('images').upload(lowerFilename, result.newLowerBuffer, {
+                await supabaseAdmin.storage.from('images').upload(lowerFilename, result.newLowerBuffer, {
                     contentType: 'image/png', cacheControl: '3600', upsert: false
                 });
-                const newLowerUrl = supabase.storage.from('images').getPublicUrl(lowerFilename).data.publicUrl;
+                const newLowerUrl = supabaseAdmin.storage.from('images').getPublicUrl(lowerFilename).data.publicUrl;
 
                 // 3. 境界画像をアップロード
                 const boundaryFilename = `boundary-${timestamp}-${i}.png`;
-                await supabase.storage.from('images').upload(boundaryFilename, result.boundaryBuffer, {
+                await supabaseAdmin.storage.from('images').upload(boundaryFilename, result.boundaryBuffer, {
                     contentType: 'image/png', cacheControl: '3600', upsert: false
                 });
-                const boundaryUrl = supabase.storage.from('images').getPublicUrl(boundaryFilename).data.publicUrl;
+                const boundaryUrl = supabaseAdmin.storage.from('images').getPublicUrl(boundaryFilename).data.publicUrl;
 
                 // メタデータ取得
                 const [upperMeta, lowerMeta, boundaryMeta] = await Promise.all([

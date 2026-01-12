@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
 
         // Supabaseにアップロード
         const filename = `bg-unify-${targetSectionId}-${Date.now()}.png`;
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabaseAdmin.storage
             .from('images')
             .upload(filename, finalBuffer, {
                 contentType: 'image/png',
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'アップロードに失敗しました' }, { status: 500 });
         }
 
-        const newImageUrl = supabase.storage.from('images').getPublicUrl(filename).data.publicUrl;
+        const newImageUrl = supabaseAdmin.storage.from('images').getPublicUrl(filename).data.publicUrl;
 
         // MediaImage作成
         const finalMeta = await sharp(finalBuffer).metadata();

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseAdmin } from '@/lib/supabase';
 import sharp from 'sharp';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
@@ -185,7 +185,7 @@ ${width}x${height}pxの画像を1枚だけ生成してください。`;
         const timestamp = Date.now();
         const filename = `section-generated-${timestamp}.png`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabaseAdmin.storage
             .from('images')
             .upload(filename, resizedBuffer, {
                 contentType: 'image/png',
@@ -198,7 +198,7 @@ ${width}x${height}pxの画像を1枚だけ生成してください。`;
             return Response.json({ error: 'Upload failed' }, { status: 500 });
         }
 
-        const imageUrl = supabase.storage.from('images').getPublicUrl(filename).data.publicUrl;
+        const imageUrl = supabaseAdmin.storage.from('images').getPublicUrl(filename).data.publicUrl;
 
         // MediaImage作成
         const meta = await sharp(resizedBuffer).metadata();

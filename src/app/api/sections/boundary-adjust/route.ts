@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
 import sharp from 'sharp';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseAdmin } from '@/lib/supabase';
 
 /**
  * 境界調整API
@@ -159,11 +159,11 @@ export async function POST(request: NextRequest) {
         const lowerFilename = `${user.id}/boundary-adj-lower-${timestamp}.png`;
 
         const [upperUpload, lowerUpload] = await Promise.all([
-            supabase.storage.from('images').upload(upperFilename, newUpperBuffer, {
+            supabaseAdmin.storage.from('images').upload(upperFilename, newUpperBuffer, {
                 contentType: 'image/png',
                 upsert: true
             }),
-            supabase.storage.from('images').upload(lowerFilename, newLowerBuffer, {
+            supabaseAdmin.storage.from('images').upload(lowerFilename, newLowerBuffer, {
                 contentType: 'image/png',
                 upsert: true
             })
@@ -175,8 +175,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Get public URLs
-        const upperPublicUrl = supabase.storage.from('images').getPublicUrl(upperFilename).data.publicUrl;
-        const lowerPublicUrl = supabase.storage.from('images').getPublicUrl(lowerFilename).data.publicUrl;
+        const upperPublicUrl = supabaseAdmin.storage.from('images').getPublicUrl(upperFilename).data.publicUrl;
+        const lowerPublicUrl = supabaseAdmin.storage.from('images').getPublicUrl(lowerFilename).data.publicUrl;
 
         log.info(`Uploaded upper: ${upperPublicUrl}`);
         log.info(`Uploaded lower: ${lowerPublicUrl}`);
