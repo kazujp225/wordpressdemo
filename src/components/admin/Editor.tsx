@@ -3513,7 +3513,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         "w-1.5 h-1.5 rounded-full",
                                         status === 'published' ? "bg-white" : "bg-gray-300"
                                     )} />
-                                    {status === 'published' ? 'Published' : 'Draft'}
+                                    {status === 'published' ? '公開中' : '下書き'}
                                 </button>
                                 {/* 画像追加 */}
                                 <button
@@ -3521,7 +3521,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
                                 >
                                     <Plus className="h-3.5 w-3.5 text-gray-400" />
-                                    Add Image
+                                    画像追加
                                 </button>
                                 {/* プレビュー */}
                                 <Link
@@ -3530,7 +3530,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
                                 >
                                     <Eye className="h-3.5 w-3.5 text-gray-400" />
-                                    Preview
+                                    プレビュー
                                 </Link>
                                 {/* ダウンロード */}
                                 <button
@@ -3538,7 +3538,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
                                 >
                                     <Download className="h-3.5 w-3.5 text-gray-400" />
-                                    ZIP Export
+                                    ZIP出力
                                 </button>
                             </div>
                             {/* 表示切替 */}
@@ -3570,7 +3570,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                         {/* セクション操作 */}
                         <div className="space-y-2">
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">Edit Sections</p>
+                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">セクション編集</p>
 
                             {/* セクションクロップ */}
                             <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -3583,8 +3583,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             <Scissors className="h-3.5 w-3.5" />
                                         </div>
                                         <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">Crop Image</h4>
-                                            <p className="text-[10px] text-gray-500">Trim unnecessary parts</p>
+                                            <h4 className="text-xs font-semibold text-gray-900">画像クロップ</h4>
+                                            <p className="text-[10px] text-gray-500">不要な部分をトリミング</p>
                                         </div>
                                     </div>
                                     {expandedTools.has('crop') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
@@ -3617,7 +3617,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 </button>
                                             ))}
                                             {sections.filter(s => s.image?.filePath).length === 0 && (
-                                                <p className="text-xs text-gray-400 text-center py-2">No images found</p>
+                                                <p className="text-xs text-gray-400 text-center py-2">画像がありません</p>
                                             )}
                                         </div>
                                     </div>
@@ -3635,8 +3635,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             <Layers className="h-3.5 w-3.5" />
                                         </div>
                                         <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">Add Overlay</h4>
-                                            <p className="text-[10px] text-gray-500">Buttons & Text</p>
+                                            <h4 className="text-xs font-semibold text-gray-900">オーバーレイ追加</h4>
+                                            <p className="text-[10px] text-gray-500">ボタン＆テキスト</p>
                                         </div>
                                     </div>
                                     {expandedTools.has('overlay') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
@@ -3677,7 +3677,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 </button>
                                             ))}
                                             {sections.filter(s => s.image?.filePath).length === 0 && (
-                                                <p className="text-xs text-gray-400 text-center py-2">No images found</p>
+                                                <p className="text-xs text-gray-400 text-center py-2">画像がありません</p>
                                             )}
                                         </div>
                                     </div>
@@ -3695,8 +3695,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </div>
                                         <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">Delete Sections</h4>
-                                            <p className="text-[10px] text-gray-500">Remove unwanted parts</p>
+                                            <h4 className="text-xs font-semibold text-gray-900">セクション削除</h4>
+                                            <p className="text-[10px] text-gray-500">不要なセクションを削除</p>
                                         </div>
                                     </div>
                                     {expandedTools.has('delete') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
@@ -3714,7 +3714,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             className="w-full py-2 bg-gray-50 text-gray-600 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
-                                            Select to Delete
+                                            削除するセクションを選択
                                         </button>
                                     </div>
                                 )}
@@ -3728,12 +3728,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             <Undo2 className="h-3.5 w-3.5" />
                                         </div>
                                         <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">History</h4>
-                                            <p className="text-[10px] text-gray-400">Section level history</p>
+                                            <h4 className="text-xs font-semibold text-gray-900">履歴</h4>
+                                            <p className="text-[10px] text-gray-400">セクション単位の履歴</p>
                                         </div>
                                     </div>
                                     <div className="text-[10px] text-gray-500 bg-gray-50 rounded p-1.5 text-center">
-                                        Click "History" on each section
+                                        各セクションの「履歴」をクリック
                                     </div>
                                 </div>
                             </div>
@@ -3741,7 +3741,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                         {/* バッチ処理 */}
                         <div className="space-y-2">
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">Batch Operations</p>
+                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">バッチ処理</p>
 
                             {/* 一括再生成 */}
                             <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -3751,8 +3751,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             <RefreshCw className="h-3.5 w-3.5" />
                                         </div>
                                         <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">Batch Regenerate</h4>
-                                            <p className="text-[10px] text-gray-400">Update multiple designs</p>
+                                            <h4 className="text-xs font-semibold text-gray-900">一括再生成</h4>
+                                            <p className="text-[10px] text-gray-400">複数のデザインを更新</p>
                                         </div>
                                     </div>
                                     <button
@@ -3764,7 +3764,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         disabled={sections.filter(s => s.image?.filePath).length === 0}
                                         className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
                                     >
-                                        Select Sections
+                                        セクションを選択
                                     </button>
                                 </div>
                             </div>
@@ -3777,8 +3777,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             <Palette className="h-3.5 w-3.5" />
                                         </div>
                                         <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">Unify Background</h4>
-                                            <p className="text-[10px] text-gray-400">Match background colors</p>
+                                            <h4 className="text-xs font-semibold text-gray-900">背景色統一</h4>
+                                            <p className="text-[10px] text-gray-400">背景色を統一</p>
                                         </div>
                                     </div>
                                     <button
@@ -3790,7 +3790,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         disabled={sections.filter(s => s.image?.filePath).length === 0}
                                         className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
                                     >
-                                        Select Sections
+                                        セクションを選択
                                     </button>
                                 </div>
                             </div>
