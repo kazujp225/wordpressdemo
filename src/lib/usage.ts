@@ -1,237 +1,377 @@
 /**
  * 使用量管理ユーティリティ
- * ユーザーの使用量を取得・チェックするための関数群
+ * クレジットベースのAPI使用量管理
  */
 
 import { prisma } from '@/lib/db';
-import { getPlan, isWithinLimit, PlanType } from '@/lib/plans';
+import { getPlan, PlanType, requiresSubscription, isFreePlan } from '@/lib/plans';
+import {
+  checkCreditBalance,
+  consumeCredit,
+  getCurrentBalance,
+} from '@/lib/credits';
+import { AI_COSTS, estimateImageCost, estimateTextCost } from '@/lib/ai-costs';
+import { getGoogleApiKeyWithInfo } from '@/lib/apiKeys';
 
 export interface UsageStats {
-    // 今月のAI生成回数
-    monthlyGenerations: number;
-    // 今月のアップロード数
-    monthlyUploads: number;
-    // 総ページ数
-    totalPages: number;
-    // 総ストレージ使用量（MB）
-    totalStorageMB: number;
+  // 今月のAI生成回数
+  monthlyGenerations: number;
+  // 今月のアップロード数
+  monthlyUploads: number;
+  // 総ページ数
+  totalPages: number;
+  // 総ストレージ使用量（MB）
+  totalStorageMB: number;
 }
 
 export interface UsageLimitCheck {
-    allowed: boolean;
-    reason?: string;
-    current: number;
-    limit: number;
-    remaining: number | 'unlimited';
+  allowed: boolean;
+  reason?: string;
+  current?: number;
+  limit?: number;
+  remaining?: number | 'unlimited';
+  // クレジットベースの追加フィールド
+  currentBalanceUsd?: number;
+  estimatedCostUsd?: number;
+  remainingAfterUsd?: number;
+  needPurchase?: boolean;
+  needSubscription?: boolean;
+  needApiKey?: boolean; // Freeプランで自分のAPIキーが必要
+  usingOwnApiKey?: boolean; // 自分のAPIキーを使用中
+  skipCreditConsumption?: boolean; // クレジット消費をスキップするか
 }
 
 /**
  * ユーザーの現在の使用量を取得
  */
 export async function getUserUsage(userId: string): Promise<UsageStats> {
-    // 今月の開始日を取得
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // 今月の開始日を取得
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // 並列でクエリを実行
-    const [generationCount, uploadCount, pageCount] = await Promise.all([
-        // 今月のAI生成回数
-        prisma.generationRun.count({
-            where: {
-                userId,
-                createdAt: { gte: startOfMonth },
-                status: 'succeeded',
-            },
-        }),
-        // 今月のアップロード数
-        prisma.mediaImage.count({
-            where: {
-                userId,
-                createdAt: { gte: startOfMonth },
-                sourceType: 'upload',
-            },
-        }),
-        // 総ページ数
-        prisma.page.count({
-            where: { userId },
-        }),
-    ]);
+  // 並列でクエリを実行
+  const [generationCount, uploadCount, pageCount] = await Promise.all([
+    // 今月のAI生成回数
+    prisma.generationRun.count({
+      where: {
+        userId,
+        createdAt: { gte: startOfMonth },
+        status: 'succeeded',
+      },
+    }),
+    // 今月のアップロード数
+    prisma.mediaImage.count({
+      where: {
+        userId,
+        createdAt: { gte: startOfMonth },
+        sourceType: 'upload',
+      },
+    }),
+    // 総ページ数
+    prisma.page.count({
+      where: { userId },
+    }),
+  ]);
 
-    // ストレージ使用量は概算（画像数 × 平均サイズ）
-    // 本来はファイルサイズを保存して合計するべき
-    const estimatedStorageMB = Math.round((generationCount + uploadCount) * 0.5);
+  // ストレージ使用量は概算（画像数 × 平均サイズ）
+  const estimatedStorageMB = Math.round((generationCount + uploadCount) * 0.5);
 
-    return {
-        monthlyGenerations: generationCount,
-        monthlyUploads: uploadCount,
-        totalPages: pageCount,
-        totalStorageMB: estimatedStorageMB,
-    };
+  return {
+    monthlyGenerations: generationCount,
+    monthlyUploads: uploadCount,
+    totalPages: pageCount,
+    totalStorageMB: estimatedStorageMB,
+  };
 }
 
 /**
  * ユーザーのプランを取得
  */
-export async function getUserPlan(userId: string): Promise<PlanType> {
-    const settings = await prisma.userSettings.findUnique({
-        where: { userId },
-        select: { plan: true },
-    });
+export async function getUserPlan(userId: string): Promise<string> {
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: { plan: true },
+  });
 
-    return (settings?.plan as PlanType) || 'free';
+  return settings?.plan || 'free';
 }
 
 /**
- * AI生成が可能かチェック
+ * AI生成が可能かチェック（クレジットベース）
+ * @param estimatedCostUsd 推定コスト（USD）。指定しない場合はデフォルト値を使用
  */
-export async function checkGenerationLimit(userId: string): Promise<UsageLimitCheck> {
-    const [usage, planId] = await Promise.all([
-        getUserUsage(userId),
-        getUserPlan(userId),
-    ]);
+export async function checkGenerationLimit(
+  userId: string,
+  estimatedCostUsd?: number
+): Promise<UsageLimitCheck> {
+  const planId = await getUserPlan(userId);
 
-    const plan = getPlan(planId);
-    const limit = plan.limits.monthlyGenerations;
-    const current = usage.monthlyGenerations;
-
-    if (!isWithinLimit(current, limit)) {
-        return {
-            allowed: false,
-            reason: `月間生成上限（${limit}回）に達しました。プランをアップグレードしてください。`,
-            current,
-            limit,
-            remaining: 0,
-        };
-    }
-
+  // サブスク必須チェック（starterプランなど廃止されたプラン）
+  if (requiresSubscription(planId)) {
     return {
-        allowed: true,
-        current,
-        limit,
-        remaining: limit === -1 ? 'unlimited' : limit - current,
+      allowed: false,
+      reason:
+        'サブスクリプションが必要です。プランを選択してください。',
+      needSubscription: true,
     };
+  }
+
+  // APIキー情報を取得
+  const apiKeyInfo = await getGoogleApiKeyWithInfo(userId);
+
+  // Freeプランの場合
+  if (isFreePlan(planId)) {
+    // Freeプランで自分のAPIキーがない場合はエラー
+    if (!apiKeyInfo.apiKey || !apiKeyInfo.isUserOwnKey) {
+      return {
+        allowed: false,
+        reason: 'Freeプランでは自分のGoogle AI APIキーの設定が必要です。設定画面でAPIキーを入力してください。',
+        needApiKey: true,
+      };
+    }
+    // Freeプランで自分のAPIキーがある場合はクレジット消費をスキップ
+    return {
+      allowed: true,
+      usingOwnApiKey: true,
+      skipCreditConsumption: true,
+    };
+  }
+
+  // 有料プランの場合
+
+  // 自分のAPIキーを使用している場合はクレジット消費をスキップ
+  if (apiKeyInfo.isUserOwnKey) {
+    return {
+      allowed: true,
+      usingOwnApiKey: true,
+      skipCreditConsumption: true,
+    };
+  }
+
+  // 自社APIキーを使用する場合はクレジットチェック
+  // 推定コストが指定されていない場合は最小コストを使用
+  const costToCheck = estimatedCostUsd ?? 0.001;
+
+  // クレジット残高チェック
+  const creditCheck = await checkCreditBalance(userId, costToCheck);
+
+  if (!creditCheck.allowed) {
+    return {
+      allowed: false,
+      reason: creditCheck.reason,
+      currentBalanceUsd: creditCheck.currentBalanceUsd,
+      estimatedCostUsd: creditCheck.estimatedCostUsd,
+      needPurchase: true,
+    };
+  }
+
+  return {
+    allowed: true,
+    usingOwnApiKey: false,
+    skipCreditConsumption: false,
+    currentBalanceUsd: creditCheck.currentBalanceUsd,
+    estimatedCostUsd: creditCheck.estimatedCostUsd,
+    remainingAfterUsd: creditCheck.remainingAfterUsd,
+  };
+}
+
+/**
+ * 画像生成のクレジットチェック
+ */
+export async function checkImageGenerationLimit(
+  userId: string,
+  model: string = 'gemini-3-pro-image-preview',
+  imageCount: number = 1
+): Promise<UsageLimitCheck> {
+  const estimatedCost = estimateImageCost(model, imageCount);
+  return checkGenerationLimit(userId, estimatedCost);
+}
+
+/**
+ * テキスト生成のクレジットチェック
+ */
+export async function checkTextGenerationLimit(
+  userId: string,
+  model: string = 'gemini-2.0-flash',
+  estimatedInputTokens: number = 1000,
+  estimatedOutputTokens: number = 1000
+): Promise<UsageLimitCheck> {
+  const estimatedCost = estimateTextCost(
+    model,
+    estimatedInputTokens,
+    estimatedOutputTokens
+  );
+  return checkGenerationLimit(userId, estimatedCost);
+}
+
+/**
+ * 動画生成のクレジットチェック
+ */
+export async function checkVideoGenerationLimit(
+  userId: string,
+  durationSeconds: number = 5
+): Promise<UsageLimitCheck> {
+  const costPerSecond = AI_COSTS['veo-2.0-generate-001']?.perSecond || 0.35;
+  const estimatedCost = costPerSecond * durationSeconds;
+  return checkGenerationLimit(userId, estimatedCost);
+}
+
+/**
+ * API使用後のクレジット消費
+ */
+export async function recordApiUsage(
+  userId: string,
+  generationRunId: number,
+  actualCostUsd: number,
+  details: {
+    model: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    imageCount?: number;
+  }
+): Promise<void> {
+  await consumeCredit(userId, actualCostUsd, generationRunId, details);
 }
 
 /**
  * アップロードが可能かチェック
  */
-export async function checkUploadLimit(userId: string): Promise<UsageLimitCheck> {
-    const [usage, planId] = await Promise.all([
-        getUserUsage(userId),
-        getUserPlan(userId),
-    ]);
+export async function checkUploadLimit(
+  userId: string
+): Promise<UsageLimitCheck> {
+  const planId = await getUserPlan(userId);
 
-    const plan = getPlan(planId);
-    const limit = plan.limits.monthlyUploads;
-    const current = usage.monthlyUploads;
-
-    if (!isWithinLimit(current, limit)) {
-        return {
-            allowed: false,
-            reason: `月間アップロード上限（${limit}回）に達しました。`,
-            current,
-            limit,
-            remaining: 0,
-        };
-    }
-
+  // サブスク必須チェック
+  if (requiresSubscription(planId)) {
     return {
-        allowed: true,
-        current,
-        limit,
-        remaining: limit === -1 ? 'unlimited' : limit - current,
+      allowed: false,
+      reason: 'サブスクリプションが必要です。',
+      needSubscription: true,
     };
+  }
+
+  // アップロードはクレジット消費なし、常に許可
+  return { allowed: true };
 }
 
 /**
  * ページ作成が可能かチェック
  */
 export async function checkPageLimit(userId: string): Promise<UsageLimitCheck> {
-    const [usage, planId] = await Promise.all([
-        getUserUsage(userId),
-        getUserPlan(userId),
-    ]);
+  const [usage, planId] = await Promise.all([
+    getUserUsage(userId),
+    getUserPlan(userId),
+  ]);
 
-    const plan = getPlan(planId);
-    const limit = plan.limits.maxPages;
-    const current = usage.totalPages;
-
-    if (!isWithinLimit(current, limit)) {
-        return {
-            allowed: false,
-            reason: `ページ上限（${limit}ページ）に達しました。`,
-            current,
-            limit,
-            remaining: 0,
-        };
-    }
-
+  // サブスク必須チェック
+  if (requiresSubscription(planId)) {
     return {
-        allowed: true,
-        current,
-        limit,
-        remaining: limit === -1 ? 'unlimited' : limit - current,
+      allowed: false,
+      reason: 'サブスクリプションが必要です。',
+      needSubscription: true,
     };
+  }
+
+  const plan = getPlan(planId);
+  const limit = plan.limits.maxPages;
+  const current = usage.totalPages;
+
+  // 無制限の場合
+  if (limit === -1) {
+    return {
+      allowed: true,
+      current,
+      limit,
+      remaining: 'unlimited',
+    };
+  }
+
+  if (current >= limit) {
+    return {
+      allowed: false,
+      reason: `ページ上限（${limit}ページ）に達しました。プランをアップグレードしてください。`,
+      current,
+      limit,
+      remaining: 0,
+    };
+  }
+
+  return {
+    allowed: true,
+    current,
+    limit,
+    remaining: limit - current,
+  };
 }
 
 /**
  * 機能が利用可能かチェック
  */
 export async function checkFeatureAccess(
-    userId: string,
-    feature: 'upscale4K' | 'restyle' | 'export' | 'generateVideo' | 'setApiKey'
-): Promise<{ allowed: boolean; reason?: string }> {
-    const planId = await getUserPlan(userId);
-    const plan = getPlan(planId);
+  userId: string,
+  feature: 'upscale4K' | 'restyle' | 'export' | 'generateVideo' | 'setApiKey'
+): Promise<{ allowed: boolean; reason?: string; needSubscription?: boolean }> {
+  const planId = await getUserPlan(userId);
 
-    const featureMap = {
-        upscale4K: { check: plan.limits.canUpscale4K, name: '4Kアップスケール' },
-        restyle: { check: plan.limits.canRestyle, name: 'リスタイル' },
-        export: { check: plan.limits.canExport, name: 'エクスポート' },
-        generateVideo: { check: plan.limits.canGenerateVideo, name: '動画生成' },
-        setApiKey: { check: plan.limits.canSetApiKey, name: 'APIキー設定' },
+  // サブスク必須チェック
+  if (requiresSubscription(planId)) {
+    return {
+      allowed: false,
+      reason: 'サブスクリプションが必要です。',
+      needSubscription: true,
     };
+  }
 
-    const featureInfo = featureMap[feature];
-    if (!featureInfo.check) {
-        return {
-            allowed: false,
-            reason: `${featureInfo.name}機能は${plan.name}プランでは利用できません。プランをアップグレードしてください。`,
-        };
-    }
+  const plan = getPlan(planId);
 
-    return { allowed: true };
+  const featureMap = {
+    upscale4K: { check: plan.limits.canUpscale4K, name: '4Kアップスケール' },
+    restyle: { check: plan.limits.canRestyle, name: 'リスタイル' },
+    export: { check: plan.limits.canExport, name: 'エクスポート' },
+    generateVideo: { check: plan.limits.canGenerateVideo, name: '動画生成' },
+    setApiKey: { check: plan.limits.canSetApiKey, name: 'APIキー設定' },
+  };
+
+  const featureInfo = featureMap[feature];
+  if (!featureInfo.check) {
+    return {
+      allowed: false,
+      reason: `${featureInfo.name}機能は${plan.name}プランでは利用できません。プランをアップグレードしてください。`,
+    };
+  }
+
+  return { allowed: true };
 }
 
 /**
  * 使用量の完全なレポートを取得
  */
 export async function getUsageReport(userId: string) {
-    const [usage, planId] = await Promise.all([
-        getUserUsage(userId),
-        getUserPlan(userId),
-    ]);
+  const [usage, planId, currentBalance] = await Promise.all([
+    getUserUsage(userId),
+    getUserPlan(userId),
+    getCurrentBalance(userId),
+  ]);
 
-    const plan = getPlan(planId);
+  const plan = getPlan(planId);
 
-    return {
-        plan: {
-            id: plan.id,
-            name: plan.name,
-            description: plan.description,
-        },
-        usage,
-        limits: plan.limits,
-        percentages: {
-            generations: plan.limits.monthlyGenerations === -1
-                ? 0
-                : Math.round((usage.monthlyGenerations / plan.limits.monthlyGenerations) * 100),
-            uploads: plan.limits.monthlyUploads === -1
-                ? 0
-                : Math.round((usage.monthlyUploads / plan.limits.monthlyUploads) * 100),
-            pages: plan.limits.maxPages === -1
-                ? 0
-                : Math.round((usage.totalPages / plan.limits.maxPages) * 100),
-        },
-    };
+  return {
+    plan: {
+      id: plan.id,
+      name: plan.name,
+      description: plan.description,
+      includedCreditUsd: plan.includedCreditUsd,
+    },
+    usage,
+    limits: plan.limits,
+    credits: {
+      currentBalanceUsd: currentBalance,
+    },
+    percentages: {
+      pages:
+        plan.limits.maxPages === -1
+          ? 0
+          : Math.round((usage.totalPages / plan.limits.maxPages) * 100),
+    },
+  };
 }

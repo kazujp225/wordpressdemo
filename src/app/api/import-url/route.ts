@@ -335,6 +335,13 @@ export async function POST(request: NextRequest) {
     // 使用量制限チェック
     const limitCheck = await checkGenerationLimit(user.id);
     if (!limitCheck.allowed) {
+        // FreeプランでAPIキー未設定の場合
+        if (limitCheck.needApiKey) {
+            return Response.json({
+                error: 'API_KEY_REQUIRED',
+                message: limitCheck.reason,
+            }, { status: 402 });
+        }
         return Response.json({
             error: 'Usage limit exceeded',
             message: limitCheck.reason,

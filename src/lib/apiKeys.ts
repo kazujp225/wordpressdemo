@@ -1,10 +1,26 @@
 import { prisma } from '@/lib/db';
+import { isFreePlan } from '@/lib/plans';
+
+// APIキー取得結果
+export interface ApiKeyResult {
+    apiKey: string | null;
+    isUserOwnKey: boolean; // ユーザー自身のAPIキーかどうか
+}
 
 // ユーザーIDを指定してAPIキーを取得
 export async function getGoogleApiKeyForUser(userId: string | null): Promise<string | null> {
+    const result = await getGoogleApiKeyWithInfo(userId);
+    return result.apiKey;
+}
+
+// ユーザーIDを指定してAPIキーを取得（詳細情報付き）
+export async function getGoogleApiKeyWithInfo(userId: string | null): Promise<ApiKeyResult> {
     if (!userId) {
         // ユーザーIDがない場合は環境変数のみ使用
-        return process.env.GOOGLE_GENERATIVE_AI_API_KEY || null;
+        return {
+            apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || null,
+            isUserOwnKey: false
+        };
     }
 
     try {
@@ -13,15 +29,37 @@ export async function getGoogleApiKeyForUser(userId: string | null): Promise<str
             where: { userId }
         });
 
-        if (userSettings?.googleApiKey) {
-            return userSettings.googleApiKey;
+        const planId = userSettings?.plan || 'free';
+
+        // Freeプランの場合のみ自分のAPIキーを使用
+        if (isFreePlan(planId)) {
+            if (userSettings?.googleApiKey) {
+                return {
+                    apiKey: userSettings.googleApiKey,
+                    isUserOwnKey: true
+                };
+            }
+            // Freeプランで自分のAPIキーがない場合はnull
+            return {
+                apiKey: null,
+                isUserOwnKey: false
+            };
         }
+
+        // 有料プランの場合は自社APIキーを使用（ユーザーのAPIキーは無視）
+        return {
+            apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || null,
+            isUserOwnKey: false
+        };
     } catch (e) {
         console.error('Failed to fetch user API key from DB:', e);
     }
 
-    // フォールバック: 環境変数
-    return process.env.GOOGLE_GENERATIVE_AI_API_KEY || null;
+    // エラー時はフォールバック: 環境変数
+    return {
+        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || null,
+        isUserOwnKey: false
+    };
 }
 
 // 後方互換性のため（ユーザーIDなしで呼び出された場合）

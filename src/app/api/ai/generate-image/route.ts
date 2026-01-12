@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
-import { checkGenerationLimit } from '@/lib/usage';
+import { checkImageGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { estimateImageCost } from '@/lib/ai-costs';
 
 // LPデザイナーとしてのシステムプロンプト
 const LP_DESIGNER_SYSTEM_PROMPT = `あなたはプロフェッショナルなLPデザイナーです。
@@ -58,18 +59,37 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 使用量制限チェック
-    const limitCheck = await checkGenerationLimit(user.id);
+    // クレジット残高チェック
+    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1);
     if (!limitCheck.allowed) {
+        // FreeプランでAPIキー未設定の場合
+        if (limitCheck.needApiKey) {
+            return NextResponse.json({
+                error: 'API_KEY_REQUIRED',
+                message: limitCheck.reason,
+            }, { status: 402 });
+        }
+        // サブスク未契約の場合
+        if (limitCheck.needSubscription) {
+            return NextResponse.json({
+                error: 'SUBSCRIPTION_REQUIRED',
+                message: limitCheck.reason,
+            }, { status: 402 });
+        }
+        // クレジット不足の場合
         return NextResponse.json({
-            error: 'Usage limit exceeded',
+            error: 'INSUFFICIENT_CREDIT',
             message: limitCheck.reason,
-            usage: {
-                current: limitCheck.current,
-                limit: limitCheck.limit,
-            }
-        }, { status: 429 });
+            credits: {
+                currentBalance: limitCheck.currentBalanceUsd,
+                estimatedCost: limitCheck.estimatedCostUsd,
+            },
+            needPurchase: true,
+        }, { status: 402 });
     }
+
+    // クレジット消費をスキップするかどうか
+    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
 
     try {
         const { prompt, taste, brandInfo, aspectRatio = '9:16', designDefinition } = await request.json();
@@ -184,7 +204,7 @@ Generate the image to EXACTLY match this visual style and color palette.
             const fallbackResult = await processImageResponse(fallbackData, arConfig, user.id);
 
             // ログ記録（フォールバック成功）
-            await logGeneration({
+            const logResult = await logGeneration({
                 userId: user.id,
                 type: 'image',
                 endpoint: '/api/ai/generate-image',
@@ -195,6 +215,14 @@ Generate the image to EXACTLY match this visual style and color palette.
                 startTime
             });
 
+            // クレジット消費（自分のAPIキー使用時はスキップ）
+            if (logResult && !skipCreditConsumption) {
+                await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
+                    model: modelUsed,
+                    imageCount: 1,
+                });
+            }
+
             return fallbackResult;
         }
 
@@ -202,7 +230,7 @@ Generate the image to EXACTLY match this visual style and color palette.
         const result = await processImageResponse(data, arConfig, user.id);
 
         // ログ記録（プライマリ成功）
-        await logGeneration({
+        const logResult = await logGeneration({
             userId: user.id,
             type: 'image',
             endpoint: '/api/ai/generate-image',
@@ -212,6 +240,14 @@ Generate the image to EXACTLY match this visual style and color palette.
             status: 'succeeded',
             startTime
         });
+
+        // クレジット消費（自分のAPIキー使用時はスキップ）
+        if (logResult && !skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
+                model: modelUsed,
+                imageCount: 1,
+            });
+        }
 
         return result;
 

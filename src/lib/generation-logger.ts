@@ -45,7 +45,14 @@ const log = {
   error: (msg: string) => console.log(`\x1b[31m[GENERATION-LOG]\x1b[0m ${msg}`),
 };
 
-export async function logGeneration(params: LogGenerationParams): Promise<void> {
+export interface LogGenerationResult {
+  id: number;
+  estimatedCost: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export async function logGeneration(params: LogGenerationParams): Promise<LogGenerationResult | null> {
   const {
     userId,
     type,
@@ -75,7 +82,7 @@ export async function logGeneration(params: LogGenerationParams): Promise<void> 
   const durationMs = startTime ? Date.now() - startTime : null;
 
   try {
-    await prisma.generationRun.create({
+    const generationRun = await prisma.generationRun.create({
       data: {
         userId: userId || null,
         type,
@@ -98,8 +105,16 @@ export async function logGeneration(params: LogGenerationParams): Promise<void> 
     } else {
       log.error(`Logged (failed): ${type} | ${model} | Error: ${errorMessage}`);
     }
+
+    return {
+      id: generationRun.id,
+      estimatedCost,
+      inputTokens,
+      outputTokens,
+    };
   } catch (error) {
     log.error(`Failed to log generation: ${error}`);
+    return null;
   }
 }
 

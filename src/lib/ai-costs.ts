@@ -1,6 +1,12 @@
 // Gemini API Pricing (per 1M tokens / per image)
 // Source: https://ai.google.dev/pricing
 
+export const AI_COSTS = {
+  'veo-2.0-generate-001': {
+    perSecond: 0.35,
+  },
+};
+
 export const GEMINI_PRICING = {
   // Text Models (per 1M tokens)
   'gemini-2.0-flash': {

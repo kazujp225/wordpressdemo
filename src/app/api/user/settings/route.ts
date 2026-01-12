@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
+import { getPlan, isFreePlan } from '@/lib/plans';
 
 // ユーザー設定を取得（なければ自動作成）
 async function getOrCreateUserSettings(userId: string, email: string | null) {
@@ -32,11 +33,13 @@ export async function GET() {
     }
 
     const settings = await getOrCreateUserSettings(user.id, user.email || null);
+    const plan = getPlan(settings.plan);
 
     return NextResponse.json({
         plan: settings.plan,
         role: settings.role,
         hasApiKey: !!settings.googleApiKey,
+        canSetApiKey: plan.limits.canSetApiKey, // Freeプランのみtrue
         userId: user.id
     });
 }
@@ -51,6 +54,19 @@ export async function POST(request: NextRequest) {
     }
 
     const { googleApiKey } = await request.json();
+
+    // プランを確認してAPIキー設定が許可されているかチェック
+    const currentSettings = await prisma.userSettings.findUnique({
+        where: { userId: user.id }
+    });
+    const planId = currentSettings?.plan || 'free';
+
+    // Freeプラン以外はAPIキー設定を拒否
+    if (!isFreePlan(planId) && googleApiKey) {
+        return NextResponse.json({
+            error: '有料プランではAPIキーの設定はできません。自社のAPIを使用します。'
+        }, { status: 403 });
+    }
 
     await prisma.userSettings.upsert({
         where: { userId: user.id },

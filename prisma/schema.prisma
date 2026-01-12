@@ -214,3 +214,69 @@ model WaitingRoomReply {
   @@index([entryId])
   @@index([createdAt])
 }
+
+// ========================================
+// クレジット・課金関連テーブル
+// ========================================
+
+// クレジット残高管理
+model CreditBalance {
+  id              Int       @id @default(autoincrement())
+  userId          String    @unique
+  balanceUsd      Decimal   @default(0) @db.Decimal(10, 6) // USD残高
+  lastRefreshedAt DateTime? // 最後のプラン付与日
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// クレジット取引履歴
+model CreditTransaction {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  type            String   // 'plan_grant' | 'api_usage' | 'purchase' | 'refund' | 'adjustment'
+  amountUsd       Decimal  @db.Decimal(10, 6) // 正=加算、負=消費
+  balanceAfter    Decimal  @db.Decimal(10, 6) // 取引後残高
+  description     String?
+  generationRunId Int? // GenerationRunへの参照（API使用時）
+  model           String? // 使用モデル
+  inputTokens     Int?
+  outputTokens    Int?
+  imageCount      Int?
+  stripePaymentId String?  @unique // Stripe決済ID（購入時）
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+}
+
+// クレジットパッケージ（購入可能な単位）
+model CreditPackage {
+  id        Int      @id @default(autoincrement())
+  name      String // "500円分", "1000円分" etc
+  priceJpy  Int // 日本円価格
+  creditUsd Decimal  @db.Decimal(10, 6) // 付与されるUSDクレジット
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// Stripeサブスクリプション管理
+model Subscription {
+  id                   Int       @id @default(autoincrement())
+  userId               String    @unique
+  stripeCustomerId     String    @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  plan                 String    @default("pro") // pro | expert | enterprise
+  status               String    @default("active") // active | canceled | past_due | unpaid
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([stripeCustomerId])
+}
