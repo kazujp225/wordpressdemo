@@ -43,6 +43,18 @@ import {
     AccordionTrigger,
 } from '@/components/ui/accordion';
 
+// Type declaration for custom web component
+declare global {
+    namespace JSX {
+        interface IntrinsicElements {
+            'dotlottie-wc': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
+                src: string;
+                autoplay?: boolean;
+                loop?: boolean;
+            }, HTMLElement>;
+        }
+    }
+}
 
 // Feature data
 const FEATURES = [
@@ -229,6 +241,21 @@ export default function WaitingRoomPage() {
     });
     const [modalType, setModalType] = useState<'terms' | 'privacy' | null>(null);
 
+    // Load Lottie Script
+    useEffect(() => {
+        const script = document.createElement('script');
+        script.src = "https://unpkg.com/@lottiefiles/dotlottie-wc@0.8.11/dist/dotlottie-wc.js";
+        script.type = "module";
+        script.async = true;
+        document.body.appendChild(script);
+
+        return () => {
+            if (document.body.contains(script)) {
+                document.body.removeChild(script);
+            }
+        };
+    }, []);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -308,6 +335,16 @@ export default function WaitingRoomPage() {
                                 <Rocket className="w-3 h-3" />
                                 簡単LP作成ツール
                             </Badge>
+
+                            {/* Lottie Animation */}
+                            <div className="w-24 h-24 mb-6">
+                                <dotlottie-wc
+                                    src="https://lottie.host/bef0c297-c293-4e57-a030-24ff0c5cb2f0/xZUAd4jXZg.lottie"
+                                    autoplay={true}
+                                    loop={true}
+                                    style={{ width: '100%', height: '100%' }}
+                                />
+                            </div>
 
                             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] mb-4 sm:mb-6">
                                 LP制作を、
