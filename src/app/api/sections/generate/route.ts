@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { z } from 'zod';
 
 const log = {
@@ -28,6 +29,18 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // クレジットチェック
+    const limitCheck = await checkGenerationLimit(user.id);
+    if (!limitCheck.allowed) {
+        return Response.json({
+            error: limitCheck.needApiKey ? 'API_KEY_REQUIRED' :
+                   limitCheck.needPurchase ? 'CREDIT_INSUFFICIENT' : 'USAGE_LIMIT_EXCEEDED',
+            message: limitCheck.reason,
+            needApiKey: limitCheck.needApiKey,
+            needPurchase: limitCheck.needPurchase,
+        }, { status: limitCheck.needApiKey ? 402 : 429 });
     }
 
     const body = await request.json();
@@ -212,7 +225,7 @@ ${width}x${height}pxの画像を1枚だけ生成してください。`;
             },
         });
 
-        await logGeneration({
+        const logResult = await logGeneration({
             userId: user.id,
             type: 'section-generate',
             endpoint: '/api/sections/generate',
@@ -222,6 +235,15 @@ ${width}x${height}pxの画像を1枚だけ生成してください。`;
             status: 'succeeded',
             startTime,
         });
+
+        // クレジット消費（自分のAPIキー使用時はスキップ）
+        if (logResult && !limitCheck.skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
+                model: 'gemini-3-pro-image-preview',
+                imageCount: 1,
+            });
+            log.info(`Credit consumed: $${logResult.estimatedCost.toFixed(6)}`);
+        }
 
         log.success(`Section generated: ${meta.width}x${meta.height}px`);
 

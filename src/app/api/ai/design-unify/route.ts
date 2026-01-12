@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import sharp from 'sharp';
 
 const log = {
@@ -36,6 +37,18 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // クレジットチェック
+    const limitCheck = await checkGenerationLimit(user.id);
+    if (!limitCheck.allowed) {
+        return NextResponse.json({
+            error: limitCheck.needApiKey ? 'API_KEY_REQUIRED' :
+                   limitCheck.needPurchase ? 'CREDIT_INSUFFICIENT' : 'USAGE_LIMIT_EXCEEDED',
+            message: limitCheck.reason,
+            needApiKey: limitCheck.needApiKey,
+            needPurchase: limitCheck.needPurchase,
+        }, { status: limitCheck.needApiKey ? 402 : 429 });
     }
 
     try {
@@ -252,7 +265,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
         }
 
         // ログ記録
-        await logGeneration({
+        const logResult = await logGeneration({
             userId: user.id,
             type: 'design-unify',
             endpoint: '/api/ai/design-unify',
@@ -262,6 +275,15 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
             status: 'succeeded',
             startTime,
         });
+
+        // クレジット消費（自分のAPIキー使用時はスキップ）
+        if (logResult && !limitCheck.skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
+                model: 'gemini-3-pro-image-preview',
+                imageCount: 1,
+            });
+            log.info(`Credit consumed: $${logResult.estimatedCost.toFixed(6)}`);
+        }
 
         log.success(`Design unified for section ${targetSectionId}`);
 

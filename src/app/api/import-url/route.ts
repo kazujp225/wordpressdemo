@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { importUrlSchema, validateRequest } from '@/lib/validations';
-import { checkGenerationLimit } from '@/lib/usage';
+import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import {
     generateDesignTokens,
     extractDesignTokensFromImage,
@@ -88,6 +88,7 @@ async function processImageWithAI(
     totalSegments: number,
     apiKey: string,
     userId: string | null,
+    skipCreditConsumption: boolean,
     styleReferenceImage?: Buffer  // 最初のセグメントの結果を参照として渡す
 ): Promise<Buffer | null> {
     const startTime = createTimer();
@@ -255,7 +256,7 @@ ${additionalInstructions}
             if (part.inlineData?.data) {
                 log.success(`[AI] Segment ${segmentIndex + 1} processed successfully`);
 
-                await logGeneration({
+                const logResult = await logGeneration({
                     userId,
                     type: 'import-arrange',
                     endpoint: '/api/import-url',
@@ -265,6 +266,15 @@ ${additionalInstructions}
                     status: 'succeeded',
                     startTime
                 });
+
+                // クレジット消費（自分のAPIキー使用時はスキップ）
+                if (logResult && userId && !skipCreditConsumption) {
+                    await recordApiUsage(userId, logResult.id, logResult.estimatedCost, {
+                        model: 'gemini-3-pro-image-preview',
+                        imageCount: 1,
+                    });
+                    log.info(`[AI] Credit consumed: $${logResult.estimatedCost.toFixed(6)}`);
+                }
 
                 return Buffer.from(part.inlineData.data, 'base64');
             }
@@ -929,6 +939,7 @@ export async function POST(request: NextRequest) {
                     numSegments,
                     googleApiKey,
                     user.id,
+                    limitCheck.skipCreditConsumption || false,
                     styleReference  // 参照画像を渡す
                 );
 
