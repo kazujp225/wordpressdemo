@@ -179,9 +179,9 @@ export function SmartImportModal({ onClose, onImportComplete }: SmartImportModal
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b bg-white border-gray-100">
+                <div className="flex items-center justify-between px-6 py-4 border-b bg-white border-gray-100 shrink-0">
                     <div className="flex items-center gap-3 text-gray-900">
                         <div className="bg-black p-2 rounded-lg">
                             <Monitor className="w-5 h-5 text-white" />
@@ -200,7 +200,7 @@ export function SmartImportModal({ onClose, onImportComplete }: SmartImportModal
                 </div>
 
                 {/* Content */}
-                <div className="p-6">
+                <div className="p-6 overflow-y-auto flex-1">
                     {step === 'input' && (
                         <div className="space-y-6">
                             {/* URL Input */}
