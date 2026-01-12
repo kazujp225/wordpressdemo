@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowRight,
@@ -14,18 +14,12 @@ import {
     Globe,
     X,
     HelpCircle,
-    ChevronDown,
-    Zap,
     CreditCard,
     Building2,
     User,
     Mail,
     Phone,
-    MessageSquare,
-    Crown,
-    Rocket,
-    Shield,
-    Clock,
+    Zap,
     Star,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -42,19 +36,6 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from '@/components/ui/accordion';
-
-// Type declaration for custom web component
-declare global {
-    namespace JSX {
-        interface IntrinsicElements {
-            'dotlottie-wc': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
-                src: string;
-                autoplay?: boolean;
-                loop?: boolean;
-            }, HTMLElement>;
-        }
-    }
-}
 
 // Feature data
 const FEATURES = [
@@ -220,14 +201,6 @@ const CREDIT_USAGE = [
     { action: 'URL取り込み', cost: '〜1円', icon: Globe },
 ];
 
-// Stats data
-const STATS = [
-    { value: '15円〜', label: 'LP1つあたり', icon: CreditCard },
-    { value: '10秒', label: '画像生成時間', icon: Clock },
-    { value: '100+', label: '対応テンプレート', icon: Layers },
-    { value: '99.9%', label: '稼働率', icon: Shield },
-];
-
 export default function WaitingRoomPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [step, setStep] = useState(1);
@@ -240,21 +213,6 @@ export default function WaitingRoomPage() {
         remarks: '',
     });
     const [modalType, setModalType] = useState<'terms' | 'privacy' | null>(null);
-
-    // Load Lottie Script
-    useEffect(() => {
-        const script = document.createElement('script');
-        script.src = "https://unpkg.com/@lottiefiles/dotlottie-wc@0.8.11/dist/dotlottie-wc.js";
-        script.type = "module";
-        script.async = true;
-        document.body.appendChild(script);
-
-        return () => {
-            if (document.body.contains(script)) {
-                document.body.removeChild(script);
-            }
-        };
-    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -315,15 +273,14 @@ export default function WaitingRoomPage() {
                                     LP Builder
                                 </span>
                             </a>
-                            <Badge variant="amber" className="gap-1.5">
-                                <Zap className="w-3 h-3" />
+                            <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
                                 Beta
-                            </Badge>
+                            </span>
                         </nav>
                     </header>
 
                     {/* Hero Content */}
-                    <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-20 py-8 sm:py-12 lg:py-20">
+                    <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 py-8 lg:py-16 items-center min-h-[calc(100vh-100px)]">
                         {/* Left: Brand & Vision */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -331,68 +288,31 @@ export default function WaitingRoomPage() {
                             transition={{ duration: 0.6 }}
                             className="flex flex-col justify-center"
                         >
-                            <Badge variant="amber" className="w-fit mb-6 gap-1.5">
-                                <Rocket className="w-3 h-3" />
-                                簡単LP作成ツール
-                            </Badge>
-
-                            {/* Lottie Animation */}
-                            <div className="w-24 h-24 mb-6">
-                                <dotlottie-wc
-                                    src="https://lottie.host/bef0c297-c293-4e57-a030-24ff0c5cb2f0/xZUAd4jXZg.lottie"
-                                    autoplay={true}
-                                    loop={true}
-                                    style={{ width: '100%', height: '100%' }}
-                                />
-                            </div>
-
-                            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] mb-4 sm:mb-6">
+                            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-4">
                                 LP制作を、
-                                <br className="sm:hidden" />
-                                <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
-                                    もっと簡単に
-                                </span>
-                                <br className="hidden sm:block" />
-                                革新する。
+                                <span className="text-amber-500">もっと簡単に。</span>
                             </h1>
 
-                            <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 max-w-lg">
-                                URLから取り込み、画像生成、インペイント編集...
-                                <br />
-                                <span className="font-bold text-gray-900">
-                                    すべてが一つのツールで完結します。
-                                </span>
+                            <p className="text-gray-600 mb-6 max-w-md">
+                                既存サイトのURLを入力するだけで、デザインを自動で取り込み。
+                                画像生成やインペイント編集で自由にカスタマイズできます。
                             </p>
 
-                            {/* Feature Pills */}
-                            <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6 sm:mb-8">
-                                {['URL取り込み', '画像生成', 'インペイント', 'HTML出力'].map((feature) => (
-                                    <Badge
-                                        key={feature}
-                                        variant="secondary"
-                                        className="bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-default text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1"
-                                    >
-                                        {feature}
-                                    </Badge>
-                                ))}
-                            </div>
-
-                            {/* Stats */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-                                {STATS.map((stat, index) => (
-                                    <motion.div
-                                        key={stat.label}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
-                                        className="text-center p-2 sm:p-3 rounded-lg sm:rounded-xl bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all"
-                                    >
-                                        <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-0.5 sm:mb-1 text-amber-500" />
-                                        <p className="text-lg sm:text-xl font-black text-gray-900">{stat.value}</p>
-                                        <p className="text-[10px] sm:text-xs text-gray-500 leading-tight">{stat.label}</p>
-                                    </motion.div>
-                                ))}
-                            </div>
+                            {/* Feature List */}
+                            <ul className="space-y-2 text-sm text-gray-700">
+                                <li className="flex items-center gap-2">
+                                    <Check className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                    URLからデザインを自動取り込み
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <Check className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                    画像生成・インペイント編集
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <Check className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                    HTMLエクスポートですぐに公開
+                                </li>
+                            </ul>
                         </motion.div>
 
                         {/* Right: Form */}
@@ -402,75 +322,49 @@ export default function WaitingRoomPage() {
                             transition={{ duration: 0.6, delay: 0.2 }}
                             className="flex items-center justify-center"
                         >
-                            <Card className="w-full max-w-md shadow-2xl shadow-gray-200/50 border-0 bg-white/90 backdrop-blur-sm">
-                                <CardHeader className="text-center pb-4">
-                                    <AnimatePresence mode="wait">
-                                        {step === 1 ? (
-                                            <motion.div
-                                                key="form-header"
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                exit={{ opacity: 0 }}
-                                            >
-                                                <div className="w-12 h-12 mx-auto mb-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/25">
-                                                    <Crown className="w-6 h-6 text-white" />
-                                                </div>
-                                                <CardTitle className="text-2xl font-black">
-                                                    順番待ちリストに登録
-                                                </CardTitle>
-                                                <CardDescription className="mt-2">
-                                                    お申し込み順にご案内いたします
-                                                </CardDescription>
-                                            </motion.div>
-                                        ) : (
-                                            <motion.div
-                                                key="success-header"
-                                                initial={{ opacity: 0, scale: 0.9 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                            >
-                                                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/25">
-                                                    <Check className="w-8 h-8 text-white" />
-                                                </div>
-                                                <CardTitle className="text-2xl font-black">
-                                                    登録完了!
-                                                </CardTitle>
-                                                <CardDescription className="mt-2">
-                                                    ご登録ありがとうございます
-                                                </CardDescription>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
+                            <Card className="w-full max-w-md shadow-lg border bg-white">
+                                <CardHeader className="pb-4">
+                                    {step === 1 ? (
+                                        <div>
+                                            <CardTitle className="text-xl font-bold">
+                                                順番待ちリストに登録
+                                            </CardTitle>
+                                            <CardDescription className="mt-1">
+                                                お申し込み順にご案内いたします
+                                            </CardDescription>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center">
+                                            <div className="w-12 h-12 mx-auto mb-3 bg-green-100 rounded-full flex items-center justify-center">
+                                                <Check className="w-6 h-6 text-green-600" />
+                                            </div>
+                                            <CardTitle className="text-xl font-bold">
+                                                登録完了
+                                            </CardTitle>
+                                            <CardDescription className="mt-1">
+                                                ご登録ありがとうございます
+                                            </CardDescription>
+                                        </div>
+                                    )}
                                 </CardHeader>
 
                                 <CardContent>
-                                    <AnimatePresence mode="wait">
-                                        {step === 1 ? (
-                                            <motion.div
-                                                key="form"
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -10 }}
-                                            >
-                                                {/* Current Plan Badge */}
-                                                <div className="mb-6 p-4 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
-                                                    <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <Badge variant="amber" className="mb-2">現在ご案内中</Badge>
-                                                            <p className="font-bold text-gray-900">PoCプラン</p>
-                                                            <p className="text-2xl font-black text-amber-600">¥20,000<span className="text-sm font-medium text-gray-500">/月</span></p>
-                                                        </div>
-                                                        <div className="text-right text-sm">
-                                                            <p className="flex items-center gap-1 text-gray-600">
-                                                                <Check className="w-4 h-4 text-green-500" />
-                                                                初月無料
-                                                            </p>
-                                                            <p className="flex items-center gap-1 text-gray-600">
-                                                                <Check className="w-4 h-4 text-green-500" />
-                                                                全機能利用可
-                                                            </p>
-                                                        </div>
+                                    {step === 1 ? (
+                                        <div>
+                                            {/* Current Plan */}
+                                            <div className="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-xs text-amber-600 font-medium mb-1">現在ご案内中</p>
+                                                        <p className="font-bold text-gray-900">PoCプラン</p>
+                                                        <p className="text-xl font-bold text-amber-600">¥20,000<span className="text-sm font-normal text-gray-500">/月</span></p>
+                                                    </div>
+                                                    <div className="text-right text-xs text-gray-600">
+                                                        <p>初月無料</p>
+                                                        <p>全機能利用可</p>
                                                     </div>
                                                 </div>
+                                            </div>
 
                                                 <form onSubmit={handleSubmit} className="space-y-4">
                                                     {/* Account Type */}
@@ -620,39 +514,28 @@ export default function WaitingRoomPage() {
                                                         に同意
                                                     </p>
                                                 </form>
-                                            </motion.div>
-                                        ) : (
-                                            <motion.div
-                                                key="success"
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                className="text-center py-4"
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-4">
+                                            <p className="text-gray-600 mb-4 text-sm">
+                                                準備が整い次第、ご登録のメールアドレス宛に
+                                                <strong className="text-gray-900">本登録のご案内</strong>をお送りいたします。
+                                            </p>
+
+                                            <p className="text-xs text-gray-500 mb-4">
+                                                順番が来ましたらメールでお知らせします。
+                                            </p>
+
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setStep(1)}
+                                                className="text-gray-500"
                                             >
-                                                <p className="text-gray-600 mb-6">
-                                                    準備が整い次第、ご登録のメールアドレス宛に
-                                                    <br />
-                                                    <strong className="text-gray-900">本登録のご案内</strong>をお送りいたします。
-                                                </p>
-
-                                                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
-                                                    <div className="flex items-center gap-3">
-                                                        <Star className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                                                        <p className="text-sm text-amber-800 text-left">
-                                                            順番が来ましたらメールでお知らせします。今しばらくお待ちください。
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <Button
-                                                    variant="ghost"
-                                                    onClick={() => setStep(1)}
-                                                    className="text-gray-500"
-                                                >
-                                                    フォームに戻る
-                                                </Button>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
+                                                フォームに戻る
+                                            </Button>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </motion.div>
