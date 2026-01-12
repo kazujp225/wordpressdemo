@@ -404,154 +404,154 @@ export default function WaitingRoomPage() {
                                                 </div>
                                             </div>
 
-                                                <form onSubmit={handleSubmit} className="space-y-4">
-                                                    {/* Account Type */}
-                                                    <div className="space-y-2">
-                                                        <Label>ご利用形態 <span className="text-red-500">*</span></Label>
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            <Button
-                                                                type="button"
-                                                                variant={formData.accountType === 'individual' ? 'amber' : 'outline'}
-                                                                className="w-full"
-                                                                onClick={() => setFormData({ ...formData, accountType: 'individual' })}
-                                                            >
-                                                                <User className="w-4 h-4" />
-                                                                個人
-                                                            </Button>
-                                                            <Button
-                                                                type="button"
-                                                                variant={formData.accountType === 'corporate' ? 'amber' : 'outline'}
-                                                                className="w-full"
-                                                                onClick={() => setFormData({ ...formData, accountType: 'corporate' })}
-                                                            >
-                                                                <Building2 className="w-4 h-4" />
-                                                                法人
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Company Name (Corporate only) */}
-                                                    <AnimatePresence>
-                                                        {formData.accountType === 'corporate' && (
-                                                            <motion.div
-                                                                initial={{ opacity: 0, height: 0 }}
-                                                                animate={{ opacity: 1, height: 'auto' }}
-                                                                exit={{ opacity: 0, height: 0 }}
-                                                                className="space-y-2 overflow-hidden"
-                                                            >
-                                                                <Label htmlFor="companyName">
-                                                                    会社名 <span className="text-red-500">*</span>
-                                                                </Label>
-                                                                <Input
-                                                                    id="companyName"
-                                                                    required
-                                                                    value={formData.companyName}
-                                                                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                                                                    placeholder="株式会社〇〇"
-                                                                />
-                                                            </motion.div>
-                                                        )}
-                                                    </AnimatePresence>
-
-                                                    {/* Name & Email */}
+                                            <form onSubmit={handleSubmit} className="space-y-4">
+                                                {/* Account Type */}
+                                                <div className="space-y-2">
+                                                    <Label>ご利用形態 <span className="text-red-500">*</span></Label>
                                                     <div className="grid grid-cols-2 gap-3">
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="name">
-                                                                お名前 <span className="text-red-500">*</span>
-                                                            </Label>
-                                                            <div className="relative">
-                                                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                                                <Input
-                                                                    id="name"
-                                                                    required
-                                                                    className="pl-9"
-                                                                    value={formData.name}
-                                                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                                    placeholder="山田 太郎"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="email">
-                                                                メール <span className="text-red-500">*</span>
-                                                            </Label>
-                                                            <div className="relative">
-                                                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                                                <Input
-                                                                    id="email"
-                                                                    type="email"
-                                                                    required
-                                                                    className="pl-9"
-                                                                    value={formData.email}
-                                                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                                                    placeholder="email@example.com"
-                                                                />
-                                                            </div>
-                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            variant={formData.accountType === 'individual' ? 'amber' : 'outline'}
+                                                            className="w-full"
+                                                            onClick={() => setFormData({ ...formData, accountType: 'individual' })}
+                                                        >
+                                                            <User className="w-4 h-4" />
+                                                            個人
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant={formData.accountType === 'corporate' ? 'amber' : 'outline'}
+                                                            className="w-full"
+                                                            onClick={() => setFormData({ ...formData, accountType: 'corporate' })}
+                                                        >
+                                                            <Building2 className="w-4 h-4" />
+                                                            法人
+                                                        </Button>
                                                     </div>
+                                                </div>
 
-                                                    {/* Phone */}
+                                                {/* Company Name (Corporate only) */}
+                                                <AnimatePresence>
+                                                    {formData.accountType === 'corporate' && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="space-y-2 overflow-hidden"
+                                                        >
+                                                            <Label htmlFor="companyName">
+                                                                会社名 <span className="text-red-500">*</span>
+                                                            </Label>
+                                                            <Input
+                                                                id="companyName"
+                                                                required
+                                                                value={formData.companyName}
+                                                                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                                                                placeholder="株式会社〇〇"
+                                                            />
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+
+                                                {/* Name & Email */}
+                                                <div className="grid grid-cols-2 gap-3">
                                                     <div className="space-y-2">
-                                                        <Label htmlFor="phone">
-                                                            電話番号 <span className="text-gray-400 text-xs font-normal">(任意)</span>
+                                                        <Label htmlFor="name">
+                                                            お名前 <span className="text-red-500">*</span>
                                                         </Label>
                                                         <div className="relative">
-                                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                                             <Input
-                                                                id="phone"
-                                                                type="tel"
+                                                                id="name"
+                                                                required
                                                                 className="pl-9"
-                                                                value={formData.phone}
-                                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                                                placeholder="03-1234-5678"
+                                                                value={formData.name}
+                                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                                placeholder="山田 太郎"
                                                             />
                                                         </div>
                                                     </div>
-
-                                                    {/* Remarks */}
                                                     <div className="space-y-2">
-                                                        <Label htmlFor="remarks">
-                                                            備考 <span className="text-gray-400 text-xs font-normal">(任意)</span>
+                                                        <Label htmlFor="email">
+                                                            メール <span className="text-red-500">*</span>
                                                         </Label>
-                                                        <Textarea
-                                                            id="remarks"
-                                                            rows={2}
-                                                            value={formData.remarks}
-                                                            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                                                            placeholder="ご質問やご要望など"
+                                                        <div className="relative">
+                                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                            <Input
+                                                                id="email"
+                                                                type="email"
+                                                                required
+                                                                className="pl-9"
+                                                                value={formData.email}
+                                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                                placeholder="email@example.com"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Phone */}
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="phone">
+                                                        電話番号 <span className="text-gray-400 text-xs font-normal">(任意)</span>
+                                                    </Label>
+                                                    <div className="relative">
+                                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                        <Input
+                                                            id="phone"
+                                                            type="tel"
+                                                            className="pl-9"
+                                                            value={formData.phone}
+                                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                            placeholder="03-1234-5678"
                                                         />
                                                     </div>
+                                                </div>
 
-                                                    {/* Submit */}
-                                                    <Button
-                                                        type="submit"
-                                                        variant="dark"
-                                                        size="lg"
-                                                        className="w-full"
-                                                        disabled={isLoading || !formData.accountType}
-                                                    >
-                                                        {isLoading ? (
-                                                            <span className="flex items-center gap-2">
-                                                                <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                                <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                                <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                                            </span>
-                                                        ) : (
-                                                            <>
-                                                                リストに登録する
-                                                                <ArrowRight className="w-4 h-4" />
-                                                            </>
-                                                        )}
-                                                    </Button>
+                                                {/* Remarks */}
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="remarks">
+                                                        備考 <span className="text-gray-400 text-xs font-normal">(任意)</span>
+                                                    </Label>
+                                                    <Textarea
+                                                        id="remarks"
+                                                        rows={2}
+                                                        value={formData.remarks}
+                                                        onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                                                        placeholder="ご質問やご要望など"
+                                                    />
+                                                </div>
 
-                                                    <p className="text-xs text-gray-400 text-center">
-                                                        登録により
-                                                        <button type="button" onClick={() => setModalType('terms')} className="underline hover:text-amber-600 mx-1">利用規約</button>
-                                                        と
-                                                        <button type="button" onClick={() => setModalType('privacy')} className="underline hover:text-amber-600 mx-1">プライバシーポリシー</button>
-                                                        に同意
-                                                    </p>
-                                                </form>
+                                                {/* Submit */}
+                                                <Button
+                                                    type="submit"
+                                                    variant="dark"
+                                                    size="lg"
+                                                    className="w-full"
+                                                    disabled={isLoading || !formData.accountType}
+                                                >
+                                                    {isLoading ? (
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            リストに登録する
+                                                            <ArrowRight className="w-4 h-4" />
+                                                        </>
+                                                    )}
+                                                </Button>
+
+                                                <p className="text-xs text-gray-400 text-center">
+                                                    登録により
+                                                    <button type="button" onClick={() => setModalType('terms')} className="underline hover:text-amber-600 mx-1">利用規約</button>
+                                                    と
+                                                    <button type="button" onClick={() => setModalType('privacy')} className="underline hover:text-amber-600 mx-1">プライバシーポリシー</button>
+                                                    に同意
+                                                </p>
+                                            </form>
                                         </div>
                                     ) : (
                                         <div className="text-center py-4">
@@ -660,18 +660,18 @@ export default function WaitingRoomPage() {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
                                 transition={{ delay: index * 0.15 }}
-                                className="text-center relative"
+                                className="text-center relative group"
                             >
-                                <div className="relative inline-block mb-6">
-                                    <div className="w-20 h-20 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center shadow-lg">
-                                        <item.icon className="w-8 h-8 text-gray-700" />
-                                    </div>
-                                    <span className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-500 text-white text-sm font-black rounded-full flex items-center justify-center shadow-lg">
+                                <div className="relative inline-flex flex-col items-center mb-6">
+                                    <span className="text-6xl font-black text-amber-100 select-none absolute -top-4 -z-10 transition-colors group-hover:text-amber-200">
                                         {item.step}
                                     </span>
+                                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-4 mt-8 group-hover:bg-amber-50 transition-colors">
+                                        <item.icon className="w-6 h-6 text-gray-900" />
+                                    </div>
                                 </div>
-                                <h3 className="text-xl font-bold mb-2">{item.title}</h3>
-                                <p className="text-gray-600">{item.description}</p>
+                                <h3 className="text-xl font-bold mb-3">{item.title}</h3>
+                                <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto">{item.description}</p>
                             </motion.div>
                         ))}
                     </div>
@@ -822,31 +822,27 @@ export default function WaitingRoomPage() {
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
+                        className="max-w-5xl mx-auto"
                     >
-                        <div className="text-center mb-8">
-                            <h3 className="text-2xl font-black">各機能のクレジット消費</h3>
-                            <p className="text-gray-500">機能を使うたびにクレジットが消費されます</p>
+                        <div className="flex flex-col md:flex-row items-end justify-between gap-4 mb-8">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900">各機能のクレジット消費</h3>
+                                <p className="text-sm text-gray-500 mt-1">機能を使用するたびにクレジットが消費されます</p>
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 border-t border-l border-gray-200 bg-gray-200 gap-px">
                             {CREDIT_USAGE.map((item, index) => (
-                                <motion.div
+                                <div
                                     key={item.action}
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    whileInView={{ opacity: 1, scale: 1 }}
-                                    viewport={{ once: true }}
-                                    transition={{ delay: index * 0.05 }}
+                                    className="bg-white p-6 flex flex-col justify-between h-full hover:bg-amber-50 transition-colors"
                                 >
-                                    <Card className="text-center hover:shadow-md transition-all group border-gray-100">
-                                        <CardContent className="p-4">
-                                            <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-amber-100 flex items-center justify-center mx-auto mb-3 transition-colors">
-                                                <item.icon className="w-5 h-5 text-gray-500 group-hover:text-amber-600 transition-colors" />
-                                            </div>
-                                            <p className="text-xs font-bold mb-1">{item.action}</p>
-                                            <p className="text-lg font-black text-amber-600">{item.cost}</p>
-                                        </CardContent>
-                                    </Card>
-                                </motion.div>
+                                    <div className="mb-4">
+                                        <item.icon className="w-5 h-5 text-gray-400 mb-3" />
+                                        <p className="text-xs font-bold text-gray-500">{item.action}</p>
+                                    </div>
+                                    <p className="text-lg font-bold text-gray-900 tracking-tight tabular-nums">{item.cost}</p>
+                                </div>
                             ))}
                         </div>
                     </motion.div>
