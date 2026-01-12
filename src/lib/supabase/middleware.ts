@@ -94,8 +94,11 @@ export async function updateSession(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
     // 認証不要のパブリックルート
-    const publicRoutes = ['/', '/auth/callback', '/waitingroom', '/terms', '/privacy'];
-    const isPublicRoute = publicRoutes.includes(pathname) || pathname.startsWith('/api/auth/') || pathname.startsWith('/api/waitingroom');
+    const publicRoutes = ['/', '/auth/callback', '/terms', '/privacy'];
+    const isPublicRoute = publicRoutes.includes(pathname)
+        || pathname.startsWith('/api/auth/')
+        || pathname.startsWith('/api/waitingroom')
+        || pathname.startsWith('/waitingroom');
 
     // 特殊ページ
     const isPendingApproval = pathname === '/pending-approval';

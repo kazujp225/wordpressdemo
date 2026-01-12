@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowRight,
     Check,
-    Sparkles,
     Image,
     Layers,
     Wand2,
@@ -44,18 +43,6 @@ import {
     AccordionTrigger,
 } from '@/components/ui/accordion';
 
-// Type declaration for custom web component
-declare global {
-    namespace JSX {
-        interface IntrinsicElements {
-            'dotlottie-wc': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
-                src: string;
-                autoplay?: boolean;
-                loop?: boolean;
-            }, HTMLElement>;
-        }
-    }
-}
 
 // Feature data
 const FEATURES = [
@@ -66,15 +53,15 @@ const FEATURES = [
         color: 'bg-blue-500',
     },
     {
-        icon: Sparkles,
-        title: 'AI画像生成',
-        description: 'Google Geminiを使用して、プロンプトから高品質な画像を生成。ヒーロー画像やバナーを簡単に作成。',
+        icon: Image,
+        title: '画像生成',
+        description: 'プロンプトから高品質な画像を生成。ヒーロー画像やバナーを簡単に作成。',
         color: 'bg-purple-500',
     },
     {
         icon: Wand2,
-        title: 'AIインペイント編集',
-        description: '画像の一部を選択して、AIで自然に編集・修正。テキスト変更や要素の追加・削除が可能。',
+        title: 'インペイント編集',
+        description: '画像の一部を選択して自然に編集・修正。テキスト変更や要素の追加・削除が可能。',
         color: 'bg-pink-500',
     },
     {
@@ -98,7 +85,7 @@ const FEATURES = [
     {
         icon: Video,
         title: '動画生成',
-        description: '静止画からAIで動画を生成。LPにダイナミックな動きを追加できます。',
+        description: '静止画から動画を生成。LPにダイナミックな動きを追加できます。',
         color: 'bg-red-500',
     },
     {
@@ -113,11 +100,11 @@ const FEATURES = [
 const FAQ_DATA = [
     {
         question: 'LP Builder とは何ですか？',
-        answer: 'LP BuilderはAI技術を活用したランディングページ作成ツールです。既存LPのURLを入力して取り込み、AI画像生成やインペイント編集で自由にカスタマイズできます。コーディング不要で、誰でも簡単に高品質なLPを作成できます。',
+        answer: 'LP Builderは高機能なランディングページ作成ツールです。既存LPのURLを入力して取り込み、画像生成やインペイント編集で自由にカスタマイズできます。コーディング不要で、誰でも簡単に高品質なLPを作成できます。',
     },
     {
         question: 'クレジットとは何ですか？',
-        answer: 'クレジットはAI機能を使用するための通貨です。画像生成、インペイント編集、リスタイルなどのAI処理にクレジットが消費されます。月額プランには毎月クレジットが付与され、追加購入も可能です。',
+        answer: 'クレジットは各種機能を使用するための通貨です。画像生成、インペイント編集、リスタイルなどの処理にクレジットが消費されます。月額プランには毎月クレジットが付与され、追加購入も可能です。',
     },
     {
         question: 'LP1つ作成するのにどのくらいクレジットが必要ですか？',
@@ -125,15 +112,15 @@ const FAQ_DATA = [
     },
     {
         question: 'どのような画像を生成できますか？',
-        answer: 'Google Geminiを使用して、ヒーロー画像、商品画像、背景画像など様々な画像を生成できます。プロンプトを入力するだけで、LP用に最適化された高品質な画像が生成されます。また、既存画像の一部を編集するインペイント機能も利用可能です。',
+        answer: 'ヒーロー画像、商品画像、背景画像など様々な画像を生成できます。プロンプトを入力するだけで、LP用に最適化された高品質な画像が生成されます。また、既存画像の一部を編集するインペイント機能も利用可能です。',
     },
     {
         question: '無料で試せますか？',
-        answer: 'Freeプランでは、ご自身のGoogle AI Studio APIキーをご用意いただければ、基本機能を無料でお試しいただけます。4Kアップスケール、リスタイル、動画生成は有料プランのみの機能となります。',
+        answer: 'Freeプランでは、ご自身のAPIキーをご用意いただければ、基本機能を無料でお試しいただけます。4Kアップスケール、リスタイル、動画生成は有料プランのみの機能となります。',
     },
     {
         question: 'URLから取り込んだLPの著作権はどうなりますか？',
-        answer: '取り込んだLPのデザインを参考にする場合は、元のサイトの著作権にご注意ください。生成した新しいコンテンツ（AI画像など）の著作権は利用者に帰属しますが、元サイトのコンテンツをそのまま使用する場合は権利者の許可が必要です。',
+        answer: '取り込んだLPのデザインを参考にする場合は、元のサイトの著作権にご注意ください。生成した新しいコンテンツ（画像など）の著作権は利用者に帰属しますが、元サイトのコンテンツをそのまま使用する場合は権利者の許可が必要です。',
     },
     {
         question: '作成したLPはどのように公開できますか？',
@@ -158,7 +145,7 @@ const PLAN_DATA = [
         icon: User,
         features: [
             '最大10ページ',
-            'AI画像生成（自分のAPIキー）',
+            '画像生成（自分のAPIキー）',
             'HTMLエクスポート',
         ],
         limitations: [
@@ -181,7 +168,7 @@ const PLAN_DATA = [
         features: [
             '最大50ページ',
             '月間クレジット $16.67分',
-            'AI画像生成',
+            '画像生成',
             '4Kアップスケール',
             'リスタイル機能',
             'HTMLエクスポート',
@@ -214,7 +201,7 @@ const PLAN_DATA = [
 
 // Credit usage data
 const CREDIT_USAGE = [
-    { action: 'AI画像生成', cost: '約3〜6円', icon: Sparkles },
+    { action: '画像生成', cost: '約3〜6円', icon: Image },
     { action: 'インペイント', cost: '約3〜6円', icon: Wand2 },
     { action: 'リスタイル', cost: '約3〜6円', icon: Palette },
     { action: '動画生成', cost: '約53円/秒', icon: Video },
@@ -241,21 +228,6 @@ export default function WaitingRoomPage() {
         remarks: '',
     });
     const [modalType, setModalType] = useState<'terms' | 'privacy' | null>(null);
-
-    // Load Lottie Script
-    useEffect(() => {
-        const script = document.createElement('script');
-        script.src = "https://unpkg.com/@lottiefiles/dotlottie-wc@0.8.11/dist/dotlottie-wc.js";
-        script.type = "module";
-        script.async = true;
-        document.body.appendChild(script);
-
-        return () => {
-            if (document.body.contains(script)) {
-                document.body.removeChild(script);
-            }
-        };
-    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -317,14 +289,14 @@ export default function WaitingRoomPage() {
                                 </span>
                             </a>
                             <Badge variant="amber" className="gap-1.5">
-                                <Sparkles className="w-3 h-3" />
+                                <Zap className="w-3 h-3" />
                                 Beta
                             </Badge>
                         </nav>
                     </header>
 
                     {/* Hero Content */}
-                    <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 py-12 lg:py-20">
+                    <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-20 py-8 sm:py-12 lg:py-20">
                         {/* Left: Brand & Vision */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -334,30 +306,21 @@ export default function WaitingRoomPage() {
                         >
                             <Badge variant="amber" className="w-fit mb-6 gap-1.5">
                                 <Rocket className="w-3 h-3" />
-                                AI-Powered LP Creation
+                                簡単LP作成ツール
                             </Badge>
 
-                            {/* Lottie Animation */}
-                            <div className="w-24 h-24 mb-6">
-                                <dotlottie-wc
-                                    src="https://lottie.host/bef0c297-c293-4e57-a030-24ff0c5cb2f0/xZUAd4jXZg.lottie"
-                                    autoplay={true}
-                                    loop={true}
-                                    style={{ width: '100%', height: '100%' }}
-                                />
-                            </div>
-
-                            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] mb-6">
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] mb-4 sm:mb-6">
                                 LP制作を、
-                                <br />
+                                <br className="sm:hidden" />
                                 <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
-                                    AIの力で
+                                    もっと簡単に
                                 </span>
+                                <br className="hidden sm:block" />
                                 革新する。
                             </h1>
 
-                            <p className="text-lg text-gray-600 mb-8 max-w-lg">
-                                URLから取り込み、AI画像生成、インペイント編集...
+                            <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 max-w-lg">
+                                URLから取り込み、画像生成、インペイント編集...
                                 <br />
                                 <span className="font-bold text-gray-900">
                                     すべてが一つのツールで完結します。
@@ -365,27 +328,31 @@ export default function WaitingRoomPage() {
                             </p>
 
                             {/* Feature Pills */}
-                            <div className="flex flex-wrap gap-2 mb-8">
-                                {['URL取り込み', 'AI画像生成', 'インペイント', 'HTML出力'].map((feature) => (
-                                    <Badge key={feature} variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-default">
+                            <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6 sm:mb-8">
+                                {['URL取り込み', '画像生成', 'インペイント', 'HTML出力'].map((feature) => (
+                                    <Badge
+                                        key={feature}
+                                        variant="secondary"
+                                        className="bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-default text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1"
+                                    >
                                         {feature}
                                     </Badge>
                                 ))}
                             </div>
 
                             {/* Stats */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                                 {STATS.map((stat, index) => (
                                     <motion.div
                                         key={stat.label}
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
-                                        className="text-center p-3 rounded-xl bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm"
+                                        className="text-center p-2 sm:p-3 rounded-lg sm:rounded-xl bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all"
                                     >
-                                        <stat.icon className="w-5 h-5 mx-auto mb-1 text-amber-500" />
-                                        <p className="text-xl font-black text-gray-900">{stat.value}</p>
-                                        <p className="text-xs text-gray-500">{stat.label}</p>
+                                        <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-0.5 sm:mb-1 text-amber-500" />
+                                        <p className="text-lg sm:text-xl font-black text-gray-900">{stat.value}</p>
+                                        <p className="text-[10px] sm:text-xs text-gray-500 leading-tight">{stat.label}</p>
                                     </motion.div>
                                 ))}
                             </div>
@@ -670,7 +637,7 @@ export default function WaitingRoomPage() {
                             LP Builderでできること
                         </h2>
                         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                            最新のAI技術を活用して、高品質なランディングページを誰でも簡単に作成・編集できます。
+                            高品質なランディングページを誰でも簡単に作成・編集できます。
                         </p>
                     </motion.div>
 
@@ -726,7 +693,7 @@ export default function WaitingRoomPage() {
 
                         {[
                             { step: '01', title: 'URLを入力', description: '参考にしたいLPのURLを入力するか、新規作成を選択します。', icon: Globe },
-                            { step: '02', title: 'AIで編集', description: 'テキストや画像をAIの力で自由に編集。プロンプトを入力するだけ。', icon: Wand2 },
+                            { step: '02', title: '自由に編集', description: 'テキストや画像を自由に編集。プロンプトを入力するだけで簡単に変更。', icon: Wand2 },
                             { step: '03', title: 'エクスポート', description: '完成したLPをHTMLでエクスポート。すぐに公開できます。', icon: Download },
                         ].map((item, index) => (
                             <motion.div
@@ -766,7 +733,7 @@ export default function WaitingRoomPage() {
                         className="text-center mb-16"
                     >
                         <Badge variant="amber" className="mb-4 gap-1.5">
-                            <Sparkles className="w-3 h-3" />
+                            <CreditCard className="w-3 h-3" />
                             シンプルな料金体系
                         </Badge>
                         <h2 className="text-4xl sm:text-5xl font-black tracking-tight mb-4">
@@ -900,7 +867,7 @@ export default function WaitingRoomPage() {
                     >
                         <div className="text-center mb-8">
                             <h3 className="text-2xl font-black">各機能のクレジット消費</h3>
-                            <p className="text-gray-500">AIを使うたびにクレジットが消費されます</p>
+                            <p className="text-gray-500">機能を使うたびにクレジットが消費されます</p>
                         </div>
 
                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
