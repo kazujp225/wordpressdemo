@@ -122,8 +122,8 @@ const FAQ_DATA = [
         answer: 'ヒーロー画像、商品画像、背景画像など様々な画像を生成できます。プロンプトを入力するだけで、LP用に最適化された高品質な画像が生成されます。また、既存画像の一部を編集するインペイント機能も利用可能です。',
     },
     {
-        question: '無料で試せますか？',
-        answer: 'Freeプランでは、ご自身のAPIキーをご用意いただければ、基本機能を無料でお試しいただけます。4Kアップスケール、リスタイル、動画生成は有料プランのみの機能となります。',
+        question: '契約前に試せますか？',
+        answer: 'お申し込み後、初回14日間は無料トライアル期間としてご利用いただけます。トライアル期間中も全機能をお試しいただけますので、ぜひご検討ください。',
     },
     {
         question: 'URLから取り込んだLPの著作権はどうなりますか？',
@@ -409,11 +409,11 @@ export default function WaitingRoomPage() {
                                                 <div className="flex items-center gap-2 text-sm">
                                                     <Sparkles className="w-4 h-4 text-amber-500" />
                                                     <span className="text-gray-700">
-                                                        <span className="font-bold">10万</span>〜<span className="font-bold">100万</span>トークン/月
+                                                        月額<span className="font-bold">¥20,000</span>〜<span className="font-bold">¥100,000</span>
                                                     </span>
                                                 </div>
                                                 <p className="text-xs text-gray-500 mt-1.5">
-                                                    Enterpriseなら<span className="text-red-500 font-bold">50%お得</span>
+                                                    初回<span className="text-amber-600 font-bold">14日間無料</span>トライアル
                                                 </p>
                                             </div>
 
@@ -741,8 +741,8 @@ export default function WaitingRoomPage() {
                         </h2>
                         <div className="h-2 w-32 bg-amber-500 mb-10" />
                         <p className="text-xl md:text-3xl text-gray-900 font-bold max-w-2xl leading-tight">
-                            必要な分だけ、必要な時に。<br className="hidden md:block" />
-                            透明性の高い<span className="inline-block">「Pay as you go」</span>システム。
+                            上位プランほどお得に。<br className="hidden md:block" />
+                            シンプルで<span className="inline-block">わかりやすい</span>トークン制。
                         </p>
                     </div>
 
@@ -761,8 +761,8 @@ export default function WaitingRoomPage() {
                                     <span className="text-xl md:text-3xl font-bold text-gray-500">トークン / 1LP</span>
                                 </div>
                                 <p className="text-base md:text-xl text-gray-600 font-bold leading-relaxed">
-                                    使った分だけ消費する<span className="inline-block">シンプルな従量制。</span><br className="hidden md:block" />
-                                    <span className="inline-block">Enterpriseなら</span><span className="inline-block text-amber-600">Proの半額で使える！</span>
+                                    使った分だけ消費する<span className="inline-block">シンプルな仕組み。</span><br className="hidden md:block" />
+                                    <span className="inline-block">Enterpriseは</span><span className="inline-block text-amber-600">1トークンあたり50%お得！</span>
                                 </p>
                             </div>
 
@@ -859,8 +859,11 @@ export default function WaitingRoomPage() {
                                             ? "bg-amber-500 border-black text-black hover:bg-amber-400"
                                             : "bg-white border-black text-black hover:bg-gray-100"
                                     )}
+                                    onClick={() => {
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
                                 >
-                                    {plan.highlight ? "Get Started" : "Start Free"}
+                                    {plan.highlight ? "おすすめ" : "申し込む"}
                                 </Button>
                             </div>
                         ))}
@@ -870,8 +873,8 @@ export default function WaitingRoomPage() {
                     <div className="max-w-5xl mx-auto mt-20 md:mt-32">
                         <div className="flex flex-col md:flex-row items-end justify-between gap-4 mb-8">
                             <div>
-                                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Token Consumption</h3>
-                                <p className="text-sm font-bold text-gray-500 mt-2">各機能のトークン消費目安</p>
+                                <h3 className="text-xl font-black text-gray-900 tracking-tight">トークン消費一覧</h3>
+                                <p className="text-sm font-bold text-gray-500 mt-2">各機能の消費目安（1回あたり）</p>
                             </div>
                         </div>
 
