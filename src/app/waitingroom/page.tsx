@@ -115,7 +115,7 @@ const FAQ_DATA = [
     },
     {
         question: 'LP1つ作成するのにどのくらいトークンが必要ですか？',
-        answer: 'シンプルなLP（5〜6セクション、画像3〜5枚生成）で約8,000〜10,000トークン、本格的なLP（10セクション以上、画像10枚以上）で約15,000〜20,000トークンが目安です。使用する機能や生成回数によって変動します。',
+        answer: '標準的なLP（5〜6セクション、画像5枚生成）で約1万トークンが目安です。Proプランなら約10LP、Enterpriseなら約100LP作成可能。上位プランほど1トークンあたりの単価がお得になります。',
     },
     {
         question: 'どのような画像を生成できますか？',
@@ -146,15 +146,15 @@ const PLAN_DATA = [
         name: 'Pro',
         price: '¥20,000',
         period: '/月',
-        tokens: '50,000',
-        tokensNum: 50000,
-        tokenNote: '約4〜6LP分',
-        tokenPerYen: '0.4円/トークン',
+        tokens: '10万',
+        tokensNum: 100000,
+        tokenNote: '約10LP分',
+        discount: '',
         description: 'スタートアップ・個人事業主に',
         icon: User,
         features: [
             '最大30ページ',
-            '月間 50,000トークン',
+            '月間 10万トークン',
             '画像生成',
             'インペイント編集',
             'HTMLエクスポート',
@@ -170,15 +170,15 @@ const PLAN_DATA = [
         name: 'Business',
         price: '¥40,000',
         period: '/月',
-        tokens: '150,000',
-        tokensNum: 150000,
-        tokenNote: '約12〜18LP分',
-        tokenPerYen: '0.27円/トークン',
+        tokens: '30万',
+        tokensNum: 300000,
+        tokenNote: '約30LP分',
+        discount: '35%お得',
         description: '成長企業・制作会社に',
         icon: Zap,
         features: [
             '最大100ページ',
-            '月間 150,000トークン',
+            '月間 30万トークン',
             'Pro全機能',
             '4Kアップスケール',
             'リスタイル機能',
@@ -192,15 +192,15 @@ const PLAN_DATA = [
         name: 'Enterprise',
         price: '¥100,000',
         period: '/月',
-        tokens: '500,000',
-        tokensNum: 500000,
-        tokenNote: '約40〜60LP分',
-        tokenPerYen: '0.2円/トークン',
+        tokens: '100万',
+        tokensNum: 1000000,
+        tokenNote: '約100LP分',
+        discount: '50%お得',
         description: '代理店・大規模ビジネスに',
         icon: Building2,
         features: [
             '無制限ページ',
-            '月間 500,000トークン',
+            '月間 100万トークン',
             'Business全機能',
             '動画生成',
             '優先サポート',
@@ -213,11 +213,11 @@ const PLAN_DATA = [
 
 // Token usage data
 const TOKEN_USAGE = [
-    { action: '画像生成', cost: '約1,000〜1,500', icon: Image },
-    { action: 'インペイント', cost: '約500〜800', icon: Wand2 },
-    { action: 'リスタイル', cost: '約1,500〜2,000', icon: Palette },
-    { action: '動画生成', cost: '約300〜500/秒', icon: Video },
-    { action: 'URL取り込み', cost: '約300〜500', icon: Globe },
+    { action: '画像生成', cost: '1,000', icon: Image },
+    { action: 'インペイント', cost: '500', icon: Wand2 },
+    { action: 'リスタイル', cost: '2,000', icon: Palette },
+    { action: '動画生成', cost: '500/秒', icon: Video },
+    { action: 'URL取り込み', cost: '500', icon: Globe },
 ];
 
 export default function WaitingRoomPage() {
@@ -409,11 +409,11 @@ export default function WaitingRoomPage() {
                                                 <div className="flex items-center gap-2 text-sm">
                                                     <Sparkles className="w-4 h-4 text-amber-500" />
                                                     <span className="text-gray-700">
-                                                        <span className="font-bold">5万</span>〜<span className="font-bold">50万</span>トークン/月
+                                                        <span className="font-bold">10万</span>〜<span className="font-bold">100万</span>トークン/月
                                                     </span>
                                                 </div>
                                                 <p className="text-xs text-gray-500 mt-1.5">
-                                                    上位プランほど1トークンあたりがお得
+                                                    Enterpriseなら<span className="text-red-500 font-bold">50%お得</span>
                                                 </p>
                                             </div>
 
@@ -465,11 +465,18 @@ export default function WaitingRoomPage() {
                                                         ))}
                                                     </div>
                                                     {formData.selectedPlan && (
-                                                        <div className="text-xs text-gray-500 mt-1 space-y-0.5">
-                                                            <p className="font-medium text-amber-600">
-                                                                月間 {PLAN_DATA.find(p => p.id === formData.selectedPlan)?.tokens} トークン
-                                                            </p>
-                                                            <p>（{PLAN_DATA.find(p => p.id === formData.selectedPlan)?.tokenNote}）</p>
+                                                        <div className="text-xs mt-1.5 flex items-center gap-2">
+                                                            <span className="font-medium text-amber-600">
+                                                                月間 {PLAN_DATA.find(p => p.id === formData.selectedPlan)?.tokens}トークン
+                                                            </span>
+                                                            <span className="text-gray-400">
+                                                                ({PLAN_DATA.find(p => p.id === formData.selectedPlan)?.tokenNote})
+                                                            </span>
+                                                            {PLAN_DATA.find(p => p.id === formData.selectedPlan)?.discount && (
+                                                                <span className="bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                                                    {PLAN_DATA.find(p => p.id === formData.selectedPlan)?.discount}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -754,13 +761,13 @@ export default function WaitingRoomPage() {
                                 <h3 className="text-3xl md:text-5xl font-black mb-4 tracking-tight">シンプルなトークン制</h3>
                                 <div className="flex flex-wrap items-baseline gap-2 md:gap-4 mb-6 md:mb-8">
                                     <span className="text-5xl md:text-8xl font-black tracking-tighter text-black leading-none">
-                                        8,000
+                                        1万
                                     </span>
-                                    <span className="text-xl md:text-3xl font-bold text-gray-500">トークン〜 / 1LP</span>
+                                    <span className="text-xl md:text-3xl font-bold text-gray-500">トークン / 1LP</span>
                                 </div>
                                 <p className="text-base md:text-xl text-gray-600 font-bold leading-relaxed">
                                     使った分だけ消費する<span className="inline-block">シンプルな従量制。</span><br className="hidden md:block" />
-                                    <span className="inline-block">上位プランほど</span><span className="inline-block text-amber-600">1トークンあたりがお得に。</span>
+                                    <span className="inline-block">Enterpriseなら</span><span className="inline-block text-amber-600">Proの半額で使える！</span>
                                 </p>
                             </div>
 
@@ -776,29 +783,29 @@ export default function WaitingRoomPage() {
                                             </span>
                                             画像生成 (x5)
                                         </span>
-                                        <span className="font-mono text-lg md:text-xl pl-11 md:pl-0">5,000〜7,500</span>
+                                        <span className="font-mono text-lg md:text-xl pl-11 md:pl-0">5,000</span>
                                     </div>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center text-sm md:text-lg font-bold gap-1 md:gap-0">
                                         <span className="flex items-center gap-3">
                                             <span className="w-8 h-8 bg-black text-white flex items-center justify-center rounded-none">
                                                 <Wand2 className="w-4 h-4" />
                                             </span>
-                                            インペイント (x3)
+                                            インペイント (x5)
                                         </span>
-                                        <span className="font-mono text-lg md:text-xl pl-11 md:pl-0">1,500〜2,400</span>
+                                        <span className="font-mono text-lg md:text-xl pl-11 md:pl-0">2,500</span>
                                     </div>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center text-sm md:text-lg font-bold gap-1 md:gap-0">
                                         <span className="flex items-center gap-3">
                                             <span className="w-8 h-8 bg-black text-white flex items-center justify-center rounded-none">
                                                 <Globe className="w-4 h-4" />
                                             </span>
-                                            URL取り込み
+                                            URL取り込み + その他
                                         </span>
-                                        <span className="font-mono text-lg md:text-xl pl-11 md:pl-0">300〜500</span>
+                                        <span className="font-mono text-lg md:text-xl pl-11 md:pl-0">2,500</span>
                                     </div>
                                     <div className="pt-6 mt-6 border-t-2 border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-0">
                                         <span className="font-black text-lg md:text-xl text-gray-900">TOTAL</span>
-                                        <span className="font-mono text-2xl md:text-3xl font-black text-amber-600 bg-amber-100 px-2">約 8,000〜12,000</span>
+                                        <span className="font-mono text-2xl md:text-3xl font-black text-amber-600 bg-amber-100 px-2">約 10,000</span>
                                     </div>
                                 </div>
                             </div>
