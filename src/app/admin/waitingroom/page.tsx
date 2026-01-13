@@ -42,10 +42,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 };
 
 const PLAN_OPTIONS = [
-    { value: 'free', label: 'Free', description: '無料プラン' },
-    { value: 'poc', label: 'PoC', description: '¥20,000/月（初月無料）' },
-    { value: 'pro', label: 'Pro', description: '¥10,000/月' },
-    { value: 'expert', label: 'Expert', description: '¥30,000/月' },
+    { value: 'pro', label: 'Pro', description: '¥20,000/月（月間クレジット ¥5,000分）' },
+    { value: 'business', label: 'Business', description: '¥40,000/月（月間クレジット ¥10,000分）' },
+    { value: 'enterprise', label: 'Enterprise', description: '¥100,000/月（月間クレジット ¥25,000分）' },
 ];
 
 export default function WaitingRoomPage() {
@@ -407,6 +406,17 @@ export default function WaitingRoomPage() {
                                                             <div>
                                                                 <p className="text-xs text-gray-500">電話番号</p>
                                                                 <p className="text-sm text-gray-900">{entry.phone}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {entry.plan && (
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-4 h-4 text-gray-400 mt-0.5">★</div>
+                                                            <div>
+                                                                <p className="text-xs text-gray-500">希望プラン</p>
+                                                                <p className="text-sm font-medium text-amber-600">
+                                                                    {PLAN_OPTIONS.find(p => p.value === entry.plan)?.label || entry.plan}
+                                                                </p>
                                                             </div>
                                                         </div>
                                                     )}

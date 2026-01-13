@@ -219,6 +219,7 @@ export default function WaitingRoomPage() {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         accountType: '' as 'individual' | 'corporate' | '',
+        selectedPlan: '' as 'pro' | 'business' | 'enterprise' | '',
         companyName: '',
         name: '',
         email: '',
@@ -252,6 +253,7 @@ export default function WaitingRoomPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     accountType: formData.accountType,
+                    selectedPlan: formData.selectedPlan,
                     companyName: formData.companyName || undefined,
                     name: formData.name,
                     email: formData.email,
@@ -396,19 +398,18 @@ export default function WaitingRoomPage() {
                                 <CardContent>
                                     {step === 1 ? (
                                         <div>
-                                            {/* Current Plan */}
-                                            <div className="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-xs text-amber-600 font-medium mb-1">現在ご案内中</p>
-                                                        <p className="font-bold text-gray-900">PoCプラン</p>
-                                                        <p className="text-xl font-bold text-amber-600">¥20,000<span className="text-sm font-normal text-gray-500">/月</span></p>
-                                                    </div>
-                                                    <div className="text-right text-xs text-gray-600">
-                                                        <p>初期費用無料</p>
-                                                        <p>全機能利用可</p>
-                                                    </div>
+                                            {/* Plan Info Banner */}
+                                            <div className="mb-5 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <Sparkles className="w-4 h-4 text-amber-500" />
+                                                    <span className="text-gray-700">
+                                                        <span className="font-bold">Pro</span>（¥20,000/月）〜
+                                                        <span className="font-bold">Enterprise</span>（¥100,000/月）
+                                                    </span>
                                                 </div>
+                                                <p className="text-xs text-gray-500 mt-1.5">
+                                                    初期費用無料・すべてのプランで主要機能をご利用いただけます
+                                                </p>
                                             </div>
 
                                             <form onSubmit={handleSubmit} className="space-y-4">
@@ -435,6 +436,34 @@ export default function WaitingRoomPage() {
                                                             法人
                                                         </Button>
                                                     </div>
+                                                </div>
+
+                                                {/* Plan Selection */}
+                                                <div className="space-y-2">
+                                                    <Label>ご希望プラン <span className="text-red-500">*</span></Label>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {PLAN_DATA.map((plan) => (
+                                                            <Button
+                                                                key={plan.id}
+                                                                type="button"
+                                                                variant={formData.selectedPlan === plan.id ? 'amber' : 'outline'}
+                                                                className={cn(
+                                                                    "w-full flex-col h-auto py-3 px-2",
+                                                                    plan.highlight && formData.selectedPlan !== plan.id && "border-amber-300 bg-amber-50/50"
+                                                                )}
+                                                                onClick={() => setFormData({ ...formData, selectedPlan: plan.id as 'pro' | 'business' | 'enterprise' })}
+                                                            >
+                                                                <plan.icon className="w-4 h-4 mb-1" />
+                                                                <span className="text-xs font-bold">{plan.name}</span>
+                                                                <span className="text-[10px] text-gray-500">{plan.price}</span>
+                                                            </Button>
+                                                        ))}
+                                                    </div>
+                                                    {formData.selectedPlan && (
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            月間クレジット: {PLAN_DATA.find(p => p.id === formData.selectedPlan)?.credit}分
+                                                        </p>
+                                                    )}
                                                 </div>
 
                                                 {/* Company Name (Corporate only) */}
@@ -535,7 +564,7 @@ export default function WaitingRoomPage() {
                                                     variant="dark"
                                                     size="lg"
                                                     className="w-full"
-                                                    disabled={isLoading || !formData.accountType}
+                                                    disabled={isLoading || !formData.accountType || !formData.selectedPlan}
                                                 >
                                                     {isLoading ? (
                                                         <span className="flex items-center gap-2">
@@ -1006,21 +1035,95 @@ export default function WaitingRoomPage() {
                                 </Button>
                             </div>
                             <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
-                                <div className="prose prose-sm prose-gray max-w-none">
-                                    <p className="text-sm text-gray-500">
-                                        {modalType === 'terms'
-                                            ? '利用規約の詳細は /terms ページをご確認ください。'
-                                            : 'プライバシーポリシーの詳細は /privacy ページをご確認ください。'}
-                                    </p>
-                                    <Button
-                                        variant="outline"
-                                        className="mt-4"
-                                        onClick={() => window.open(modalType === 'terms' ? '/terms' : '/privacy', '_blank')}
-                                    >
-                                        詳細を見る
-                                        <ArrowRight className="w-4 h-4 ml-2" />
-                                    </Button>
-                                </div>
+                                {modalType === 'terms' ? (
+                                    <div className="space-y-6">
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                            <p className="text-amber-800 font-bold text-sm mb-2">重要ポイント</p>
+                                            <ul className="text-sm text-amber-700 space-y-1">
+                                                <li>・生成コンテンツの著作権は利用者に帰属します</li>
+                                                <li>・入力データ・生成物の権利侵害責任は利用者が負います</li>
+                                                <li>・サービスは「現状有姿」で提供されます</li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="space-y-4 text-sm text-gray-700">
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 mb-2">サービス内容</h3>
+                                                <p>LP BuilderはAIを活用したランディングページ作成支援ツールです。当社はサービス内容を予告なく変更・終了する場合があります。</p>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 mb-2">利用料金</h3>
+                                                <p>当社が定める料金を指定方法でお支払いください。支払済みの料金は返金いたしません。</p>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 mb-2">禁止事項</h3>
+                                                <p>法令違反、権利侵害、虚偽情報の発信、違法・有害コンテンツの作成、不正アクセス等は禁止されています。</p>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 mb-2">免責事項</h3>
+                                                <p>当社は生成コンテンツの正確性・適法性を保証しません。AI生成結果に起因する損害について当社は責任を負いません。</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-gray-200">
+                                            <Button
+                                                variant="outline"
+                                                className="w-full"
+                                                onClick={() => window.open('/terms', '_blank')}
+                                            >
+                                                利用規約の全文を見る
+                                                <ArrowRight className="w-4 h-4 ml-2" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                            <p className="text-blue-800 font-bold text-sm mb-2">お客様の情報の取扱いについて</p>
+                                            <ul className="text-sm text-blue-700 space-y-1">
+                                                <li>・個人情報はサービス提供・改善目的で使用します</li>
+                                                <li>・同意なく第三者に提供することはありません</li>
+                                                <li>・情報の開示・削除請求が可能です</li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="space-y-4 text-sm text-gray-700">
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 mb-2">取得する情報</h3>
+                                                <p>氏名、メールアドレス、電話番号、会社名のほか、IPアドレス、ブラウザ情報、サービス利用履歴等を取得します。</p>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 mb-2">利用目的</h3>
+                                                <p>サービスの提供・運営・改善、お問い合わせ対応、利用料金の請求、不正利用の防止等に利用します。</p>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 mb-2">外部サービス</h3>
+                                                <p>AI API、クラウドサービス（Supabase、Vercel）、分析ツール（Google Analytics）、決済サービス（Stripe）を利用します。</p>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 mb-2">お客様の権利</h3>
+                                                <p>個人情報の開示・訂正・利用停止・削除を請求することができます。</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-gray-200">
+                                            <Button
+                                                variant="outline"
+                                                className="w-full"
+                                                onClick={() => window.open('/privacy', '_blank')}
+                                            >
+                                                プライバシーポリシーの全文を見る
+                                                <ArrowRight className="w-4 h-4 ml-2" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     </motion.div>

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 
 interface WaitingRoomRequest {
     accountType: 'individual' | 'corporate';
+    selectedPlan: 'pro' | 'business' | 'enterprise';
     companyName?: string;
     name: string;
     email: string;
@@ -13,12 +14,21 @@ interface WaitingRoomRequest {
 export async function POST(request: NextRequest) {
     try {
         const body: WaitingRoomRequest = await request.json();
-        const { accountType, companyName, name, email, phone, remarks } = body;
+        const { accountType, selectedPlan, companyName, name, email, phone, remarks } = body;
 
         // バリデーション
-        if (!accountType || !name || !email) {
+        if (!accountType || !selectedPlan || !name || !email) {
             return NextResponse.json(
                 { success: false, error: '必須フィールドが不足しています' },
+                { status: 400 }
+            );
+        }
+
+        // プランのバリデーション
+        const validPlans = ['pro', 'business', 'enterprise'];
+        if (!validPlans.includes(selectedPlan)) {
+            return NextResponse.json(
+                { success: false, error: '有効なプランを選択してください' },
                 { status: 400 }
             );
         }
@@ -61,12 +71,14 @@ export async function POST(request: NextRequest) {
                 email,
                 phone: phone || null,
                 remarks: remarks || null,
+                plan: selectedPlan,
                 status: 'pending',
             }
         });
 
         console.log('=== Waiting Room 登録 ===');
         console.log('タイプ:', accountType === 'corporate' ? '法人' : '個人');
+        console.log('希望プラン:', selectedPlan);
         if (companyName) console.log('会社名:', companyName);
         console.log('名前:', name);
         console.log('メール:', email);
