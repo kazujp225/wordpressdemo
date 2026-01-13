@@ -310,13 +310,13 @@ export default function WaitingRoomPage() {
                     </header>
 
                     {/* Hero Content */}
-                    <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 py-8 lg:py-16 items-center min-h-[calc(100vh-100px)]">
+                    <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 py-8 lg:py-12 items-start min-h-[calc(100vh-100px)]">
                         {/* Left: Brand & Vision */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
-                            className="flex flex-col justify-center"
+                            className="flex flex-col pt-4 lg:pt-8"
                         >
                             {/* Lottie Animation */}
                             <div className="w-20 h-20 mb-4">
