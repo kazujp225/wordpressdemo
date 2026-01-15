@@ -116,24 +116,14 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
         const totalOperations = targetSections.length + mobileTargetCount;
         setProgress({ current: 0, total: totalOperations });
 
-        const results: { sectionId: string; newImageUrl: string; newImageId: number; mobileImageUrl?: string; mobileImageId?: number }[] = [];
-        let operationCount = 0;
+        let completedCount = 0;
 
-        // レート制限対策用のディレイ関数
-        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+        console.log(`[BG-UNIFY] Starting parallel processing for ${targetSections.length} sections`);
 
-        for (let i = 0; i < targetSections.length; i++) {
-            const section = targetSections[i];
-            operationCount++;
-            setProgress({ current: operationCount, total: totalOperations });
-
+        // 全セクションを並列で処理
+        const processPromises = targetSections.map(async (section) => {
             let desktopResult: { newImageUrl: string; newImageId: number } | null = null;
             let mobileResult: { newImageUrl: string; newImageId: number } | null = null;
-
-            // 2番目以降のセクションは1秒待機（レート制限対策）
-            if (i > 0) {
-                await delay(1000);
-            }
 
             // デスクトップ画像の処理
             try {
@@ -150,16 +140,13 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                     }),
                 });
 
+                completedCount++;
+                setProgress({ current: completedCount, total: totalOperations });
+
                 if (!response.ok) {
                     const error = await response.json();
                     console.error(`Section ${section.id} desktop failed:`, error);
-                    // クレジット不足の場合は処理を中断
-                    if (error.error === 'CREDIT_INSUFFICIENT') {
-                        toast.error('クレジット残高が不足しています。チャージしてください。');
-                        setIsProcessing(false);
-                        return;
-                    }
-                    toast.error(`セクション${section.order + 1}(デスクトップ)の処理に失敗しました`);
+                    return { sectionId: section.id, success: false, error: error.error };
                 } else {
                     const result = await response.json();
                     desktopResult = {
@@ -168,18 +155,14 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                     };
                 }
             } catch (error: any) {
+                completedCount++;
+                setProgress({ current: completedCount, total: totalOperations });
                 console.error(`Section ${section.id} desktop error:`, error);
-                toast.error(`セクション${section.order + 1}(デスクトップ)でエラーが発生しました`);
+                return { sectionId: section.id, success: false, error: error.message };
             }
 
             // モバイル画像の処理（オプションがONで、モバイル画像がある場合）
             if (includeMobile && section.mobileImage?.filePath) {
-                operationCount++;
-                setProgress({ current: operationCount, total: totalOperations });
-
-                // モバイル処理前に1秒待機（レート制限対策）
-                await delay(1000);
-
                 try {
                     const response = await fetch('/api/ai/background-unify', {
                         method: 'POST',
@@ -194,17 +177,10 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                         }),
                     });
 
-                    if (!response.ok) {
-                        const error = await response.json();
-                        console.error(`Section ${section.id} mobile failed:`, error);
-                        // クレジット不足の場合は処理を中断
-                        if (error.error === 'CREDIT_INSUFFICIENT') {
-                            toast.error('クレジット残高が不足しています。チャージしてください。');
-                            setIsProcessing(false);
-                            return;
-                        }
-                        toast.error(`セクション${section.order + 1}(モバイル)の処理に失敗しました`);
-                    } else {
+                    completedCount++;
+                    setProgress({ current: completedCount, total: totalOperations });
+
+                    if (response.ok) {
                         const result = await response.json();
                         mobileResult = {
                             newImageUrl: result.newImageUrl,
@@ -212,21 +188,43 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                         };
                     }
                 } catch (error: any) {
+                    completedCount++;
+                    setProgress({ current: completedCount, total: totalOperations });
                     console.error(`Section ${section.id} mobile error:`, error);
-                    toast.error(`セクション${section.order + 1}(モバイル)でエラーが発生しました`);
                 }
             }
 
-            // 結果を追加（少なくともデスクトップが成功した場合）
+            // 結果を返す
             if (desktopResult) {
-                results.push({
+                return {
                     sectionId: section.id,
+                    success: true,
                     newImageUrl: desktopResult.newImageUrl,
                     newImageId: desktopResult.newImageId,
                     mobileImageUrl: mobileResult?.newImageUrl,
                     mobileImageId: mobileResult?.newImageId,
-                });
+                };
             }
+            return { sectionId: section.id, success: false };
+        });
+
+        // 全ての並列処理を待機
+        const allResults = await Promise.all(processPromises);
+        const results = allResults
+            .filter((r): r is { sectionId: string; success: true; newImageUrl: string; newImageId: number; mobileImageUrl?: string; mobileImageId?: number } => r.success)
+            .map(r => ({
+                sectionId: r.sectionId,
+                newImageUrl: r.newImageUrl,
+                newImageId: r.newImageId,
+                mobileImageUrl: r.mobileImageUrl,
+                mobileImageId: r.mobileImageId,
+            }));
+
+        const failedCount = allResults.filter(r => !r.success).length;
+        console.log(`[BG-UNIFY] Parallel complete: ${results.length} success, ${failedCount} failed`);
+
+        if (failedCount > 0) {
+            toast.error(`${failedCount}件のセクションで処理に失敗しました`);
         }
 
         setIsProcessing(false);
