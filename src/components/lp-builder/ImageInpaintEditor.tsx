@@ -1553,56 +1553,6 @@ export function ImageInpaintEditor({
                                 onMouseLeave={handleMouseUp}
                             />
 
-                        {/* Toolbar - 下部中央に水平配置して画像を邪魔しないように */}
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-background/95 backdrop-blur-sm p-1.5 rounded-lg border border-border shadow-lg z-20">
-                            <button
-                                onClick={() => setTool('select')}
-                                className={`p-2 rounded-md transition-all ${tool === 'select' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-surface-100 hover:text-foreground'}`}
-                                title="選択ツール"
-                            >
-                                <Plus className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setTool('pan')}
-                                className={`p-2 rounded-md transition-all ${tool === 'pan' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-surface-100 hover:text-foreground'}`}
-                                title="移動ツール"
-                            >
-                                <Move className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => { setTool('cut'); cancelCut(); }}
-                                className={`p-2 rounded-md transition-all ${tool === 'cut' ? 'bg-red-500 text-white shadow-sm' : 'text-muted-foreground hover:bg-surface-100 hover:text-foreground'}`}
-                                title="カットツール（範囲を削除）"
-                            >
-                                <Scissors className="w-4 h-4" />
-                            </button>
-                            <div className="w-px h-6 bg-border mx-1" />
-                            <button
-                                onClick={handleZoomOut}
-                                className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
-                                title="縮小"
-                            >
-                                <ZoomOut className="w-4 h-4" />
-                            </button>
-                            <span className="text-xs font-bold text-foreground min-w-[40px] text-center">
-                                {Math.round(scale * 100)}%
-                            </span>
-                            <button
-                                onClick={handleZoomIn}
-                                className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
-                                title="拡大"
-                            >
-                                <ZoomIn className="w-4 h-4" />
-                            </button>
-                            <div className="w-px h-6 bg-border mx-1" />
-                            <button
-                                onClick={handleReset}
-                                className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
-                                title="リセット"
-                            >
-                                <RotateCcw className="w-4 h-4" />
-                            </button>
-                        </div>
                         </div>
                     )}
 
@@ -1638,34 +1588,6 @@ export function ImageInpaintEditor({
                                 onMouseLeave={handleMobileMouseUp}
                             />
 
-                            {/* Mobile Toolbar - 下部中央に水平配置 */}
-                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-background/95 backdrop-blur-sm p-1.5 rounded-lg border border-border shadow-lg z-20">
-                                <button
-                                    onClick={handleMobileZoomOut}
-                                    className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
-                                    title="縮小"
-                                >
-                                    <ZoomOut className="w-4 h-4" />
-                                </button>
-                                <span className="text-xs font-bold text-foreground min-w-[40px] text-center">
-                                    {Math.round(mobileScale * 100)}%
-                                </span>
-                                <button
-                                    onClick={handleMobileZoomIn}
-                                    className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
-                                    title="拡大"
-                                >
-                                    <ZoomIn className="w-4 h-4" />
-                                </button>
-                                <div className="w-px h-6 bg-border mx-1" />
-                                <button
-                                    onClick={handleMobileReset}
-                                    className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-100 transition-all"
-                                    title="リセット"
-                                >
-                                    <RotateCcw className="w-4 h-4" />
-                                </button>
-                            </div>
                         </div>
                     )}
 

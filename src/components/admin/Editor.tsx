@@ -546,12 +546,19 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             try {
                 // 今日のコスト
                 const todayRes = await fetch('/api/admin/stats?days=1');
+                if (!todayRes.ok) {
+                    // 認証エラーなど - 静かに失敗
+                    return;
+                }
                 const todayData = await todayRes.json();
 
                 // 今月のコスト
                 const now = new Date();
                 const daysThisMonth = now.getDate();
                 const monthRes = await fetch(`/api/admin/stats?days=${daysThisMonth}`);
+                if (!monthRes.ok) {
+                    return;
+                }
                 const monthData = await monthRes.json();
 
                 setApiCost({
@@ -559,7 +566,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     monthCost: monthData.summary?.totalCost || 0
                 });
             } catch (error) {
-                console.error('Failed to fetch API cost:', error);
+                // サイレントエラー - APIコストの取得失敗はユーザー体験に影響しない
             }
         };
 
@@ -1562,47 +1569,39 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         setRegeneratingSectionIds(new Set(sectionIds));
 
         let successCount = 0;
-        // 最初のセクションから抽出したカラー（後続セクションの一貫性担保用）
-        let extractedColors: { primary: string; secondary: string; accent: string; background: string } | null = null;
+        let completedCount = 0;
 
-        for (let i = 0; i < sectionIds.length; i++) {
-            const sectionId = sectionIds[i];
-            // 型を揃えて比較（文字列と数値の両方に対応）
+        // 参照セクションの画像URLを取得（全セクションで共通）
+        const referenceSection = batchReferenceSection
+            ? sections.find(s => s.id === batchReferenceSection)
+            : null;
+        const refFilePath = referenceSection?.image?.filePath;
+        const styleReferenceUrl = refFilePath && refFilePath.startsWith('http') ? refFilePath : undefined;
+
+        console.log('=== Starting Parallel Batch Regenerate ===');
+        console.log(`Processing ${sectionIds.length} sections in parallel`);
+        console.log(`Style reference URL: ${styleReferenceUrl}`);
+
+        // 各セクションを並列で処理
+        const regeneratePromises = sectionIds.map(async (sectionId, i) => {
             const section = sections.find(s => String(s.id) === String(sectionId));
-
-            console.log(`Processing section ${i + 1}:`, { sectionId, sectionIdType: typeof sectionId, found: !!section });
 
             if (!section) {
                 console.warn(`Section not found for ID: ${sectionId}`);
-                continue;
+                return { sectionId, success: false, error: 'not found' };
             }
-
-            console.log(`Section found:`, { id: section.id, idType: typeof section.id });
 
             const dbSectionId = typeof section.id === 'string' && section.id.startsWith('temp-')
                 ? null
                 : Number(section.id);
 
-            console.log(`DB Section ID: ${dbSectionId} (from ${section.id}, type: ${typeof section.id})`);
-
             if (!dbSectionId || isNaN(dbSectionId)) {
                 console.warn(`Section ${section.id} skipped - not saved yet`);
-                continue;
+                return { sectionId, success: false, error: 'not saved' };
             }
 
-            setBatchRegenerateProgress({ current: i + 1, total: sectionIds.length });
-
             try {
-                // 参照セクションの画像URLを取得（空文字列やnullの場合はundefined）
-                const referenceSection = batchReferenceSection
-                    ? sections.find(s => s.id === batchReferenceSection)
-                    : null;
-                const refFilePath = referenceSection?.image?.filePath;
-                const styleReferenceUrl = refFilePath && refFilePath.startsWith('http') ? refFilePath : undefined;
-
-                console.log(`Calling API: /api/sections/${dbSectionId}/regenerate`);
-                console.log(`Style reference URL: ${styleReferenceUrl}`);
-                console.log(`Extracted colors for consistency:`, extractedColors);
+                console.log(`[Parallel] Starting section ${dbSectionId}...`);
 
                 const response: Response = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
                     method: 'POST',
@@ -1614,69 +1613,50 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         mode: batchRegenerateGenerationMode,
                         designDefinition: !batchReferenceSection && batchRegenerateStyle === 'design-definition' ? designDefinition : undefined,
                         styleReferenceUrl: styleReferenceUrl || undefined,
-                        extractedColors: extractedColors || undefined,
-                        unifyDesign: !!batchReferenceSection, // デザイン統一モード
-                        // 境界オフセット情報
+                        unifyDesign: !!batchReferenceSection,
                         boundaryOffsetTop: section.boundaryOffsetTop || undefined,
                         boundaryOffsetBottom: section.boundaryOffsetBottom || undefined,
-                        // コピーテキスト
                         copyText: section.config?.text || undefined,
                     })
                 });
 
                 const data = await response.json();
-                console.log(`API Response for section ${sectionId}:`, { ok: response.ok, data });
+
+                // 進捗更新
+                completedCount++;
+                setBatchRegenerateProgress({ current: completedCount, total: sectionIds.length });
+
+                // ローディング状態を解除
+                setRegeneratingSectionIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(sectionId);
+                    return next;
+                });
 
                 if (response.ok) {
-                    console.log(`✅ Section ${sectionId} regenerated successfully`);
-                    // 現在の画像を履歴に追加（元に戻す機能用）
+                    console.log(`✅ [Parallel] Section ${dbSectionId} completed`);
+
+                    // 履歴に追加
                     if (section.imageId && section.image) {
                         setEditHistory(prev => ({
                             ...prev,
                             [sectionId]: [
                                 { imageId: section.imageId, image: section.image, timestamp: Date.now() },
                                 ...(prev[sectionId] || [])
-                            ].slice(0, 10) // 最大10件保持
+                            ].slice(0, 10)
                         }));
                     }
 
+                    // セクション更新
                     setSections(prev => prev.map(s =>
                         s.id === sectionId
                             ? { ...s, imageId: data.newImageId, image: data.media }
                             : s
                     ));
-                    successCount++;
 
-                    // 最初のセクションが成功したら、その画像からカラーを抽出して後続に使用
-                    const generatedImageUrl = data.media?.filePath || data.newImageUrl;
-                    if (i === 0 && !extractedColors && generatedImageUrl && sectionIds.length > 1) {
-                        console.log('Extracting colors from first generated section for consistency...');
-                        try {
-                            const colorResponse = await fetch('/api/analyze-colors', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ imageUrl: generatedImageUrl })
-                            });
-                            if (colorResponse.ok) {
-                                const colorData = await colorResponse.json();
-                                extractedColors = colorData.colors;
-                                console.log('✅ Extracted colors for subsequent sections:', extractedColors);
-                                toast.success('カラーを抽出しました。後続セクションに適用します。');
-                            }
-                        } catch (colorError) {
-                            console.warn('Failed to extract colors, continuing without:', colorError);
-                        }
-                    }
-
-                    // モバイル画像も同時に再生成（オプションがONで、モバイル画像がある場合）
+                    // モバイル画像も並列で再生成（オプションがONの場合）
                     if (includeMobileInBatch && section.mobileImage?.filePath) {
-                        console.log(`Also regenerating mobile image for section ${sectionId}...`);
-
-                        // 生成したばかりのデスクトップ画像をモバイルの参照として使用
-                        // これによりデスクトップとモバイルの色・スタイルが一致する
-                        const desktopImageForMobileRef = generatedImageUrl;
-                        console.log(`Using desktop image as reference for mobile:`, desktopImageForMobileRef);
-
+                        const generatedImageUrl = data.media?.filePath || data.newImageUrl;
                         try {
                             const mobileResponse = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
                                 method: 'POST',
@@ -1687,12 +1667,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     customPrompt: batchRegeneratePrompt || undefined,
                                     mode: batchRegenerateGenerationMode,
                                     designDefinition: !batchReferenceSection && batchRegenerateStyle === 'design-definition' ? designDefinition : undefined,
-                                    // モバイル用の参照画像として、同じセクションのデスクトップ画像を優先使用
-                                    styleReferenceUrl: desktopImageForMobileRef || styleReferenceUrl || undefined,
-                                    extractedColors: extractedColors || undefined,
+                                    styleReferenceUrl: generatedImageUrl || styleReferenceUrl || undefined,
                                     targetImage: 'mobile',
-                                    unifyDesign: true, // モバイルは常にデスクトップに合わせる
-                                    // 境界オフセット情報
+                                    unifyDesign: true,
                                     boundaryOffsetTop: section.boundaryOffsetTop || undefined,
                                     boundaryOffsetBottom: section.boundaryOffsetBottom || undefined,
                                 })
@@ -1704,30 +1681,39 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         ? { ...s, mobileImageId: mobileData.newImageId, mobileImage: mobileData.media }
                                         : s
                                 ));
-                                console.log(`✅ Mobile image regenerated for section ${sectionId}`);
-                            } else {
-                                console.warn(`Mobile regenerate failed for section ${sectionId}:`, mobileData.error);
                             }
-                        } catch (mobileError: any) {
-                            console.warn(`Mobile regenerate error for section ${sectionId}:`, mobileError.message);
+                        } catch (mobileError) {
+                            console.warn(`Mobile regenerate error for section ${sectionId}`);
                         }
                     }
+
+                    return { sectionId, success: true, data };
                 } else {
-                    console.error(`Section ${sectionId} API error:`, data.error || 'Unknown error');
-                    console.error(`Section ${sectionId} API error details:`, data.details);
-                    toast.error(`セクション ${i + 1}: ${data.error || '再生成失敗'}`);
+                    console.error(`❌ [Parallel] Section ${dbSectionId} failed:`, data.error);
+                    return { sectionId, success: false, error: data.error };
                 }
             } catch (error: any) {
-                console.error(`Section ${sectionId} regenerate failed:`, error);
-                toast.error(`セクション ${i + 1}: ${error.message || '通信エラー'}`);
+                completedCount++;
+                setBatchRegenerateProgress({ current: completedCount, total: sectionIds.length });
+                setRegeneratingSectionIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(sectionId);
+                    return next;
+                });
+                console.error(`❌ [Parallel] Section ${sectionId} error:`, error.message);
+                return { sectionId, success: false, error: error.message };
             }
+        });
 
-            // 完了したセクションをローディングから外す
-            setRegeneratingSectionIds(prev => {
-                const next = new Set(prev);
-                next.delete(sectionId);
-                return next;
-            });
+        // 全ての並列処理を待機
+        const results = await Promise.all(regeneratePromises);
+        successCount = results.filter(r => r.success).length;
+        const failedCount = results.filter(r => !r.success).length;
+
+        console.log(`=== Parallel Batch Complete: ${successCount} success, ${failedCount} failed ===`);
+
+        if (failedCount > 0) {
+            toast.error(`${failedCount}件のセクションで再生成に失敗しました`);
         }
 
         setIsBatchRegenerating(false);
@@ -1993,284 +1979,234 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     items={sections.map(s => s.id)}
                                     strategy={verticalListSortingStrategy}
                                 >
-                            {sections.map((section, sectionIndex) => (
-                                <SortableSectionWrapper key={section.id} id={section.id}>
-                                    {/* ドロップゾーンインジケーター（セクション上部） */}
-                                    {isDraggingAsset && sectionIndex === 0 && (
-                                        <div
-                                            className={clsx(
-                                                "h-16 border-2 border-dashed rounded-lg mx-2 transition-all flex items-center justify-center",
-                                                dragOverSectionId === `before-${section.id}`
-                                                    ? "border-violet-500 bg-violet-50"
-                                                    : "border-gray-300 bg-gray-50"
-                                            )}
-                                            onDragOver={(e) => {
-                                                e.preventDefault();
-                                                setDragOverSectionId(`before-${section.id}`);
-                                            }}
-                                            onDragLeave={() => setDragOverSectionId(null)}
-                                            onDrop={async (e) => {
-                                                e.preventDefault();
-                                                // 先頭に追加
-                                                const assetData = e.dataTransfer.getData('application/json');
-                                                if (!assetData) return;
-                                                const asset = JSON.parse(assetData);
-                                                setIsProcessingAssetDrop(true);
-                                                try {
-                                                    const res = await fetch('/api/assets/download', {
-                                                        method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({ url: asset.downloadUrl, type: asset.type, title: asset.title })
-                                                    });
-                                                    const data = await res.json();
-                                                    if (data.url) {
-                                                        const newSection = {
-                                                            id: `temp-${Date.now()}`,
-                                                            role: 'asset',
-                                                            order: 0,
-                                                            imageId: null,
-                                                            image: { filePath: data.url },
-                                                            config: { assetType: asset.type, assetTitle: asset.title }
-                                                        };
-                                                        setSections(prev => [newSection, ...prev].map((s, i) => ({ ...s, order: i })));
-                                                        toast.success('素材を先頭に追加しました');
-                                                    }
-                                                } catch (error) {
-                                                    toast.error('素材の追加に失敗しました');
-                                                } finally {
-                                                    setIsProcessingAssetDrop(false);
-                                                    setDragOverSectionId(null);
-                                                    setIsDraggingAsset(false);
-                                                }
-                                            }}
-                                        >
-                                            <span className="text-xs text-gray-500">ここにドロップして先頭に追加</span>
-                                        </div>
-                                    )}
-                                    <div
-                                        id={`section-${section.id}`}
-                                        data-section-container
-                                        className={clsx(
-                                            "relative group cursor-pointer",
-                                            batchRegenerateMode && batchReferenceSection === section.id && "ring-4 ring-blue-500",
-                                            batchRegenerateMode && selectedSectionsForRegenerate.has(section.id) && batchReferenceSection !== section.id && "ring-4 ring-orange-500",
-                                            backgroundUnifyMode && selectedSectionsForBackgroundUnify.has(section.id) && "ring-4 ring-amber-500",
-                                            sectionDeleteMode && selectedSectionsForDelete.has(section.id) && "ring-4 ring-red-500",
-                                            isDraggingAsset && dragOverSectionId === `overlay-${section.id}` && "ring-4 ring-cyan-500 bg-cyan-500/10"
-                                        )}
-                                        onDragOver={(e) => {
-                                            if (isDraggingAsset && section.image?.filePath) {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                setDragOverSectionId(`overlay-${section.id}`);
-                                            }
-                                        }}
-                                        onDragLeave={(e) => {
-                                            if (dragOverSectionId === `overlay-${section.id}`) {
-                                                setDragOverSectionId(null);
-                                            }
-                                        }}
-                                        onDrop={async (e) => {
-                                            if (!isDraggingAsset || !section.image?.filePath) return;
-                                            e.preventDefault();
-                                            e.stopPropagation();
-
-                                            try {
-                                                const assetData = e.dataTransfer.getData('application/json');
-                                                if (!assetData) return;
-
-                                                const asset = JSON.parse(assetData);
-
-                                                // ドロップ位置を計算（セクション内での相対位置）
-                                                const rect = e.currentTarget.getBoundingClientRect();
-                                                const x = ((e.clientX - rect.left) / rect.width) * 100;
-                                                const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-                                                // オーバーレイとして追加
-                                                const newOverlay = {
-                                                    id: `overlay-${Date.now()}`,
-                                                    type: 'button' as const,
-                                                    x: Math.max(5, Math.min(95, x)),
-                                                    y: Math.max(5, Math.min(95, y)),
-                                                    width: 30,
-                                                    height: 48,
-                                                    content: asset.name || 'ボタン',
-                                                    style: {
-                                                        backgroundColor: '#6366f1',
-                                                        textColor: '#ffffff',
-                                                        borderRadius: 8,
-                                                        fontSize: 16,
-                                                        fontWeight: 'bold',
-                                                        padding: '12px 24px',
-                                                    },
-                                                };
-
-                                                // セクションにオーバーレイを追加
-                                                setSections(prev => prev.map(s =>
-                                                    s.id === section.id
-                                                        ? {
-                                                            ...s,
-                                                            config: {
-                                                                ...(s.config || {}),
-                                                                overlays: [...(s.config?.overlays || []), newOverlay]
-                                                            }
-                                                        }
-                                                        : s
-                                                ));
-
-                                                toast.success(`「${asset.name}」をオーバーレイとして追加しました`);
-                                            } catch (error) {
-                                                console.error('Overlay drop error:', error);
-                                            } finally {
-                                                setDragOverSectionId(null);
-                                                setIsDraggingAsset(false);
-                                            }
-                                        }}
-                                        onClick={() => {
-                                            if (sectionDeleteMode) {
-                                                // セクション削除モード: 選択/解除
-                                                setSelectedSectionsForDelete(prev => {
-                                                    const next = new Set(prev);
-                                                    if (next.has(section.id)) {
-                                                        next.delete(section.id);
-                                                    } else {
-                                                        next.add(section.id);
-                                                    }
-                                                    return next;
-                                                });
-                                            } else if (batchRegenerateMode && section.image?.filePath) {
-                                                // 参照セクションをクリックした場合は解除
-                                                if (batchReferenceSection === section.id) {
-                                                    setBatchReferenceSection(null);
-                                                    return;
-                                                }
-                                                // 一括再生成モード: 選択/解除（参照セクション以外）
-                                                setSelectedSectionsForRegenerate(prev => {
-                                                    const next = new Set(prev);
-                                                    if (next.has(section.id)) {
-                                                        next.delete(section.id);
-                                                    } else {
-                                                        next.add(section.id);
-                                                    }
-                                                    return next;
-                                                });
-                                            } else if (backgroundUnifyMode && section.image?.filePath) {
-                                                // 背景色統一モード: 選択/解除
-                                                setSelectedSectionsForBackgroundUnify(prev => {
-                                                    const next = new Set(prev);
-                                                    if (next.has(section.id)) {
-                                                        next.delete(section.id);
-                                                    } else {
-                                                        next.add(section.id);
-                                                    }
-                                                    return next;
-                                                });
-                                            } else if (section.image?.filePath) {
-                                                handleOpenInpaint(
-                                                    section.id,
-                                                    section.image.filePath,
-                                                    section.mobileImage?.filePath
-                                                );
-                                            }
-                                        }}
-                                    >
-                                        {(viewMode === 'desktop' ? section.image?.filePath : section.mobileImage?.filePath || section.image?.filePath) ? (
-                                            <>
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img
-                                                    src={viewMode === 'mobile' && section.mobileImage?.filePath
-                                                        ? section.mobileImage.filePath
-                                                        : section.image?.filePath}
-                                                    alt={section.role}
+                                    {sections.map((section, sectionIndex) => (
+                                        <SortableSectionWrapper key={section.id} id={section.id}>
+                                            {/* ドロップゾーンインジケーター（セクション上部） */}
+                                            {isDraggingAsset && sectionIndex === 0 && (
+                                                <div
                                                     className={clsx(
-                                                        "block h-auto",
-                                                        viewMode === 'mobile' ? "w-full max-w-[390px] mx-auto" : "w-full"
+                                                        "h-16 border-2 border-dashed rounded-lg mx-2 transition-all flex items-center justify-center",
+                                                        dragOverSectionId === `before-${section.id}`
+                                                            ? "border-violet-500 bg-violet-50"
+                                                            : "border-gray-300 bg-gray-50"
                                                     )}
-                                                />
-                                                {/* モバイル画像がない場合の警告 */}
-                                                {viewMode === 'mobile' && !section.mobileImage?.filePath && section.image?.filePath && (
-                                                    <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-bold">
-                                                        モバイル画像なし
-                                                    </div>
+                                                    onDragOver={(e) => {
+                                                        e.preventDefault();
+                                                        setDragOverSectionId(`before-${section.id}`);
+                                                    }}
+                                                    onDragLeave={() => setDragOverSectionId(null)}
+                                                    onDrop={async (e) => {
+                                                        e.preventDefault();
+                                                        // 先頭に追加
+                                                        const assetData = e.dataTransfer.getData('application/json');
+                                                        if (!assetData) return;
+                                                        const asset = JSON.parse(assetData);
+                                                        setIsProcessingAssetDrop(true);
+                                                        try {
+                                                            const res = await fetch('/api/assets/download', {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({ url: asset.downloadUrl, type: asset.type, title: asset.title })
+                                                            });
+                                                            const data = await res.json();
+                                                            if (data.url) {
+                                                                const newSection = {
+                                                                    id: `temp-${Date.now()}`,
+                                                                    role: 'asset',
+                                                                    order: 0,
+                                                                    imageId: null,
+                                                                    image: { filePath: data.url },
+                                                                    config: { assetType: asset.type, assetTitle: asset.title }
+                                                                };
+                                                                setSections(prev => [newSection, ...prev].map((s, i) => ({ ...s, order: i })));
+                                                                toast.success('素材を先頭に追加しました');
+                                                            }
+                                                        } catch (error) {
+                                                            toast.error('素材の追加に失敗しました');
+                                                        } finally {
+                                                            setIsProcessingAssetDrop(false);
+                                                            setDragOverSectionId(null);
+                                                            setIsDraggingAsset(false);
+                                                        }
+                                                    }}
+                                                >
+                                                    <span className="text-xs text-gray-500">ここにドロップして先頭に追加</span>
+                                                </div>
+                                            )}
+                                            <div
+                                                id={`section-${section.id}`}
+                                                data-section-container
+                                                className={clsx(
+                                                    "relative group cursor-pointer",
+                                                    batchRegenerateMode && batchReferenceSection === section.id && "ring-4 ring-blue-500",
+                                                    batchRegenerateMode && selectedSectionsForRegenerate.has(section.id) && batchReferenceSection !== section.id && "ring-4 ring-orange-500",
+                                                    backgroundUnifyMode && selectedSectionsForBackgroundUnify.has(section.id) && "ring-4 ring-amber-500",
+                                                    sectionDeleteMode && selectedSectionsForDelete.has(section.id) && "ring-4 ring-red-500",
+                                                    isDraggingAsset && dragOverSectionId === `overlay-${section.id}` && "ring-4 ring-cyan-500 bg-cyan-500/10"
                                                 )}
-                                                {/* 動画がある場合のプレビュー */}
-                                                {(() => {
-                                                    const config = section.config ? (typeof section.config === 'string' ? JSON.parse(section.config) : section.config) : {};
-                                                    if (!config.video) return null;
+                                                onDragOver={(e) => {
+                                                    if (isDraggingAsset && section.image?.filePath) {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setDragOverSectionId(`overlay-${section.id}`);
+                                                    }
+                                                }}
+                                                onDragLeave={(e) => {
+                                                    if (dragOverSectionId === `overlay-${section.id}`) {
+                                                        setDragOverSectionId(null);
+                                                    }
+                                                }}
+                                                onDrop={async (e) => {
+                                                    if (!isDraggingAsset || !section.image?.filePath) return;
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
 
-                                                    const video = config.video;
-                                                    const isYouTube = video.type === 'youtube' || video.url?.includes('youtube.com');
-                                                    const isPartial = video.displayMode === 'partial';
+                                                    try {
+                                                        const assetData = e.dataTransfer.getData('application/json');
+                                                        if (!assetData) return;
 
-                                                    // 部分配置の場合
-                                                    if (isPartial) {
-                                                        const handleResize = (e: React.MouseEvent, corner: string) => {
-                                                            e.stopPropagation();
-                                                            e.preventDefault();
-                                                            const parentRect = (e.currentTarget as HTMLElement).closest('[data-section-container]')?.getBoundingClientRect();
-                                                            if (!parentRect) return;
-                                                            const startX = e.clientX;
-                                                            const startWidth = video.width || 40;
+                                                        const asset = JSON.parse(assetData);
 
-                                                            const handleMouseMove = (moveEvent: MouseEvent) => {
-                                                                const deltaX = ((moveEvent.clientX - startX) / parentRect.width) * 100;
-                                                                let newWidth = startWidth;
-                                                                if (corner.includes('right')) {
-                                                                    newWidth = startWidth + deltaX * 2;
-                                                                } else {
-                                                                    newWidth = startWidth - deltaX * 2;
-                                                                }
-                                                                newWidth = Math.max(15, Math.min(80, newWidth));
+                                                        // ドロップ位置を計算（セクション内での相対位置）
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                                        const y = ((e.clientY - rect.top) / rect.height) * 100;
 
-                                                                setSections(prev => prev.map(s => {
-                                                                    if (s.id === section.id) {
-                                                                        const currentConfig = s.config ? (typeof s.config === 'string' ? JSON.parse(s.config) : s.config) : {};
-                                                                        return {
-                                                                            ...s,
-                                                                            config: JSON.stringify({
-                                                                                ...currentConfig,
-                                                                                video: { ...currentConfig.video, width: newWidth }
-                                                                            })
-                                                                        };
-                                                                    }
-                                                                    return s;
-                                                                }));
-                                                            };
-
-                                                            const handleMouseUp = () => {
-                                                                document.removeEventListener('mousemove', handleMouseMove);
-                                                                document.removeEventListener('mouseup', handleMouseUp);
-                                                            };
-
-                                                            document.addEventListener('mousemove', handleMouseMove);
-                                                            document.addEventListener('mouseup', handleMouseUp);
+                                                        // オーバーレイとして追加
+                                                        const newOverlay = {
+                                                            id: `overlay-${Date.now()}`,
+                                                            type: 'button' as const,
+                                                            x: Math.max(5, Math.min(95, x)),
+                                                            y: Math.max(5, Math.min(95, y)),
+                                                            width: 30,
+                                                            height: 48,
+                                                            content: asset.name || 'ボタン',
+                                                            style: {
+                                                                backgroundColor: '#6366f1',
+                                                                textColor: '#ffffff',
+                                                                borderRadius: 8,
+                                                                fontSize: 16,
+                                                                fontWeight: 'bold',
+                                                                padding: '12px 24px',
+                                                            },
                                                         };
 
-                                                        return (
-                                                            <div
-                                                                className="absolute z-30 cursor-move group"
-                                                                style={{
-                                                                    left: `${video.x || 50}%`,
-                                                                    top: `${video.y || 50}%`,
-                                                                    width: `${video.width || 40}%`,
-                                                                    transform: 'translate(-50%, -50%)',
-                                                                }}
-                                                                onMouseDown={(e) => {
-                                                                    if ((e.target as HTMLElement).closest('.resize-handle')) return;
+                                                        // セクションにオーバーレイを追加
+                                                        setSections(prev => prev.map(s =>
+                                                            s.id === section.id
+                                                                ? {
+                                                                    ...s,
+                                                                    config: {
+                                                                        ...(s.config || {}),
+                                                                        overlays: [...(s.config?.overlays || []), newOverlay]
+                                                                    }
+                                                                }
+                                                                : s
+                                                        ));
+
+                                                        toast.success(`「${asset.name}」をオーバーレイとして追加しました`);
+                                                    } catch (error) {
+                                                        console.error('Overlay drop error:', error);
+                                                    } finally {
+                                                        setDragOverSectionId(null);
+                                                        setIsDraggingAsset(false);
+                                                    }
+                                                }}
+                                                onClick={() => {
+                                                    if (sectionDeleteMode) {
+                                                        // セクション削除モード: 選択/解除
+                                                        setSelectedSectionsForDelete(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(section.id)) {
+                                                                next.delete(section.id);
+                                                            } else {
+                                                                next.add(section.id);
+                                                            }
+                                                            return next;
+                                                        });
+                                                    } else if (batchRegenerateMode && section.image?.filePath) {
+                                                        // 参照セクションをクリックした場合は解除
+                                                        if (batchReferenceSection === section.id) {
+                                                            setBatchReferenceSection(null);
+                                                            return;
+                                                        }
+                                                        // 一括再生成モード: 選択/解除（参照セクション以外）
+                                                        setSelectedSectionsForRegenerate(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(section.id)) {
+                                                                next.delete(section.id);
+                                                            } else {
+                                                                next.add(section.id);
+                                                            }
+                                                            return next;
+                                                        });
+                                                    } else if (backgroundUnifyMode && section.image?.filePath) {
+                                                        // 背景色統一モード: 選択/解除
+                                                        setSelectedSectionsForBackgroundUnify(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(section.id)) {
+                                                                next.delete(section.id);
+                                                            } else {
+                                                                next.add(section.id);
+                                                            }
+                                                            return next;
+                                                        });
+                                                    } else if (section.image?.filePath) {
+                                                        handleOpenInpaint(
+                                                            section.id,
+                                                            section.image.filePath,
+                                                            section.mobileImage?.filePath
+                                                        );
+                                                    }
+                                                }}
+                                            >
+                                                {(viewMode === 'desktop' ? section.image?.filePath : section.mobileImage?.filePath || section.image?.filePath) ? (
+                                                    <>
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={viewMode === 'mobile' && section.mobileImage?.filePath
+                                                                ? section.mobileImage.filePath
+                                                                : section.image?.filePath}
+                                                            alt={section.role}
+                                                            className={clsx(
+                                                                "block h-auto",
+                                                                viewMode === 'mobile' ? "w-full max-w-[390px] mx-auto" : "w-full"
+                                                            )}
+                                                        />
+                                                        {/* モバイル画像がない場合の警告 */}
+                                                        {viewMode === 'mobile' && !section.mobileImage?.filePath && section.image?.filePath && (
+                                                            <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                                                                モバイル画像なし
+                                                            </div>
+                                                        )}
+                                                        {/* 動画がある場合のプレビュー */}
+                                                        {(() => {
+                                                            const config = section.config ? (typeof section.config === 'string' ? JSON.parse(section.config) : section.config) : {};
+                                                            if (!config.video) return null;
+
+                                                            const video = config.video;
+                                                            const isYouTube = video.type === 'youtube' || video.url?.includes('youtube.com');
+                                                            const isPartial = video.displayMode === 'partial';
+
+                                                            // 部分配置の場合
+                                                            if (isPartial) {
+                                                                const handleResize = (e: React.MouseEvent, corner: string) => {
                                                                     e.stopPropagation();
                                                                     e.preventDefault();
-                                                                    const rect = e.currentTarget.parentElement?.getBoundingClientRect();
-                                                                    if (!rect) return;
+                                                                    const parentRect = (e.currentTarget as HTMLElement).closest('[data-section-container]')?.getBoundingClientRect();
+                                                                    if (!parentRect) return;
                                                                     const startX = e.clientX;
-                                                                    const startY = e.clientY;
-                                                                    const startVideoX = video.x || 50;
-                                                                    const startVideoY = video.y || 50;
+                                                                    const startWidth = video.width || 40;
 
                                                                     const handleMouseMove = (moveEvent: MouseEvent) => {
-                                                                        const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
-                                                                        const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
-                                                                        const newX = Math.max(10, Math.min(90, startVideoX + deltaX));
-                                                                        const newY = Math.max(10, Math.min(90, startVideoY + deltaY));
+                                                                        const deltaX = ((moveEvent.clientX - startX) / parentRect.width) * 100;
+                                                                        let newWidth = startWidth;
+                                                                        if (corner.includes('right')) {
+                                                                            newWidth = startWidth + deltaX * 2;
+                                                                        } else {
+                                                                            newWidth = startWidth - deltaX * 2;
+                                                                        }
+                                                                        newWidth = Math.max(15, Math.min(80, newWidth));
 
                                                                         setSections(prev => prev.map(s => {
                                                                             if (s.id === section.id) {
@@ -2279,7 +2215,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                                     ...s,
                                                                                     config: JSON.stringify({
                                                                                         ...currentConfig,
-                                                                                        video: { ...currentConfig.video, x: newX, y: newY }
+                                                                                        video: { ...currentConfig.video, width: newWidth }
                                                                                     })
                                                                                 };
                                                                             }
@@ -2294,42 +2230,134 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                                                                     document.addEventListener('mousemove', handleMouseMove);
                                                                     document.addEventListener('mouseup', handleMouseUp);
-                                                                }}
-                                                            >
-                                                                <div className="relative rounded-lg overflow-hidden shadow-2xl ring-2 ring-indigo-500/50">
+                                                                };
+
+                                                                return (
+                                                                    <div
+                                                                        className="absolute z-30 cursor-move group"
+                                                                        style={{
+                                                                            left: `${video.x || 50}%`,
+                                                                            top: `${video.y || 50}%`,
+                                                                            width: `${video.width || 40}%`,
+                                                                            transform: 'translate(-50%, -50%)',
+                                                                        }}
+                                                                        onMouseDown={(e) => {
+                                                                            if ((e.target as HTMLElement).closest('.resize-handle')) return;
+                                                                            e.stopPropagation();
+                                                                            e.preventDefault();
+                                                                            const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+                                                                            if (!rect) return;
+                                                                            const startX = e.clientX;
+                                                                            const startY = e.clientY;
+                                                                            const startVideoX = video.x || 50;
+                                                                            const startVideoY = video.y || 50;
+
+                                                                            const handleMouseMove = (moveEvent: MouseEvent) => {
+                                                                                const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
+                                                                                const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
+                                                                                const newX = Math.max(10, Math.min(90, startVideoX + deltaX));
+                                                                                const newY = Math.max(10, Math.min(90, startVideoY + deltaY));
+
+                                                                                setSections(prev => prev.map(s => {
+                                                                                    if (s.id === section.id) {
+                                                                                        const currentConfig = s.config ? (typeof s.config === 'string' ? JSON.parse(s.config) : s.config) : {};
+                                                                                        return {
+                                                                                            ...s,
+                                                                                            config: JSON.stringify({
+                                                                                                ...currentConfig,
+                                                                                                video: { ...currentConfig.video, x: newX, y: newY }
+                                                                                            })
+                                                                                        };
+                                                                                    }
+                                                                                    return s;
+                                                                                }));
+                                                                            };
+
+                                                                            const handleMouseUp = () => {
+                                                                                document.removeEventListener('mousemove', handleMouseMove);
+                                                                                document.removeEventListener('mouseup', handleMouseUp);
+                                                                            };
+
+                                                                            document.addEventListener('mousemove', handleMouseMove);
+                                                                            document.addEventListener('mouseup', handleMouseUp);
+                                                                        }}
+                                                                    >
+                                                                        <div className="relative rounded-lg overflow-hidden shadow-2xl ring-2 ring-indigo-500/50">
+                                                                            {isYouTube ? (
+                                                                                <iframe
+                                                                                    src={`${video.url}?autoplay=0`}
+                                                                                    className="w-full aspect-video pointer-events-none"
+                                                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                                                />
+                                                                            ) : (
+                                                                                <video
+                                                                                    src={video.url}
+                                                                                    controls
+                                                                                    className="w-full"
+                                                                                    autoPlay={video.autoplay}
+                                                                                    loop={video.loop}
+                                                                                    muted={video.muted}
+                                                                                />
+                                                                            )}
+                                                                            {/* リサイズハンドル */}
+                                                                            <div
+                                                                                className="resize-handle absolute -left-1 -top-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100"
+                                                                                onMouseDown={(e) => handleResize(e, 'top-left')}
+                                                                            />
+                                                                            <div
+                                                                                className="resize-handle absolute -right-1 -top-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-ne-resize opacity-0 group-hover:opacity-100"
+                                                                                onMouseDown={(e) => handleResize(e, 'top-right')}
+                                                                            />
+                                                                            <div
+                                                                                className="resize-handle absolute -left-1 -bottom-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-sw-resize opacity-0 group-hover:opacity-100"
+                                                                                onMouseDown={(e) => handleResize(e, 'bottom-left')}
+                                                                            />
+                                                                            <div
+                                                                                className="resize-handle absolute -right-1 -bottom-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-se-resize opacity-0 group-hover:opacity-100"
+                                                                                onMouseDown={(e) => handleResize(e, 'bottom-right')}
+                                                                            />
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setSections(prev => prev.map(s => {
+                                                                                        if (s.id === section.id) {
+                                                                                            const currentConfig = s.config ? (typeof s.config === 'string' ? JSON.parse(s.config) : s.config) : {};
+                                                                                            delete currentConfig.video;
+                                                                                            return { ...s, config: JSON.stringify(currentConfig) };
+                                                                                        }
+                                                                                        return s;
+                                                                                    }));
+                                                                                    toast.success('動画を削除しました');
+                                                                                }}
+                                                                                className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                                            >
+                                                                                <X className="h-3 w-3" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            // 全体表示・背景の場合
+                                                            return (
+                                                                <div className="absolute inset-0 z-30 bg-black/60 flex items-center justify-center group">
                                                                     {isYouTube ? (
                                                                         <iframe
                                                                             src={`${video.url}?autoplay=0`}
-                                                                            className="w-full aspect-video pointer-events-none"
+                                                                            className="w-full h-full"
                                                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                                            allowFullScreen
                                                                         />
                                                                     ) : (
                                                                         <video
                                                                             src={video.url}
                                                                             controls
-                                                                            className="w-full"
+                                                                            className="max-w-full max-h-full"
                                                                             autoPlay={video.autoplay}
                                                                             loop={video.loop}
                                                                             muted={video.muted}
                                                                         />
                                                                     )}
-                                                                    {/* リサイズハンドル */}
-                                                                    <div
-                                                                        className="resize-handle absolute -left-1 -top-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100"
-                                                                        onMouseDown={(e) => handleResize(e, 'top-left')}
-                                                                    />
-                                                                    <div
-                                                                        className="resize-handle absolute -right-1 -top-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-ne-resize opacity-0 group-hover:opacity-100"
-                                                                        onMouseDown={(e) => handleResize(e, 'top-right')}
-                                                                    />
-                                                                    <div
-                                                                        className="resize-handle absolute -left-1 -bottom-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-sw-resize opacity-0 group-hover:opacity-100"
-                                                                        onMouseDown={(e) => handleResize(e, 'bottom-left')}
-                                                                    />
-                                                                    <div
-                                                                        className="resize-handle absolute -right-1 -bottom-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-se-resize opacity-0 group-hover:opacity-100"
-                                                                        onMouseDown={(e) => handleResize(e, 'bottom-right')}
-                                                                    />
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
@@ -2343,494 +2371,452 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                             }));
                                                                             toast.success('動画を削除しました');
                                                                         }}
-                                                                        className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                                                                    >
+                                                                        <X className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                        {/* オーバーレイ要素の表示（インタラクティブ） */}
+                                                        {section.config?.overlays?.map((overlay: any) => (
+                                                            <div
+                                                                key={overlay.id}
+                                                                className={clsx(
+                                                                    "absolute cursor-move z-40 transition-all",
+                                                                    selectedOverlayId === overlay.id && selectedOverlaySectionId === String(section.id) && "ring-2 ring-cyan-500 ring-offset-2"
+                                                                )}
+                                                                style={{
+                                                                    left: `${overlay.x}%`,
+                                                                    top: `${overlay.y}%`,
+                                                                    transform: 'translate(-50%, -50%)',
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedOverlayId(overlay.id);
+                                                                    setSelectedOverlaySectionId(String(section.id));
+                                                                }}
+                                                                onDoubleClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingOverlayId(overlay.id);
+                                                                }}
+                                                                onMouseDown={(e) => {
+                                                                    if (editingOverlayId === overlay.id) return;
+                                                                    e.stopPropagation();
+                                                                    e.preventDefault();
+                                                                    const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+                                                                    if (!rect) return;
+                                                                    setDraggingOverlayId(overlay.id);
+                                                                    setSelectedOverlaySectionId(String(section.id));
+                                                                    setOverlayDragStart({
+                                                                        x: e.clientX,
+                                                                        y: e.clientY,
+                                                                        overlayX: overlay.x,
+                                                                        overlayY: overlay.y
+                                                                    });
+                                                                }}
+                                                            >
+                                                                {overlay.type === 'button' && (
+                                                                    editingOverlayId === overlay.id ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            autoFocus
+                                                                            value={overlay.content}
+                                                                            onChange={(e) => {
+                                                                                setSections(prev => prev.map(s =>
+                                                                                    s.id === section.id
+                                                                                        ? {
+                                                                                            ...s,
+                                                                                            config: {
+                                                                                                ...s.config,
+                                                                                                overlays: s.config?.overlays?.map((o: any) =>
+                                                                                                    o.id === overlay.id ? { ...o, content: e.target.value } : o
+                                                                                                )
+                                                                                            }
+                                                                                        }
+                                                                                        : s
+                                                                                ));
+                                                                            }}
+                                                                            onBlur={() => setEditingOverlayId(null)}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter') setEditingOverlayId(null);
+                                                                                if (e.key === 'Escape') setEditingOverlayId(null);
+                                                                            }}
+                                                                            className="whitespace-nowrap text-center outline-none"
+                                                                            style={{
+                                                                                backgroundColor: overlay.style?.backgroundColor || '#6366f1',
+                                                                                color: overlay.style?.textColor || '#fff',
+                                                                                borderRadius: `${overlay.style?.borderRadius || 8}px`,
+                                                                                fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                                fontWeight: overlay.style?.fontWeight || 'bold',
+                                                                                padding: overlay.style?.padding || '12px 24px',
+                                                                                boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
+                                                                                minWidth: '80px',
+                                                                            }}
+                                                                        />
+                                                                    ) : (
+                                                                        <div
+                                                                            className="whitespace-nowrap"
+                                                                            style={{
+                                                                                backgroundColor: overlay.style?.backgroundColor || '#6366f1',
+                                                                                color: overlay.style?.textColor || '#fff',
+                                                                                borderRadius: `${overlay.style?.borderRadius || 8}px`,
+                                                                                fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                                fontWeight: overlay.style?.fontWeight || 'bold',
+                                                                                padding: overlay.style?.padding || '12px 24px',
+                                                                                boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
+                                                                            }}
+                                                                        >
+                                                                            {overlay.content}
+                                                                        </div>
+                                                                    )
+                                                                )}
+                                                                {overlay.type === 'text' && (
+                                                                    editingOverlayId === overlay.id ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            autoFocus
+                                                                            value={overlay.content}
+                                                                            onChange={(e) => {
+                                                                                setSections(prev => prev.map(s =>
+                                                                                    s.id === section.id
+                                                                                        ? {
+                                                                                            ...s,
+                                                                                            config: {
+                                                                                                ...s.config,
+                                                                                                overlays: s.config?.overlays?.map((o: any) =>
+                                                                                                    o.id === overlay.id ? { ...o, content: e.target.value } : o
+                                                                                                )
+                                                                                            }
+                                                                                        }
+                                                                                        : s
+                                                                                ));
+                                                                            }}
+                                                                            onBlur={() => setEditingOverlayId(null)}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter') setEditingOverlayId(null);
+                                                                            }}
+                                                                            className="outline-none bg-transparent"
+                                                                            style={{
+                                                                                color: overlay.style?.textColor || '#000',
+                                                                                fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                                fontWeight: overlay.style?.fontWeight || 'normal',
+                                                                            }}
+                                                                        />
+                                                                    ) : (
+                                                                        <div
+                                                                            style={{
+                                                                                color: overlay.style?.textColor || '#000',
+                                                                                fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                                fontWeight: overlay.style?.fontWeight || 'normal',
+                                                                            }}
+                                                                        >
+                                                                            {overlay.content}
+                                                                        </div>
+                                                                    )
+                                                                )}
+                                                                {/* 選択時の削除ボタン */}
+                                                                {selectedOverlayId === overlay.id && selectedOverlaySectionId === String(section.id) && !editingOverlayId && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSections(prev => prev.map(s =>
+                                                                                s.id === section.id
+                                                                                    ? {
+                                                                                        ...s,
+                                                                                        config: {
+                                                                                            ...s.config,
+                                                                                            overlays: s.config?.overlays?.filter((o: any) => o.id !== overlay.id)
+                                                                                        }
+                                                                                    }
+                                                                                    : s
+                                                                            ));
+                                                                            setSelectedOverlayId(null);
+                                                                            toast.success('オーバーレイを削除しました');
+                                                                        }}
+                                                                        className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
                                                                     >
                                                                         <X className="h-3 w-3" />
                                                                     </button>
-                                                                </div>
+                                                                )}
                                                             </div>
-                                                        );
-                                                    }
-
-                                                    // 全体表示・背景の場合
-                                                    return (
-                                                        <div className="absolute inset-0 z-30 bg-black/60 flex items-center justify-center group">
-                                                            {isYouTube ? (
-                                                                <iframe
-                                                                    src={`${video.url}?autoplay=0`}
-                                                                    className="w-full h-full"
-                                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                                    allowFullScreen
-                                                                />
-                                                            ) : (
-                                                                <video
-                                                                    src={video.url}
-                                                                    controls
-                                                                    className="max-w-full max-h-full"
-                                                                    autoPlay={video.autoplay}
-                                                                    loop={video.loop}
-                                                                    muted={video.muted}
-                                                                />
-                                                            )}
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSections(prev => prev.map(s => {
-                                                                        if (s.id === section.id) {
-                                                                            const currentConfig = s.config ? (typeof s.config === 'string' ? JSON.parse(s.config) : s.config) : {};
-                                                                            delete currentConfig.video;
-                                                                            return { ...s, config: JSON.stringify(currentConfig) };
-                                                                        }
-                                                                        return s;
-                                                                    }));
-                                                                    toast.success('動画を削除しました');
-                                                                }}
-                                                                className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
-                                                            >
-                                                                <X className="h-4 w-4" />
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })()}
-                                                {/* オーバーレイ要素の表示（インタラクティブ） */}
-                                                {section.config?.overlays?.map((overlay: any) => (
-                                                    <div
-                                                        key={overlay.id}
-                                                        className={clsx(
-                                                            "absolute cursor-move z-40 transition-all",
-                                                            selectedOverlayId === overlay.id && selectedOverlaySectionId === String(section.id) && "ring-2 ring-cyan-500 ring-offset-2"
+                                                        ))}
+                                                        {/* 一括再生成モード選択インジケーター */}
+                                                        {batchRegenerateMode && (
+                                                            <>
+                                                                {/* 参照セクションバッジ */}
+                                                                {batchReferenceSection === section.id && (
+                                                                    <div className="absolute top-3 left-3 z-20 px-3 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg">
+                                                                        <Palette className="h-3.5 w-3.5" />
+                                                                        参照スタイル
+                                                                    </div>
+                                                                )}
+                                                                {/* 対象セクションバッジ */}
+                                                                {batchReferenceSection !== section.id && (
+                                                                    <div className={clsx(
+                                                                        "absolute top-3 left-3 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                                                                        selectedSectionsForRegenerate.has(section.id)
+                                                                            ? "bg-orange-500 text-white"
+                                                                            : "bg-white/90 text-gray-400 border-2 border-gray-300"
+                                                                    )}>
+                                                                        {selectedSectionsForRegenerate.has(section.id) ? (
+                                                                            <Check className="h-5 w-5" />
+                                                                        ) : (
+                                                                            <span className="text-xs font-bold">{sectionIndex + 1}</span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {/* 参照として設定ボタン（右上） */}
+                                                                {batchReferenceSection !== section.id && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            // 参照セクションに設定し、対象リストから除外
+                                                                            console.log('Setting reference section:', section.id);
+                                                                            setBatchReferenceSection(section.id);
+                                                                            setSelectedSectionsForRegenerate(prev => {
+                                                                                const next = new Set(prev);
+                                                                                next.delete(section.id);
+                                                                                return next;
+                                                                            });
+                                                                        }}
+                                                                        className="absolute top-3 right-3 z-20 px-2 py-1 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold transition-all flex items-center gap-1 shadow-lg"
+                                                                        title="このセクションのスタイルを参照として使用"
+                                                                    >
+                                                                        <Palette className="h-3 w-3" />
+                                                                        参照に設定
+                                                                    </button>
+                                                                )}
+                                                            </>
                                                         )}
-                                                        style={{
-                                                            left: `${overlay.x}%`,
-                                                            top: `${overlay.y}%`,
-                                                            transform: 'translate(-50%, -50%)',
-                                                        }}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedOverlayId(overlay.id);
-                                                            setSelectedOverlaySectionId(String(section.id));
-                                                        }}
-                                                        onDoubleClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditingOverlayId(overlay.id);
-                                                        }}
-                                                        onMouseDown={(e) => {
-                                                            if (editingOverlayId === overlay.id) return;
-                                                            e.stopPropagation();
-                                                            e.preventDefault();
-                                                            const rect = e.currentTarget.parentElement?.getBoundingClientRect();
-                                                            if (!rect) return;
-                                                            setDraggingOverlayId(overlay.id);
-                                                            setSelectedOverlaySectionId(String(section.id));
-                                                            setOverlayDragStart({
-                                                                x: e.clientX,
-                                                                y: e.clientY,
-                                                                overlayX: overlay.x,
-                                                                overlayY: overlay.y
-                                                            });
-                                                        }}
-                                                    >
-                                                        {overlay.type === 'button' && (
-                                                            editingOverlayId === overlay.id ? (
-                                                                <input
-                                                                    type="text"
-                                                                    autoFocus
-                                                                    value={overlay.content}
-                                                                    onChange={(e) => {
-                                                                        setSections(prev => prev.map(s =>
-                                                                            s.id === section.id
-                                                                                ? {
-                                                                                    ...s,
-                                                                                    config: {
-                                                                                        ...s.config,
-                                                                                        overlays: s.config?.overlays?.map((o: any) =>
-                                                                                            o.id === overlay.id ? { ...o, content: e.target.value } : o
-                                                                                        )
-                                                                                    }
-                                                                                }
-                                                                                : s
-                                                                        ));
-                                                                    }}
-                                                                    onBlur={() => setEditingOverlayId(null)}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') setEditingOverlayId(null);
-                                                                        if (e.key === 'Escape') setEditingOverlayId(null);
-                                                                    }}
-                                                                    className="whitespace-nowrap text-center outline-none"
-                                                                    style={{
-                                                                        backgroundColor: overlay.style?.backgroundColor || '#6366f1',
-                                                                        color: overlay.style?.textColor || '#fff',
-                                                                        borderRadius: `${overlay.style?.borderRadius || 8}px`,
-                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
-                                                                        fontWeight: overlay.style?.fontWeight || 'bold',
-                                                                        padding: overlay.style?.padding || '12px 24px',
-                                                                        boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
-                                                                        minWidth: '80px',
-                                                                    }}
-                                                                />
-                                                            ) : (
-                                                                <div
-                                                                    className="whitespace-nowrap"
-                                                                    style={{
-                                                                        backgroundColor: overlay.style?.backgroundColor || '#6366f1',
-                                                                        color: overlay.style?.textColor || '#fff',
-                                                                        borderRadius: `${overlay.style?.borderRadius || 8}px`,
-                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
-                                                                        fontWeight: overlay.style?.fontWeight || 'bold',
-                                                                        padding: overlay.style?.padding || '12px 24px',
-                                                                        boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
-                                                                    }}
-                                                                >
-                                                                    {overlay.content}
-                                                                </div>
-                                                            )
-                                                        )}
-                                                        {overlay.type === 'text' && (
-                                                            editingOverlayId === overlay.id ? (
-                                                                <input
-                                                                    type="text"
-                                                                    autoFocus
-                                                                    value={overlay.content}
-                                                                    onChange={(e) => {
-                                                                        setSections(prev => prev.map(s =>
-                                                                            s.id === section.id
-                                                                                ? {
-                                                                                    ...s,
-                                                                                    config: {
-                                                                                        ...s.config,
-                                                                                        overlays: s.config?.overlays?.map((o: any) =>
-                                                                                            o.id === overlay.id ? { ...o, content: e.target.value } : o
-                                                                                        )
-                                                                                    }
-                                                                                }
-                                                                                : s
-                                                                        ));
-                                                                    }}
-                                                                    onBlur={() => setEditingOverlayId(null)}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') setEditingOverlayId(null);
-                                                                    }}
-                                                                    className="outline-none bg-transparent"
-                                                                    style={{
-                                                                        color: overlay.style?.textColor || '#000',
-                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
-                                                                        fontWeight: overlay.style?.fontWeight || 'normal',
-                                                                    }}
-                                                                />
-                                                            ) : (
-                                                                <div
-                                                                    style={{
-                                                                        color: overlay.style?.textColor || '#000',
-                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
-                                                                        fontWeight: overlay.style?.fontWeight || 'normal',
-                                                                    }}
-                                                                >
-                                                                    {overlay.content}
-                                                                </div>
-                                                            )
-                                                        )}
-                                                        {/* 選択時の削除ボタン */}
-                                                        {selectedOverlayId === overlay.id && selectedOverlaySectionId === String(section.id) && !editingOverlayId && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSections(prev => prev.map(s =>
-                                                                        s.id === section.id
-                                                                            ? {
-                                                                                ...s,
-                                                                                config: {
-                                                                                    ...s.config,
-                                                                                    overlays: s.config?.overlays?.filter((o: any) => o.id !== overlay.id)
-                                                                                }
-                                                                            }
-                                                                            : s
-                                                                    ));
-                                                                    setSelectedOverlayId(null);
-                                                                    toast.success('オーバーレイを削除しました');
-                                                                }}
-                                                                className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
-                                                            >
-                                                                <X className="h-3 w-3" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                                {/* 一括再生成モード選択インジケーター */}
-                                                {batchRegenerateMode && (
-                                                    <>
-                                                        {/* 参照セクションバッジ */}
-                                                        {batchReferenceSection === section.id && (
-                                                            <div className="absolute top-3 left-3 z-20 px-3 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg">
-                                                                <Palette className="h-3.5 w-3.5" />
-                                                                参照スタイル
-                                                            </div>
-                                                        )}
-                                                        {/* 対象セクションバッジ */}
-                                                        {batchReferenceSection !== section.id && (
+                                                        {/* 背景色統一モード選択インジケーター */}
+                                                        {backgroundUnifyMode && (
                                                             <div className={clsx(
                                                                 "absolute top-3 left-3 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                                                                selectedSectionsForRegenerate.has(section.id)
-                                                                    ? "bg-orange-500 text-white"
+                                                                selectedSectionsForBackgroundUnify.has(section.id)
+                                                                    ? "bg-amber-500 text-white"
                                                                     : "bg-white/90 text-gray-400 border-2 border-gray-300"
                                                             )}>
-                                                                {selectedSectionsForRegenerate.has(section.id) ? (
+                                                                {selectedSectionsForBackgroundUnify.has(section.id) ? (
                                                                     <Check className="h-5 w-5" />
                                                                 ) : (
                                                                     <span className="text-xs font-bold">{sectionIndex + 1}</span>
                                                                 )}
                                                             </div>
                                                         )}
-                                                        {/* 参照として設定ボタン（右上） */}
-                                                        {batchReferenceSection !== section.id && (
+                                                        {/* アセットドラッグ中のオーバーレイ追加インジケーター */}
+                                                        {isDraggingAsset && dragOverSectionId === `overlay-${section.id}` && (
+                                                            <div className="absolute inset-0 z-30 bg-cyan-500/30 flex items-center justify-center pointer-events-none">
+                                                                <div className="bg-cyan-600 text-white px-6 py-3 rounded-xl shadow-xl font-bold text-lg flex items-center gap-2">
+                                                                    <Layers className="h-5 w-5" />
+                                                                    ここにドロップしてオーバーレイ追加
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {/* セクション削除モード選択インジケーター */}
+                                                        {sectionDeleteMode && (
+                                                            <div className={clsx(
+                                                                "absolute top-3 left-3 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                                                                selectedSectionsForDelete.has(section.id)
+                                                                    ? "bg-red-500 text-white"
+                                                                    : "bg-white/90 text-gray-400 border-2 border-gray-300"
+                                                            )}>
+                                                                {selectedSectionsForDelete.has(section.id) ? (
+                                                                    <Check className="h-5 w-5" />
+                                                                ) : (
+                                                                    <span className="text-xs font-bold">{sectionIndex + 1}</span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {/* ホバーオーバーレイ */}
+                                                        <div className={clsx(
+                                                            "absolute inset-0 transition-all duration-200 flex items-center justify-center",
+                                                            sectionDeleteMode
+                                                                ? selectedSectionsForDelete.has(section.id) ? "bg-red-500/20" : "bg-black/0 hover:bg-red-500/10"
+                                                                : batchRegenerateMode
+                                                                    ? selectedSectionsForRegenerate.has(section.id) ? "bg-orange-500/20" : "bg-black/0 hover:bg-orange-500/10"
+                                                                    : backgroundUnifyMode
+                                                                        ? selectedSectionsForBackgroundUnify.has(section.id) ? "bg-amber-500/20" : "bg-black/0 hover:bg-amber-500/10"
+                                                                        : "bg-black/0 group-hover:bg-black/30"
+                                                        )}>
+                                                            {/* セクション番号表示（選択モード以外） */}
+                                                            {!batchRegenerateMode && !sectionDeleteMode && !backgroundUnifyMode && (
+                                                                <div className="absolute top-3 left-3 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    {sectionIndex + 1}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {/* 履歴ボタン - 常に表示 */}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenHistoryPanel(section.id);
+                                                            }}
+                                                            className="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-white/90 hover:bg-white text-gray-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg transition-all hover:scale-105"
+                                                            title="編集履歴"
+                                                        >
+                                                            <Undo2 className="h-3.5 w-3.5" />
+                                                            <span>履歴</span>
+                                                        </button>
+                                                        {/* 画像ダウンロードボタン */}
+                                                        {(viewMode === 'desktop' ? section.image?.filePath : section.mobileImage?.filePath || section.image?.filePath) && (
                                                             <button
-                                                                onClick={(e) => {
+                                                                onClick={async (e) => {
                                                                     e.stopPropagation();
-                                                                    // 参照セクションに設定し、対象リストから除外
-                                                                    console.log('Setting reference section:', section.id);
-                                                                    setBatchReferenceSection(section.id);
-                                                                    setSelectedSectionsForRegenerate(prev => {
-                                                                        const next = new Set(prev);
-                                                                        next.delete(section.id);
-                                                                        return next;
-                                                                    });
+                                                                    const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
+                                                                        ? section.mobileImage.filePath
+                                                                        : section.image?.filePath;
+                                                                    if (!imageUrl) return;
+
+                                                                    try {
+                                                                        const response = await fetch(imageUrl);
+                                                                        const blob = await response.blob();
+                                                                        const url = URL.createObjectURL(blob);
+                                                                        const a = document.createElement('a');
+                                                                        a.href = url;
+                                                                        const extension = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
+                                                                        a.download = `section-${sectionIndex + 1}-${viewMode}.${extension}`;
+                                                                        document.body.appendChild(a);
+                                                                        a.click();
+                                                                        document.body.removeChild(a);
+                                                                        URL.revokeObjectURL(url);
+                                                                        toast.success('画像をダウンロードしました');
+                                                                    } catch (error) {
+                                                                        console.error('Download error:', error);
+                                                                        toast.error('ダウンロードに失敗しました');
+                                                                    }
                                                                 }}
-                                                                className="absolute top-3 right-3 z-20 px-2 py-1 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold transition-all flex items-center gap-1 shadow-lg"
-                                                                title="このセクションのスタイルを参照として使用"
+                                                                className="absolute top-3 right-[4.5rem] z-10 flex items-center gap-1.5 bg-white/90 hover:bg-white text-gray-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg transition-all hover:scale-105"
+                                                                title="画像をダウンロード"
                                                             >
-                                                                <Palette className="h-3 w-3" />
-                                                                参照に設定
+                                                                <Download className="h-3.5 w-3.5" />
+                                                                <span>保存</span>
                                                             </button>
                                                         )}
-                                                    </>
-                                                )}
-                                                {/* 背景色統一モード選択インジケーター */}
-                                                {backgroundUnifyMode && (
-                                                    <div className={clsx(
-                                                        "absolute top-3 left-3 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                                                        selectedSectionsForBackgroundUnify.has(section.id)
-                                                            ? "bg-amber-500 text-white"
-                                                            : "bg-white/90 text-gray-400 border-2 border-gray-300"
-                                                    )}>
-                                                        {selectedSectionsForBackgroundUnify.has(section.id) ? (
-                                                            <Check className="h-5 w-5" />
-                                                        ) : (
-                                                            <span className="text-xs font-bold">{sectionIndex + 1}</span>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {/* アセットドラッグ中のオーバーレイ追加インジケーター */}
-                                                {isDraggingAsset && dragOverSectionId === `overlay-${section.id}` && (
-                                                    <div className="absolute inset-0 z-30 bg-cyan-500/30 flex items-center justify-center pointer-events-none">
-                                                        <div className="bg-cyan-600 text-white px-6 py-3 rounded-xl shadow-xl font-bold text-lg flex items-center gap-2">
-                                                            <Layers className="h-5 w-5" />
-                                                            ここにドロップしてオーバーレイ追加
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {/* セクション削除モード選択インジケーター */}
-                                                {sectionDeleteMode && (
-                                                    <div className={clsx(
-                                                        "absolute top-3 left-3 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                                                        selectedSectionsForDelete.has(section.id)
-                                                            ? "bg-red-500 text-white"
-                                                            : "bg-white/90 text-gray-400 border-2 border-gray-300"
-                                                    )}>
-                                                        {selectedSectionsForDelete.has(section.id) ? (
-                                                            <Check className="h-5 w-5" />
-                                                        ) : (
-                                                            <span className="text-xs font-bold">{sectionIndex + 1}</span>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {/* ホバーオーバーレイ */}
-                                                <div className={clsx(
-                                                    "absolute inset-0 transition-all duration-200 flex items-center justify-center",
-                                                    sectionDeleteMode
-                                                        ? selectedSectionsForDelete.has(section.id) ? "bg-red-500/20" : "bg-black/0 hover:bg-red-500/10"
-                                                        : batchRegenerateMode
-                                                            ? selectedSectionsForRegenerate.has(section.id) ? "bg-orange-500/20" : "bg-black/0 hover:bg-orange-500/10"
-                                                            : backgroundUnifyMode
-                                                                ? selectedSectionsForBackgroundUnify.has(section.id) ? "bg-amber-500/20" : "bg-black/0 hover:bg-amber-500/10"
-                                                                : "bg-black/0 group-hover:bg-black/30"
-                                                )}>
-                                                    {/* セクション番号表示（選択モード以外） */}
-                                                    {!batchRegenerateMode && !sectionDeleteMode && !backgroundUnifyMode && (
-                                                        <div className="absolute top-3 left-3 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            {sectionIndex + 1}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {/* 履歴ボタン - 常に表示 */}
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleOpenHistoryPanel(section.id);
-                                                    }}
-                                                    className="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-white/90 hover:bg-white text-gray-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg transition-all hover:scale-105"
-                                                    title="編集履歴"
-                                                >
-                                                    <Undo2 className="h-3.5 w-3.5" />
-                                                    <span>履歴</span>
-                                                </button>
-                                                {/* 画像ダウンロードボタン */}
-                                                {(viewMode === 'desktop' ? section.image?.filePath : section.mobileImage?.filePath || section.image?.filePath) && (
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
-                                                                ? section.mobileImage.filePath
-                                                                : section.image?.filePath;
-                                                            if (!imageUrl) return;
-
-                                                            try {
-                                                                const response = await fetch(imageUrl);
-                                                                const blob = await response.blob();
-                                                                const url = URL.createObjectURL(blob);
-                                                                const a = document.createElement('a');
-                                                                a.href = url;
-                                                                const extension = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
-                                                                a.download = `section-${sectionIndex + 1}-${viewMode}.${extension}`;
-                                                                document.body.appendChild(a);
-                                                                a.click();
-                                                                document.body.removeChild(a);
-                                                                URL.revokeObjectURL(url);
-                                                                toast.success('画像をダウンロードしました');
-                                                            } catch (error) {
-                                                                console.error('Download error:', error);
-                                                                toast.error('ダウンロードに失敗しました');
-                                                            }
-                                                        }}
-                                                        className="absolute top-3 right-[4.5rem] z-10 flex items-center gap-1.5 bg-white/90 hover:bg-white text-gray-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg transition-all hover:scale-105"
-                                                        title="画像をダウンロード"
-                                                    >
-                                                        <Download className="h-3.5 w-3.5" />
-                                                        <span>保存</span>
-                                                    </button>
-                                                )}
-                                                {/* ローディングオーバーレイ */}
-                                                {(generatingImageSectionIds.has(section.id) || editingSectionIds.has(section.id) || regeneratingSectionIds.has(section.id)) && (
-                                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600/90 to-indigo-700/90 flex flex-col items-center justify-center gap-4 backdrop-blur-sm">
-                                                        {/* パルスリング */}
-                                                        <div className="relative">
-                                                            <div className="absolute inset-0 rounded-full bg-white/20 animate-ping" style={{ animationDuration: '1.5s' }} />
-                                                            <div className="relative w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
-                                                                <RefreshCw className="h-10 w-10 text-white animate-spin" />
-                                                            </div>
-                                                        </div>
-                                                        {/* テキスト */}
-                                                        <div className="text-center">
-                                                            <p className="text-white text-lg font-bold">
-                                                                {regeneratingSectionIds.has(section.id) ? 'AI再生成中...' :
-                                                                    editingSectionIds.has(section.id) ? '編集処理中...' : '生成中...'}
-                                                            </p>
-                                                            <p className="text-white/70 text-sm mt-1">
-                                                                しばらくお待ちください
-                                                            </p>
-                                                        </div>
-                                                        {/* コスト目安 */}
-                                                        {regeneratingSectionIds.has(section.id) && (
-                                                            <div className="bg-white/10 rounded-full px-4 py-1.5">
-                                                                <span className="text-white/80 text-xs">
-                                                                    💰 約1〜2円/回
-                                                                </span>
+                                                        {/* ローディングオーバーレイ */}
+                                                        {(generatingImageSectionIds.has(section.id) || editingSectionIds.has(section.id) || regeneratingSectionIds.has(section.id)) && (
+                                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-600/90 to-indigo-700/90 flex flex-col items-center justify-center gap-4 backdrop-blur-sm">
+                                                                {/* パルスリング */}
+                                                                <div className="relative">
+                                                                    <div className="absolute inset-0 rounded-full bg-white/20 animate-ping" style={{ animationDuration: '1.5s' }} />
+                                                                    <div className="relative w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
+                                                                        <RefreshCw className="h-10 w-10 text-white animate-spin" />
+                                                                    </div>
+                                                                </div>
+                                                                {/* テキスト */}
+                                                                <div className="text-center">
+                                                                    <p className="text-white text-lg font-bold">
+                                                                        {regeneratingSectionIds.has(section.id) ? 'AI再生成中...' :
+                                                                            editingSectionIds.has(section.id) ? '編集処理中...' : '生成中...'}
+                                                                    </p>
+                                                                    <p className="text-white/70 text-sm mt-1">
+                                                                        しばらくお待ちください
+                                                                    </p>
+                                                                </div>
+                                                                {/* コスト目安 */}
+                                                                {regeneratingSectionIds.has(section.id) && (
+                                                                    <div className="bg-white/10 rounded-full px-4 py-1.5">
+                                                                        <span className="text-white/80 text-xs">
+                                                                            💰 約1〜2円/回
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {/* プログレスバー風アニメーション */}
+                                                                <div className="w-48 h-1 bg-white/20 rounded-full overflow-hidden">
+                                                                    <div className="h-full bg-white rounded-full animate-progress" />
+                                                                </div>
                                                             </div>
                                                         )}
-                                                        {/* プログレスバー風アニメーション */}
-                                                        <div className="w-48 h-1 bg-white/20 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-white rounded-full animate-progress" />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <div className="h-48 bg-gray-100 flex items-center justify-center">
-                                                <span className="text-gray-400">画像なし</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* 境界選択UI - boundaryFixModeがtrueの時に表示 */}
-                                    {boundaryFixMode && sectionIndex < sections.length - 1 && (
-                                        <div
-                                            className={clsx(
-                                                "relative h-12 flex items-center justify-center cursor-pointer transition-all",
-                                                selectedBoundaries.has(sectionIndex)
-                                                    ? "bg-gray-900"
-                                                    : "bg-gray-100 hover:bg-gray-200"
-                                            )}
-                                            onClick={() => {
-                                                setSelectedBoundaries(prev => {
-                                                    const next = new Set(prev);
-                                                    if (next.has(sectionIndex)) {
-                                                        next.delete(sectionIndex);
-                                                    } else {
-                                                        next.add(sectionIndex);
-                                                    }
-                                                    return next;
-                                                });
-                                            }}
-                                        >
-                                            <div className={clsx(
-                                                "flex items-center gap-2 px-4 py-2 rounded-full transition-all",
-                                                selectedBoundaries.has(sectionIndex)
-                                                    ? "bg-white/20 text-white"
-                                                    : "bg-white shadow-sm text-gray-900"
-                                            )}>
-                                                {selectedBoundaries.has(sectionIndex) ? (
-                                                    <>
-                                                        <Check className="h-4 w-4" />
-                                                        <span className="text-xs font-bold">境界 {sectionIndex + 1} を削除</span>
                                                     </>
                                                 ) : (
-                                                    <>
-                                                        <Scissors className="h-4 w-4" />
-                                                        <span className="text-xs font-medium">境界 {sectionIndex + 1}</span>
-                                                    </>
+                                                    <div className="h-48 bg-gray-100 flex items-center justify-center">
+                                                        <span className="text-gray-400">画像なし</span>
+                                                    </div>
                                                 )}
                                             </div>
-                                        </div>
-                                    )}
 
-                                    {/* ドロップゾーン（セクション後） */}
-                                    {isDraggingAsset && (
-                                        <div
-                                            className={clsx(
-                                                "h-16 border-2 border-dashed rounded-lg mx-2 my-1 transition-all flex items-center justify-center",
-                                                dragOverSectionId === `after-${section.id}`
-                                                    ? "border-gray-900 bg-gray-50"
-                                                    : "border-gray-300 bg-gray-50/50"
-                                            )}
-                                            onDragOver={(e) => {
-                                                e.preventDefault();
-                                                setDragOverSectionId(`after-${section.id}`);
-                                            }}
-                                            onDragLeave={() => setDragOverSectionId(null)}
-                                            onDrop={(e) => handleAssetDrop(e, String(section.id))}
-                                        >
-                                            <span className="text-xs text-gray-500">
-                                                {`ここにドロップ → ${section.role || `セクション${sectionIndex + 1}`}の後に追加`}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {/* セクション間の挿入ボタン（通常時のみ表示） */}
-                                    {!isDraggingAsset && !batchRegenerateMode && !backgroundUnifyMode && (
-                                        <div className="relative h-0 group/insert">
-                                            <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 opacity-0 group-hover/insert:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => handleOpenInsertModal(sectionIndex + 1)}
-                                                    className="flex items-center gap-1 px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-full shadow-lg hover:shadow-xl transition-all"
+                                            {/* 境界選択UI - boundaryFixModeがtrueの時に表示 */}
+                                            {boundaryFixMode && sectionIndex < sections.length - 1 && (
+                                                <div
+                                                    className={clsx(
+                                                        "relative h-12 flex items-center justify-center cursor-pointer transition-all",
+                                                        selectedBoundaries.has(sectionIndex)
+                                                            ? "bg-gray-900"
+                                                            : "bg-gray-100 hover:bg-gray-200"
+                                                    )}
+                                                    onClick={() => {
+                                                        setSelectedBoundaries(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(sectionIndex)) {
+                                                                next.delete(sectionIndex);
+                                                            } else {
+                                                                next.add(sectionIndex);
+                                                            }
+                                                            return next;
+                                                        });
+                                                    }}
                                                 >
-                                                    <Plus className="h-3.5 w-3.5" />
-                                                    挿入
-                                                </button>
-                                            </div>
-                                            {/* ホバー検出用の透明な帯 */}
-                                            <div className="absolute left-0 right-0 -top-4 h-8 cursor-pointer" />
-                                        </div>
-                                    )}
-                                </SortableSectionWrapper>
-                            ))}
+                                                    <div className={clsx(
+                                                        "flex items-center gap-2 px-4 py-2 rounded-full transition-all",
+                                                        selectedBoundaries.has(sectionIndex)
+                                                            ? "bg-white/20 text-white"
+                                                            : "bg-white shadow-sm text-gray-900"
+                                                    )}>
+                                                        {selectedBoundaries.has(sectionIndex) ? (
+                                                            <>
+                                                                <Check className="h-4 w-4" />
+                                                                <span className="text-xs font-bold">境界 {sectionIndex + 1} を削除</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Scissors className="h-4 w-4" />
+                                                                <span className="text-xs font-medium">境界 {sectionIndex + 1}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* ドロップゾーン（セクション後） */}
+                                            {isDraggingAsset && (
+                                                <div
+                                                    className={clsx(
+                                                        "h-16 border-2 border-dashed rounded-lg mx-2 my-1 transition-all flex items-center justify-center",
+                                                        dragOverSectionId === `after-${section.id}`
+                                                            ? "border-gray-900 bg-gray-50"
+                                                            : "border-gray-300 bg-gray-50/50"
+                                                    )}
+                                                    onDragOver={(e) => {
+                                                        e.preventDefault();
+                                                        setDragOverSectionId(`after-${section.id}`);
+                                                    }}
+                                                    onDragLeave={() => setDragOverSectionId(null)}
+                                                    onDrop={(e) => handleAssetDrop(e, String(section.id))}
+                                                >
+                                                    <span className="text-xs text-gray-500">
+                                                        {`ここにドロップ → ${section.role || `セクション${sectionIndex + 1}`}の後に追加`}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* セクション間の挿入ボタン（通常時のみ表示） */}
+                                            {!isDraggingAsset && !batchRegenerateMode && !backgroundUnifyMode && (
+                                                <div className="relative h-0 group/insert">
+                                                    <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 opacity-0 group-hover/insert:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => handleOpenInsertModal(sectionIndex + 1)}
+                                                            className="flex items-center gap-1 px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-full shadow-lg hover:shadow-xl transition-all"
+                                                        >
+                                                            <Plus className="h-3.5 w-3.5" />
+                                                            挿入
+                                                        </button>
+                                                    </div>
+                                                    {/* ホバー検出用の透明な帯 */}
+                                                    <div className="absolute left-0 right-0 -top-4 h-8 cursor-pointer" />
+                                                </div>
+                                            )}
+                                        </SortableSectionWrapper>
+                                    ))}
                                 </SortableContext>
                             </DndContext>
                         </>
@@ -3472,415 +3458,415 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                 {/* メニュー */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                        {/* 基本操作 */}
-                        <div className="space-y-3">
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">基本操作</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {/* チュートリアル */}
-                                <button
-                                    onClick={() => setShowTutorialModal(true)}
-                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-violet-50 text-violet-700 text-xs font-medium border border-violet-200 hover:border-violet-300 hover:bg-violet-100 transition-all"
-                                >
-                                    <HelpCircle className="h-3.5 w-3.5" />
-                                    使い方
-                                </button>
-                                {/* 画像追加 */}
-                                <button
-                                    onClick={() => document.getElementById('file-upload-input')?.click()}
-                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
-                                >
-                                    <Plus className="h-3.5 w-3.5 text-gray-400" />
-                                    画像追加
-                                </button>
-                                {/* プレビュー */}
-                                <Link
-                                    href={`/p/${initialSlug || pageId}`}
-                                    target="_blank"
-                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
-                                >
-                                    <Eye className="h-3.5 w-3.5 text-gray-400" />
-                                    プレビュー
-                                </Link>
-                                {/* ダウンロード */}
-                                <button
-                                    onClick={handleExport}
-                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
-                                >
-                                    <Download className="h-3.5 w-3.5 text-gray-400" />
-                                    ZIP出力
-                                </button>
-                            </div>
-                            {/* 表示切替 */}
-                            <div className="flex items-center justify-center gap-1 pt-2 border-t border-gray-100">
-                                <button
-                                    onClick={() => setViewMode('desktop')}
-                                    className={clsx(
-                                        "p-1.5 rounded transition-all",
-                                        viewMode === 'desktop'
-                                            ? "text-gray-900 bg-gray-100"
-                                            : "text-gray-400 hover:text-gray-600"
-                                    )}
-                                    title="PC表示"
-                                >
-                                    <Monitor className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('mobile')}
-                                    className={clsx(
-                                        "p-1.5 rounded transition-all",
-                                        viewMode === 'mobile'
-                                            ? "text-gray-900 bg-gray-100"
-                                            : "text-gray-400 hover:text-gray-600"
-                                    )}
-                                    title="スマホ表示"
-                                >
-                                    <Smartphone className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                    {/* 基本操作 */}
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">基本操作</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            {/* チュートリアル */}
+                            <button
+                                onClick={() => setShowTutorialModal(true)}
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-violet-50 text-violet-700 text-xs font-medium border border-violet-200 hover:border-violet-300 hover:bg-violet-100 transition-all"
+                            >
+                                <HelpCircle className="h-3.5 w-3.5" />
+                                使い方
+                            </button>
+                            {/* 画像追加 */}
+                            <button
+                                onClick={() => document.getElementById('file-upload-input')?.click()}
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
+                            >
+                                <Plus className="h-3.5 w-3.5 text-gray-400" />
+                                画像追加
+                            </button>
+                            {/* プレビュー */}
+                            <Link
+                                href={`/p/${initialSlug || pageId}`}
+                                target="_blank"
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
+                            >
+                                <Eye className="h-3.5 w-3.5 text-gray-400" />
+                                プレビュー
+                            </Link>
+                            {/* ダウンロード */}
+                            <button
+                                onClick={handleExport}
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
+                            >
+                                <Download className="h-3.5 w-3.5 text-gray-400" />
+                                ZIP出力
+                            </button>
+                        </div>
+                        {/* 表示切替 */}
+                        <div className="flex items-center justify-center gap-1 pt-2 border-t border-gray-100">
+                            <button
+                                onClick={() => setViewMode('desktop')}
+                                className={clsx(
+                                    "p-1.5 rounded transition-all",
+                                    viewMode === 'desktop'
+                                        ? "text-gray-900 bg-gray-100"
+                                        : "text-gray-400 hover:text-gray-600"
+                                )}
+                                title="PC表示"
+                            >
+                                <Monitor className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('mobile')}
+                                className={clsx(
+                                    "p-1.5 rounded transition-all",
+                                    viewMode === 'mobile'
+                                        ? "text-gray-900 bg-gray-100"
+                                        : "text-gray-400 hover:text-gray-600"
+                                )}
+                                title="スマホ表示"
+                            >
+                                <Smartphone className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 見た目を調整する */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">見た目を調整する</p>
+
+                        {/* 画像を切り取る */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button
+                                onClick={() => toggleTool('crop')}
+                                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
+                                        <Scissors className="h-3.5 w-3.5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <h4 className="text-xs font-semibold text-gray-900">画像を切り取る</h4>
+                                        <p className="text-[10px] text-gray-500">余白や不要な部分をカット</p>
+                                    </div>
+                                </div>
+                                {expandedTools.has('crop') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                            </button>
+                            {expandedTools.has('crop') && (
+                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
+                                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                                        {sections.filter(s => s.image?.filePath).map((section, idx) => (
+                                            <button
+                                                key={section.id}
+                                                onClick={() => {
+                                                    if (section?.image?.filePath) {
+                                                        setCropSectionId(String(section.id));
+                                                        setCropImageUrl(section.image.filePath);
+                                                        setShowCropModal(true);
+                                                    }
+                                                }}
+                                                className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 transition-all text-left"
+                                            >
+                                                <div className="w-6 h-6 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
+                                                    <img
+                                                        src={section.image.filePath}
+                                                        alt=""
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-gray-600 truncate flex-1">
+                                                    {section.role || `セクション ${idx + 1}`}
+                                                </span>
+                                            </button>
+                                        ))}
+                                        {sections.filter(s => s.image?.filePath).length === 0 && (
+                                            <p className="text-xs text-gray-400 text-center py-2">画像がありません</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* 見た目を調整する */}
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">見た目を調整する</p>
-
-                            {/* 画像を切り取る */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <button
-                                    onClick={() => toggleTool('crop')}
-                                    className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                            <Scissors className="h-3.5 w-3.5" />
-                                        </div>
-                                        <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">画像を切り取る</h4>
-                                            <p className="text-[10px] text-gray-500">余白や不要な部分をカット</p>
-                                        </div>
+                        {/* ボタン・文字を重ねる */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button
+                                onClick={() => toggleTool('overlay')}
+                                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
+                                        <Layers className="h-3.5 w-3.5" />
                                     </div>
-                                    {expandedTools.has('crop') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                                </button>
-                                {expandedTools.has('crop') && (
-                                    <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                                            {sections.filter(s => s.image?.filePath).map((section, idx) => (
-                                                <button
-                                                    key={section.id}
-                                                    onClick={() => {
-                                                        if (section?.image?.filePath) {
-                                                            setCropSectionId(String(section.id));
-                                                            setCropImageUrl(section.image.filePath);
-                                                            setShowCropModal(true);
-                                                        }
-                                                    }}
-                                                    className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 transition-all text-left"
-                                                >
-                                                    <div className="w-6 h-6 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                                                        <img
-                                                            src={section.image.filePath}
-                                                            alt=""
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <span className="text-xs text-gray-600 truncate flex-1">
+                                    <div className="text-left">
+                                        <h4 className="text-xs font-semibold text-gray-900">ボタン・文字を重ねる</h4>
+                                        <p className="text-[10px] text-gray-500">画像の上に追加できます</p>
+                                    </div>
+                                </div>
+                                {expandedTools.has('overlay') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                            </button>
+                            {expandedTools.has('overlay') && (
+                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
+                                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                                        {sections.filter(s => s.image?.filePath).map((section, idx) => (
+                                            <button
+                                                key={section.id}
+                                                onClick={() => {
+                                                    const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
+                                                        ? section.mobileImage.filePath
+                                                        : section.image?.filePath;
+                                                    if (imageUrl) {
+                                                        setOverlayEditSectionId(String(section.id));
+                                                        setOverlayEditImageUrl(imageUrl);
+                                                        setShowOverlayEditor(true);
+                                                    }
+                                                }}
+                                                className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 transition-all text-left"
+                                            >
+                                                <div className="w-6 h-6 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
+                                                    <img
+                                                        src={section.image?.filePath}
+                                                        alt=""
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="text-xs text-gray-600 truncate block">
                                                         {section.role || `セクション ${idx + 1}`}
                                                     </span>
-                                                </button>
-                                            ))}
-                                            {sections.filter(s => s.image?.filePath).length === 0 && (
-                                                <p className="text-xs text-gray-400 text-center py-2">画像がありません</p>
-                                            )}
-                                        </div>
+                                                    <span className="text-[9px] text-gray-400 block -mt-0.5">
+                                                        {section.config?.overlays?.length || 0}件の重ね要素
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                        {sections.filter(s => s.image?.filePath).length === 0 && (
+                                            <p className="text-xs text-gray-400 text-center py-2">画像がありません</p>
+                                        )}
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
+                        </div>
 
-                            {/* ボタン・文字を重ねる */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <button
-                                    onClick={() => toggleTool('overlay')}
-                                    className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                            <Layers className="h-3.5 w-3.5" />
-                                        </div>
-                                        <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">ボタン・文字を重ねる</h4>
-                                            <p className="text-[10px] text-gray-500">画像の上に追加できます</p>
-                                        </div>
+                        {/* ブロックを削除 */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button
+                                onClick={() => toggleTool('delete')}
+                                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
+                                        <Trash2 className="h-3.5 w-3.5" />
                                     </div>
-                                    {expandedTools.has('overlay') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                                </button>
-                                {expandedTools.has('overlay') && (
-                                    <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                                            {sections.filter(s => s.image?.filePath).map((section, idx) => (
-                                                <button
-                                                    key={section.id}
-                                                    onClick={() => {
-                                                        const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
-                                                            ? section.mobileImage.filePath
-                                                            : section.image?.filePath;
-                                                        if (imageUrl) {
-                                                            setOverlayEditSectionId(String(section.id));
-                                                            setOverlayEditImageUrl(imageUrl);
-                                                            setShowOverlayEditor(true);
-                                                        }
-                                                    }}
-                                                    className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 transition-all text-left"
-                                                >
-                                                    <div className="w-6 h-6 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                                                        <img
-                                                            src={section.image?.filePath}
-                                                            alt=""
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <span className="text-xs text-gray-600 truncate block">
-                                                            {section.role || `セクション ${idx + 1}`}
-                                                        </span>
-                                                        <span className="text-[9px] text-gray-400 block -mt-0.5">
-                                                            {section.config?.overlays?.length || 0}件の重ね要素
-                                                        </span>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                            {sections.filter(s => s.image?.filePath).length === 0 && (
-                                                <p className="text-xs text-gray-400 text-center py-2">画像がありません</p>
-                                            )}
-                                        </div>
+                                    <div className="text-left">
+                                        <h4 className="text-xs font-semibold text-gray-900">ブロックを削除</h4>
+                                        <p className="text-[10px] text-gray-500">いらない部分を外す</p>
                                     </div>
-                                )}
-                            </div>
-
-                            {/* ブロックを削除 */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <button
-                                    onClick={() => toggleTool('delete')}
-                                    className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </div>
-                                        <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">ブロックを削除</h4>
-                                            <p className="text-[10px] text-gray-500">いらない部分を外す</p>
-                                        </div>
-                                    </div>
-                                    {expandedTools.has('delete') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                                </button>
-                                {expandedTools.has('delete') && (
-                                    <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                        <button
-                                            onClick={() => {
-                                                setSectionDeleteMode(true);
-                                                setBatchRegenerateMode(false);
-                                                setBackgroundUnifyMode(false);
-                                                setBoundaryFixMode(false);
-                                            }}
-                                            disabled={sections.length === 0}
-                                            className="w-full py-2 bg-gray-50 text-gray-600 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                            削除するブロックを選ぶ
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 背景色をそろえる */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <div className="p-3">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                            <Palette className="h-3.5 w-3.5" />
-                                        </div>
-                                        <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">背景色をそろえる</h4>
-                                            <p className="text-[10px] text-gray-400">全体の背景を同じ色に</p>
-                                        </div>
-                                    </div>
+                                </div>
+                                {expandedTools.has('delete') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                            </button>
+                            {expandedTools.has('delete') && (
+                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
                                     <button
                                         onClick={() => {
-                                            setBackgroundUnifyMode(true);
+                                            setSectionDeleteMode(true);
                                             setBatchRegenerateMode(false);
-                                            setBoundaryFixMode(false);
-                                        }}
-                                        disabled={sections.filter(s => s.image?.filePath).length === 0}
-                                        className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
-                                    >
-                                        ブロックを選ぶ
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* 色の組み合わせ */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <button onClick={() => toggleTool('color-palette')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Droplet className="h-3.5 w-3.5" /></div>
-                                        <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">色の組み合わせ</h4><p className="text-[10px] text-gray-500">ページ全体の色を選ぶ</p></div>
-                                    </div>
-                                    {expandedTools.has('color-palette') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                                </button>
-                                {expandedTools.has('color-palette') && (
-                                    <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                        <button onClick={() => setShowColorPaletteModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">色を選ぶ</button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 内容を編集する */}
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">内容を編集する</p>
-
-                            {/* 文章をまとめて書き直す */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <button onClick={() => toggleTool('copy-edit')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Type className="h-3.5 w-3.5" /></div>
-                                        <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">文章をまとめて書き直す</h4><p className="text-[10px] text-gray-500">AIがテキストを作成</p></div>
-                                    </div>
-                                    {expandedTools.has('copy-edit') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                                </button>
-                                {expandedTools.has('copy-edit') && (
-                                    <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                        <button onClick={() => setShowCopyEditModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">文章を編集</button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* ボタンのリンク先 */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <button onClick={() => toggleTool('cta')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><MousePointer className="h-3.5 w-3.5" /></div>
-                                        <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">ボタンのリンク先</h4><p className="text-[10px] text-gray-500">押したときの移動先を変更</p></div>
-                                    </div>
-                                    {expandedTools.has('cta') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                                </button>
-                                {expandedTools.has('cta') && (
-                                    <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                        <button onClick={() => setShowCTAModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">リンク先を変更</button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* スマホで見やすくする */}
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">スマホで見やすくする</p>
-
-                            {/* スマホ表示の調整 */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white opacity-60">
-                                <div className="p-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-400"><Smartphone className="h-3.5 w-3.5" /></div>
-                                        <div className="text-left flex-1">
-                                            <h4 className="text-xs font-semibold text-gray-500 flex items-center gap-2">
-                                                スマホ表示の調整
-                                                <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">準備中</span>
-                                            </h4>
-                                            <p className="text-[10px] text-gray-400">近日公開予定</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* LP比較 */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white opacity-60">
-                                <div className="p-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-400"><Layers className="h-3.5 w-3.5" /></div>
-                                        <div className="text-left flex-1">
-                                            <h4 className="text-xs font-semibold text-gray-500 flex items-center gap-2">
-                                                LP比較
-                                                <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">準備中</span>
-                                            </h4>
-                                            <p className="text-[10px] text-gray-400">複数LPを並べていいとこ取り</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* もっと魅力的にする */}
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">もっと魅力的にする</p>
-
-                            {/* 動画を埋め込む */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <button onClick={() => toggleTool('video')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors relative">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Video className="h-3.5 w-3.5" /></div>
-                                        <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900 flex items-center gap-2">動画を埋め込む<span className="flex items-center gap-0.5 text-[8px] px-1.5 py-0 bg-gray-900 text-white rounded-sm font-medium">Max</span></h4>
-                                            <p className="text-[10px] text-gray-500">YouTube等の動画を追加</p>
-                                        </div>
-                                    </div>
-                                    {expandedTools.has('video') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                                </button>
-                                {expandedTools.has('video') && (
-                                    <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                        <button onClick={() => setShowVideoModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">動画を追加</button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 整理・やり直し */}
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">整理・やり直し</p>
-
-                            {/* 操作をやり直す */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <div className="p-3">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                            <Undo2 className="h-3.5 w-3.5" />
-                                        </div>
-                                        <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">操作をやり直す</h4>
-                                            <p className="text-[10px] text-gray-400">前の状態に戻せます</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-[10px] text-gray-500 bg-gray-50 rounded p-1.5 text-center">
-                                        各ブロックの「履歴」をクリック
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* まとめて作り直す */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                                <div className="p-3">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                            <RefreshCw className="h-3.5 w-3.5" />
-                                        </div>
-                                        <div className="text-left">
-                                            <h4 className="text-xs font-semibold text-gray-900">まとめて作り直す</h4>
-                                            <p className="text-[10px] text-gray-400">AIでページ全体を再生成</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            setBatchRegenerateMode(true);
-                                            setBoundaryFixMode(false);
                                             setBackgroundUnifyMode(false);
+                                            setBoundaryFixMode(false);
                                         }}
-                                        disabled={sections.filter(s => s.image?.filePath).length === 0}
-                                        className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
+                                        disabled={sections.length === 0}
+                                        className="w-full py-2 bg-gray-50 text-gray-600 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
                                     >
-                                        ブロックを選ぶ
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        削除するブロックを選ぶ
                                     </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 背景色をそろえる */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <div className="p-3">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
+                                        <Palette className="h-3.5 w-3.5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <h4 className="text-xs font-semibold text-gray-900">背景色をそろえる</h4>
+                                        <p className="text-[10px] text-gray-400">全体の背景を同じ色に</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setBackgroundUnifyMode(true);
+                                        setBatchRegenerateMode(false);
+                                        setBoundaryFixMode(false);
+                                    }}
+                                    disabled={sections.filter(s => s.image?.filePath).length === 0}
+                                    className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
+                                >
+                                    ブロックを選ぶ
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 色の組み合わせ */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button onClick={() => toggleTool('color-palette')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Droplet className="h-3.5 w-3.5" /></div>
+                                    <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">色の組み合わせ</h4><p className="text-[10px] text-gray-500">ページ全体の色を選ぶ</p></div>
+                                </div>
+                                {expandedTools.has('color-palette') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                            </button>
+                            {expandedTools.has('color-palette') && (
+                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
+                                    <button onClick={() => setShowColorPaletteModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">色を選ぶ</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 内容を編集する */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">内容を編集する</p>
+
+                        {/* 文章をまとめて書き直す */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button onClick={() => toggleTool('copy-edit')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Type className="h-3.5 w-3.5" /></div>
+                                    <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">文章をまとめて書き直す</h4><p className="text-[10px] text-gray-500">AIがテキストを作成</p></div>
+                                </div>
+                                {expandedTools.has('copy-edit') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                            </button>
+                            {expandedTools.has('copy-edit') && (
+                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
+                                    <button onClick={() => setShowCopyEditModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">文章を編集</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ボタンのリンク先 */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button onClick={() => toggleTool('cta')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><MousePointer className="h-3.5 w-3.5" /></div>
+                                    <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">ボタンのリンク先</h4><p className="text-[10px] text-gray-500">押したときの移動先を変更</p></div>
+                                </div>
+                                {expandedTools.has('cta') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                            </button>
+                            {expandedTools.has('cta') && (
+                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
+                                    <button onClick={() => setShowCTAModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">リンク先を変更</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* スマホで見やすくする */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">スマホで見やすくする</p>
+
+                        {/* スマホ表示の調整 */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white opacity-60">
+                            <div className="p-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-400"><Smartphone className="h-3.5 w-3.5" /></div>
+                                    <div className="text-left flex-1">
+                                        <h4 className="text-xs font-semibold text-gray-500 flex items-center gap-2">
+                                            スマホ表示の調整
+                                            <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">準備中</span>
+                                        </h4>
+                                        <p className="text-[10px] text-gray-400">近日公開予定</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* LP比較 */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white opacity-60">
+                            <div className="p-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-400"><Layers className="h-3.5 w-3.5" /></div>
+                                    <div className="text-left flex-1">
+                                        <h4 className="text-xs font-semibold text-gray-500 flex items-center gap-2">
+                                            LP比較
+                                            <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">準備中</span>
+                                        </h4>
+                                        <p className="text-[10px] text-gray-400">複数LPを並べていいとこ取り</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    {/* もっと魅力的にする */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">もっと魅力的にする</p>
+
+                        {/* 動画を埋め込む */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button onClick={() => toggleTool('video')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors relative">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Video className="h-3.5 w-3.5" /></div>
+                                    <div className="text-left">
+                                        <h4 className="text-xs font-semibold text-gray-900 flex items-center gap-2">動画を埋め込む<span className="flex items-center gap-0.5 text-[8px] px-1.5 py-0 bg-gray-900 text-white rounded-sm font-medium">Max</span></h4>
+                                        <p className="text-[10px] text-gray-500">YouTube等の動画を追加</p>
+                                    </div>
+                                </div>
+                                {expandedTools.has('video') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                            </button>
+                            {expandedTools.has('video') && (
+                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
+                                    <button onClick={() => setShowVideoModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">動画を追加</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 整理・やり直し */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">整理・やり直し</p>
+
+                        {/* 操作をやり直す */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <div className="p-3">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
+                                        <Undo2 className="h-3.5 w-3.5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <h4 className="text-xs font-semibold text-gray-900">操作をやり直す</h4>
+                                        <p className="text-[10px] text-gray-400">前の状態に戻せます</p>
+                                    </div>
+                                </div>
+                                <div className="text-[10px] text-gray-500 bg-gray-50 rounded p-1.5 text-center">
+                                    各ブロックの「履歴」をクリック
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* まとめて作り直す */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <div className="p-3">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <h4 className="text-xs font-semibold text-gray-900">まとめて作り直す</h4>
+                                        <p className="text-[10px] text-gray-400">AIでページ全体を再生成</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setBatchRegenerateMode(true);
+                                        setBoundaryFixMode(false);
+                                        setBackgroundUnifyMode(false);
+                                    }}
+                                    disabled={sections.filter(s => s.image?.filePath).length === 0}
+                                    className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
+                                >
+                                    ブロックを選ぶ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* インペインティング（部分編集）モーダル */}
@@ -4671,11 +4657,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             {sections.filter(s => s.image?.filePath).map((section, idx) => (
                                                 <label
                                                     key={section.id}
-                                                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                                                        selectedUpscaleSections.includes(section.id)
+                                                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${selectedUpscaleSections.includes(section.id)
                                                             ? 'bg-violet-100 border-2 border-violet-300'
                                                             : 'bg-white border-2 border-gray-100 hover:border-gray-200'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <input
                                                         type="checkbox"

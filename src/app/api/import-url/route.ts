@@ -343,9 +343,12 @@ export async function POST(request: NextRequest) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 使用量制限チェック
+    // 使用量制限チェック（開発環境ではスキップ可能）
     log.info(`Checking generation limit for user: ${user.id}`);
-    const limitCheck = await checkGenerationLimit(user.id);
+    const isDev = process.env.NODE_ENV === 'development';
+    const limitCheck = isDev
+        ? { allowed: true, skipCreditConsumption: true }
+        : await checkGenerationLimit(user.id);
 
     if (!limitCheck.allowed) {
         // FreeプランでAPIキー未設定の場合
@@ -460,12 +463,25 @@ export async function POST(request: NextRequest) {
         send({ type: 'progress', step: 'browser', message: 'ブラウザを起動中...' });
         log.info('Launching Puppeteer...');
 
-        // クラウド環境用にChromiumを設定
-        const executablePath = await chromium.executablePath();
-        log.info(`Chromium path: ${executablePath}`);
+        // 環境に応じてChromiumパスを設定
+        const isDev = process.env.NODE_ENV === 'development';
+        let executablePath: string;
+        let launchArgs: string[];
+
+        if (isDev) {
+            // ローカル開発環境: システムのGoogle Chromeを使用
+            executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+            launchArgs = ['--no-sandbox', '--disable-setuid-sandbox'];
+            log.info('Using local Chrome for development');
+        } else {
+            // Vercel/本番環境: @sparticuz/chromiumを使用
+            executablePath = await chromium.executablePath();
+            launchArgs = chromium.args;
+            log.info(`Using serverless Chromium: ${executablePath}`);
+        }
 
         const browser = await puppeteer.launch({
-            args: chromium.args,
+            args: launchArgs,
             executablePath,
             headless: true,
         });

@@ -22,30 +22,32 @@ const log = {
 const regenerateSchema = z.object({
     style: z.enum(['sampling', 'professional', 'pops', 'luxury', 'minimal', 'emotional', 'design-definition']).optional(),
     colorScheme: z.enum(['original', 'blue', 'green', 'purple', 'orange', 'monochrome']).optional(),
-    customPrompt: z.string().max(500).optional(),
+    customPrompt: z.string().max(5000).optional(),
     mode: z.enum(['light', 'heavy']).default('light'),
     // 隣接セクションとの整合性を取るためのコンテキスト
     contextStyle: z.string().optional(),
     // デザイン定義（ページ全体のスタイル定義）- 柔軟なスキーマ
     designDefinition: z.any().optional(),
     // ユーザー指定の参照スタイル画像URL（一括再生成で使用）
-    styleReferenceUrl: z.string().url().optional(),
+    styleReferenceUrl: z.string().url().optional().nullable(),
     // 一括再生成で最初のセクションから抽出したカラー（後続セクションの一貫性担保用）
     extractedColors: z.object({
         primary: z.string(),
         secondary: z.string(),
         accent: z.string(),
         background: z.string(),
-    }).optional(),
+    }).optional().nullable(),
     // 対象画像（desktop or mobile）
     targetImage: z.enum(['desktop', 'mobile']).default('desktop'),
     // 境界オフセット（AIへの認識範囲指示用）
     // boundaryOffsetTop: このセクションの上端をどれだけ上に拡張するか（ピクセル）
     // boundaryOffsetBottom: このセクションの下端をどれだけ下に拡張するか（ピクセル）
-    boundaryOffsetTop: z.number().optional(),
-    boundaryOffsetBottom: z.number().optional(),
+    boundaryOffsetTop: z.number().optional().nullable(),
+    boundaryOffsetBottom: z.number().optional().nullable(),
     // コピーテキスト（AIコピー生成で作成されたテキスト）
-    copyText: z.string().max(2000).optional(),
+    copyText: z.string().max(5000).optional(),
+    // デザイン統一モード（一括再生成で使用）
+    unifyDesign: z.boolean().optional(),
 });
 
 // スタイル定義
@@ -80,6 +82,9 @@ export async function POST(
     const validation = regenerateSchema.safeParse(body);
 
     if (!validation.success) {
+        log.error(`Validation failed for section ${sectionId}`);
+        log.error(`Issues: ${JSON.stringify(validation.error.issues)}`);
+        log.error(`Request body: ${JSON.stringify(body)}`);
         return Response.json({
             error: 'Validation failed',
             details: validation.error.issues

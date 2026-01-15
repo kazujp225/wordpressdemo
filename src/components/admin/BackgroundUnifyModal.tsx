@@ -119,6 +119,9 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
         const results: { sectionId: string; newImageUrl: string; newImageId: number; mobileImageUrl?: string; mobileImageId?: number }[] = [];
         let operationCount = 0;
 
+        // レート制限対策用のディレイ関数
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
         for (let i = 0; i < targetSections.length; i++) {
             const section = targetSections[i];
             operationCount++;
@@ -126,6 +129,11 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
 
             let desktopResult: { newImageUrl: string; newImageId: number } | null = null;
             let mobileResult: { newImageUrl: string; newImageId: number } | null = null;
+
+            // 2番目以降のセクションは1秒待機（レート制限対策）
+            if (i > 0) {
+                await delay(1000);
+            }
 
             // デスクトップ画像の処理
             try {
@@ -145,6 +153,12 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                 if (!response.ok) {
                     const error = await response.json();
                     console.error(`Section ${section.id} desktop failed:`, error);
+                    // クレジット不足の場合は処理を中断
+                    if (error.error === 'CREDIT_INSUFFICIENT') {
+                        toast.error('クレジット残高が不足しています。チャージしてください。');
+                        setIsProcessing(false);
+                        return;
+                    }
                     toast.error(`セクション${section.order + 1}(デスクトップ)の処理に失敗しました`);
                 } else {
                     const result = await response.json();
@@ -163,6 +177,9 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                 operationCount++;
                 setProgress({ current: operationCount, total: totalOperations });
 
+                // モバイル処理前に1秒待機（レート制限対策）
+                await delay(1000);
+
                 try {
                     const response = await fetch('/api/ai/background-unify', {
                         method: 'POST',
@@ -180,6 +197,12 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                     if (!response.ok) {
                         const error = await response.json();
                         console.error(`Section ${section.id} mobile failed:`, error);
+                        // クレジット不足の場合は処理を中断
+                        if (error.error === 'CREDIT_INSUFFICIENT') {
+                            toast.error('クレジット残高が不足しています。チャージしてください。');
+                            setIsProcessing(false);
+                            return;
+                        }
                         toast.error(`セクション${section.order + 1}(モバイル)の処理に失敗しました`);
                     } else {
                         const result = await response.json();
