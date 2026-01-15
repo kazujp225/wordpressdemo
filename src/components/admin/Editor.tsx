@@ -17,10 +17,11 @@ import CTAManagementModal from '@/components/admin/CTAManagementModal';
 import ColorPaletteModal from '@/components/admin/ColorPaletteModal';
 import MobileOptimizeModal from '@/components/admin/MobileOptimizeModal';
 import VideoInsertModal from '@/components/admin/VideoInsertModal';
+import TutorialModal from '@/components/admin/TutorialModal';
 import SectionInsertModal from '@/components/admin/SectionInsertModal';
 import SectionCropModal from '@/components/admin/SectionCropModal';
 import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
-import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle } from 'lucide-react';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -197,6 +198,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // 動画挿入モーダル
     const [showVideoModal, setShowVideoModal] = useState(false);
+    const [showTutorialModal, setShowTutorialModal] = useState(false);
 
     // セクション挿入モーダル
     const [showInsertModal, setShowInsertModal] = useState(false);
@@ -227,7 +229,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [upscaleResolution, setUpscaleResolution] = useState<'1K' | '2K' | '4K'>('2K'); // 解像度選択
     const [upscaleMode, setUpscaleMode] = useState<'all' | 'individual'>('all'); // 全体/個別
     const [selectedUpscaleSections, setSelectedUpscaleSections] = useState<number[]>([]); // 選択されたセクションID
-    const [useRealESRGAN, setUseRealESRGAN] = useState(false); // Real-ESRGAN使用フラグ
+    const [useRealESRGAN, setUseRealESRGAN] = useState(true); // Real-ESRGAN使用フラグ（常に高画質化のみ）
     const [geminiUpscalePrompt, setGeminiUpscalePrompt] = useState(''); // Gemini AI用カスタムプロンプト
     const [upscale4KProgress, setUpscale4KProgress] = useState<{
         current: number;
@@ -3470,21 +3472,13 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         <div className="space-y-3">
                             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">基本操作</p>
                             <div className="grid grid-cols-2 gap-2">
-                                {/* 公開設定 */}
+                                {/* チュートリアル */}
                                 <button
-                                    onClick={() => setStatus(status === 'published' ? 'draft' : 'published')}
-                                    className={clsx(
-                                        "flex items-center justify-center gap-2 px-3 py-2.5 rounded-sm text-xs font-medium transition-all border",
-                                        status === 'published'
-                                            ? "bg-gray-900 text-white border-gray-900"
-                                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                                    )}
+                                    onClick={() => setShowTutorialModal(true)}
+                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-violet-50 text-violet-700 text-xs font-medium border border-violet-200 hover:border-violet-300 hover:bg-violet-100 transition-all"
                                 >
-                                    <span className={clsx(
-                                        "w-1.5 h-1.5 rounded-full",
-                                        status === 'published' ? "bg-white" : "bg-gray-300"
-                                    )} />
-                                    {status === 'published' ? '公開中' : '下書き'}
+                                    <HelpCircle className="h-3.5 w-3.5" />
+                                    使い方
                                 </button>
                                 {/* 画像追加 */}
                                 <button
@@ -4565,82 +4559,103 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             </div>
                         </div>
                     ) : (
-                        <div className="w-full max-w-sm bg-gray-900 rounded-xl shadow-2xl overflow-hidden border border-gray-700">
-                            <div className="p-6">
-                                <div className="text-center mb-4">
-                                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-800 mb-3">
-                                        <span className="text-xl font-black text-white">HD</span>
+                        <div className="w-full max-w-md overflow-hidden rounded-[2.5rem] bg-white shadow-2xl animate-in zoom-in duration-300">
+                            <div className="p-8">
+                                {/* ヘッダー */}
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+                                        <span className="text-lg font-black text-white">HD</span>
                                     </div>
-                                    <h2 className="text-white font-bold text-lg">HD高画質化</h2>
-                                    <p className="text-gray-500 text-xs mt-1">{sections.filter(s => s.image?.filePath).length}セクション</p>
+                                    <div>
+                                        <h2 className="text-xl font-black text-gray-900">画像を高画質化</h2>
+                                        <p className="text-sm text-gray-500">{sections.filter(s => s.image?.filePath).length}ブロックが対象</p>
+                                    </div>
                                 </div>
 
                                 {/* 解像度選択 */}
-                                <div className="mb-3 p-3 bg-gray-800 rounded-lg">
-                                    <span className="text-white text-sm font-medium block mb-2">解像度</span>
+                                <div className="mb-5">
+                                    <span className="text-sm font-bold text-gray-700 block mb-2">仕上がりサイズ</span>
                                     <div className="flex gap-2">
                                         {(['1K', '2K', '4K'] as const).map((res) => (
                                             <button
                                                 key={res}
                                                 onClick={() => setUpscaleResolution(res)}
-                                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${upscaleResolution === res
-                                                    ? 'bg-violet-600 text-white'
-                                                    : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                                                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all border-2 ${upscaleResolution === res
+                                                    ? 'bg-gray-900 text-white border-gray-900'
+                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                                                     }`}
                                             >
                                                 {res}
                                             </button>
                                         ))}
                                     </div>
-                                    <p className="text-gray-500 text-xs mt-1.5">
-                                        {upscaleResolution === '1K' && '1024px幅 - 軽量'}
-                                        {upscaleResolution === '2K' && '2048px幅 - LP推奨'}
-                                        {upscaleResolution === '4K' && '3840px幅 - 高精細'}
+                                    <p className="text-gray-500 text-xs mt-2">
+                                        {upscaleResolution === '1K' && '1024px幅 - 軽めに仕上げる'}
+                                        {upscaleResolution === '2K' && '2048px幅 - おすすめ'}
+                                        {upscaleResolution === '4K' && '3840px幅 - 最高画質'}
                                     </p>
                                 </div>
 
                                 {/* 全体/個別 切り替え */}
-                                <div className="mb-3 p-3 bg-gray-800 rounded-lg">
-                                    <span className="text-white text-sm font-medium block mb-2">対象</span>
+                                <div className="mb-5">
+                                    <span className="text-sm font-bold text-gray-700 block mb-2">対象ブロック</span>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => {
                                                 setUpscaleMode('all');
                                                 setSelectedUpscaleSections([]);
                                             }}
-                                            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${upscaleMode === 'all'
-                                                ? 'bg-violet-600 text-white'
-                                                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                                            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all border-2 ${upscaleMode === 'all'
+                                                ? 'bg-gray-900 text-white border-gray-900'
+                                                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                                                 }`}
                                         >
-                                            全体
+                                            すべて
                                         </button>
                                         <button
                                             onClick={() => setUpscaleMode('individual')}
-                                            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${upscaleMode === 'individual'
-                                                ? 'bg-violet-600 text-white'
-                                                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                                            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all border-2 ${upscaleMode === 'individual'
+                                                ? 'bg-gray-900 text-white border-gray-900'
+                                                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                                                 }`}
                                         >
-                                            個別
+                                            選んで実行
                                         </button>
                                     </div>
-                                    <p className="text-gray-500 text-xs mt-1.5">
-                                        {upscaleMode === 'all' ? '全セクションを高画質化' : '選択したセクションのみ高画質化'}
-                                    </p>
                                 </div>
 
                                 {/* 個別選択時のセクション一覧 */}
                                 {upscaleMode === 'individual' && (
-                                    <div className="mb-3 p-3 bg-gray-800 rounded-lg max-h-48 overflow-y-auto">
-                                        <span className="text-white text-sm font-medium block mb-2">
-                                            セクション選択 ({selectedUpscaleSections.length}件)
-                                        </span>
-                                        <div className="space-y-1.5">
+                                    <div className="mb-5 p-4 bg-gray-50 rounded-2xl max-h-48 overflow-y-auto">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-sm font-bold text-gray-700">
+                                                {selectedUpscaleSections.length}件選択中
+                                            </span>
+                                            <button
+                                                onClick={() => {
+                                                    const allIds = sections.filter(s => s.image?.filePath).map(s => s.id);
+                                                    if (selectedUpscaleSections.length === allIds.length) {
+                                                        setSelectedUpscaleSections([]);
+                                                    } else {
+                                                        setSelectedUpscaleSections(allIds);
+                                                    }
+                                                }}
+                                                className="text-xs text-violet-600 hover:text-violet-700 font-medium"
+                                            >
+                                                {selectedUpscaleSections.length === sections.filter(s => s.image?.filePath).length
+                                                    ? '全解除'
+                                                    : '全選択'}
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2">
                                             {sections.filter(s => s.image?.filePath).map((section, idx) => (
                                                 <label
                                                     key={section.id}
-                                                    className="flex items-center gap-2 p-2 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors"
+                                                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                                                        selectedUpscaleSections.includes(section.id)
+                                                            ? 'bg-violet-100 border-2 border-violet-300'
+                                                            : 'bg-white border-2 border-gray-100 hover:border-gray-200'
+                                                    }`}
                                                 >
                                                     <input
                                                         type="checkbox"
@@ -4652,130 +4667,28 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                 setSelectedUpscaleSections(prev => prev.filter(id => id !== section.id));
                                                             }
                                                         }}
-                                                        className="h-4 w-4 rounded border-gray-500 bg-gray-600 text-violet-600 focus:ring-violet-500"
+                                                        className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
                                                     />
-                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                        <img
-                                                            src={section.image.filePath}
-                                                            alt=""
-                                                            className="w-8 h-8 object-cover rounded"
-                                                        />
-                                                        <span className="text-white text-xs truncate">
-                                                            {idx + 1}. {section.role || 'セクション'}
-                                                        </span>
-                                                    </div>
+                                                    <img
+                                                        src={section.image.filePath}
+                                                        alt=""
+                                                        className="w-10 h-10 object-cover rounded-lg"
+                                                    />
+                                                    <span className="text-sm font-medium text-gray-700 truncate flex-1">
+                                                        {idx + 1}. {section.role || 'ブロック'}
+                                                    </span>
                                                 </label>
                                             ))}
                                         </div>
-                                        {sections.filter(s => s.image?.filePath).length > 0 && (
-                                            <button
-                                                onClick={() => {
-                                                    const allIds = sections.filter(s => s.image?.filePath).map(s => s.id);
-                                                    if (selectedUpscaleSections.length === allIds.length) {
-                                                        setSelectedUpscaleSections([]);
-                                                    } else {
-                                                        setSelectedUpscaleSections(allIds);
-                                                    }
-                                                }}
-                                                className="mt-2 text-xs text-violet-400 hover:text-violet-300"
-                                            >
-                                                {selectedUpscaleSections.length === sections.filter(s => s.image?.filePath).length
-                                                    ? '全て解除'
-                                                    : '全て選択'}
-                                            </button>
-                                        )}
                                     </div>
                                 )}
 
-                                {/* AIエンジン選択 */}
-                                <div className="mb-4">
-                                    <span className="text-white text-sm font-medium block mb-2">AIエンジン</span>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {/* Gemini AI オプション */}
-                                        <button
-                                            onClick={() => {
-                                                setUseRealESRGAN(false);
-                                                setTextCorrection4K(true);
-                                            }}
-                                            className={`p-3 rounded-lg border-2 transition-all text-left ${!useRealESRGAN
-                                                ? 'bg-violet-600/20 border-violet-500 ring-2 ring-violet-500/50'
-                                                : 'bg-gray-800 border-gray-700 hover:border-gray-600'
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`text-sm font-bold ${!useRealESRGAN ? 'text-violet-300' : 'text-gray-300'}`}>
-                                                    Gemini AI
-                                                </span>
-                                                {!useRealESRGAN && (
-                                                    <span className="text-[9px] px-1.5 py-0.5 bg-violet-500 text-white rounded-full">選択中</span>
-                                                )}
-                                            </div>
-                                            <p className="text-[10px] text-gray-400 leading-tight">
-                                                ✅ 文字化け修正<br />
-                                                ✅ 文字内容の変更可<br />
-                                                ✅ 画質向上
-                                            </p>
-                                        </button>
 
-                                        {/* 超解像AI オプション */}
-                                        <button
-                                            onClick={() => {
-                                                setUseRealESRGAN(true);
-                                                setTextCorrection4K(false);
-                                            }}
-                                            className={`p-3 rounded-lg border-2 transition-all text-left ${useRealESRGAN
-                                                ? 'bg-cyan-600/20 border-cyan-500 ring-2 ring-cyan-500/50'
-                                                : 'bg-gray-800 border-gray-700 hover:border-gray-600'
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`text-sm font-bold ${useRealESRGAN ? 'text-cyan-300' : 'text-gray-300'}`}>
-                                                    超解像AI
-                                                </span>
-                                                {useRealESRGAN && (
-                                                    <span className="text-[9px] px-1.5 py-0.5 bg-cyan-500 text-white rounded-full">選択中</span>
-                                                )}
-                                            </div>
-                                            <p className="text-[10px] text-gray-400 leading-tight">
-                                                ✅ 超高画質化<br />
-                                                ✅ エッジ鮮明化<br />
-                                                ⚠️ 文字補正なし
-                                            </p>
-                                        </button>
-                                    </div>
-                                    <p className="text-gray-500 text-[10px] mt-2">
-                                        {!useRealESRGAN
-                                            ? '💡 文字化けを修正したい場合はGemini AIがおすすめ'
-                                            : '💡 文字を変えずに画質だけ上げたい場合は超解像AIがおすすめ'
-                                        }
-                                    </p>
-                                </div>
-
-                                {/* Gemini AI選択時のプロンプト入力欄 */}
-                                {!useRealESRGAN && (
-                                    <div className="mb-4 p-3 bg-violet-900/30 rounded-lg border border-violet-700/50">
-                                        <label className="block">
-                                            <span className="text-violet-300 text-sm font-medium block mb-2">
-                                                修正指示（任意）
-                                            </span>
-                                            <textarea
-                                                value={geminiUpscalePrompt}
-                                                onChange={(e) => setGeminiUpscalePrompt(e.target.value)}
-                                                placeholder="例：文字を大きくして / ○○を△△に変更 / もっと鮮明に"
-                                                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500 resize-none"
-                                                rows={2}
-                                            />
-                                            <p className="text-gray-500 text-[10px] mt-1">
-                                                空欄の場合は文字補正＋画質向上のみ実行
-                                            </p>
-                                        </label>
-                                    </div>
-                                )}
-
-                                <div className="flex gap-3">
+                                {/* アクションボタン */}
+                                <div className="flex gap-3 pt-2">
                                     <button
                                         onClick={() => setShow4KModal(false)}
-                                        className="flex-1 px-4 py-3 bg-gray-800 text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+                                        className="flex-1 px-6 py-4 bg-gray-100 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-200 transition-colors"
                                     >
                                         キャンセル
                                     </button>
@@ -4785,9 +4698,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             sections.filter(s => s.image?.filePath).length === 0 ||
                                             (upscaleMode === 'individual' && selectedUpscaleSections.length === 0)
                                         }
-                                        className="flex-1 px-4 py-3 bg-white text-gray-900 text-sm font-bold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                                        className="flex-1 px-6 py-4 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        {upscaleMode === 'individual' ? `${selectedUpscaleSections.length}件を実行` : '実行'}
+                                        {upscaleMode === 'individual' ? `${selectedUpscaleSections.length}件を高画質化` : '高画質化する'}
                                     </button>
                                 </div>
                             </div>
@@ -5406,6 +5319,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                     return data;
                 }}
+            />
+
+            {/* チュートリアルモーダル */}
+            <TutorialModal
+                isOpen={showTutorialModal}
+                onClose={() => setShowTutorialModal(false)}
             />
 
             {/* セクションクロップモーダル */}
