@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const filename = file.name.replace(/[^a-zA-Z0-9.]/g, '_'); // Sanitize
     const finalFilename = `${uniqueSuffix}-${filename}`;
 
-    const { data: uploadData, error: uploadError } = await supabase
+    const { data: uploadData, error: uploadError } = await supabaseAdmin
         .storage
         .from('images')
         .upload(finalFilename, buffer, {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get Public URL
-    const { data: { publicUrl } } = supabase
+    const { data: { publicUrl } } = supabaseAdmin
         .storage
         .from('images')
         .getPublicUrl(finalFilename);
