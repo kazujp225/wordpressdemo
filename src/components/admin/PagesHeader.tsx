@@ -318,9 +318,9 @@ export function PagesHeader() {
                                         <div className="mb-4 rounded-md bg-primary/10 p-3 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                                             <Layout className="h-6 w-6" />
                                         </div>
-                                        <h3 className="text-base font-bold text-foreground mb-1"><span>ゼロから作成</span></h3>
+                                        <h3 className="text-base font-bold text-foreground mb-1"><span>あらゆる画像を編集できます</span></h3>
                                         <p className="text-xs font-medium text-muted-foreground leading-relaxed">
-                                            <span>画像をアップロードしたり、AIで生成して独自のLPを構築します。</span>
+                                            <span>画像をアップロードして、AIで自由に編集・加工できます。</span>
                                         </p>
                                     </button>
 
@@ -333,7 +333,7 @@ export function PagesHeader() {
                                         </div>
                                         <h3 className="text-base font-bold text-foreground mb-1"><span>クイックインポート</span></h3>
                                         <p className="text-xs font-medium text-muted-foreground leading-relaxed">
-                                            <span>URLを入力して自動分割。境界調整なしで素早く取り込み。</span>
+                                            <span>LPを作成する場合はこちらがおすすめです。</span>
                                         </p>
                                     </button>
                                 </div>

@@ -23,7 +23,9 @@ import LPComparePanel from '@/components/admin/LPComparePanel';
 import SectionInsertModal from '@/components/admin/SectionInsertModal';
 import SectionCropModal from '@/components/admin/SectionCropModal';
 import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
-import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle } from 'lucide-react';
+import ThumbnailTransformModal from '@/components/admin/ThumbnailTransformModal';
+import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
+import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText } from 'lucide-react';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -203,6 +205,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [showTutorialModal, setShowTutorialModal] = useState(false);
     const [showLPCompareModal, setShowLPCompareModal] = useState(false);
     const [showLPComparePanel, setShowLPComparePanel] = useState(false);
+
+    // 画像変換モーダル
+    const [showThumbnailModal, setShowThumbnailModal] = useState(false);
+    const [showDocumentModal, setShowDocumentModal] = useState(false);
 
     // セクション挿入モーダル
     const [showInsertModal, setShowInsertModal] = useState(false);
@@ -3818,6 +3824,49 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         </div>
                     </div>
 
+                    {/* 別の用途で使う */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">別の用途で使う</p>
+
+                        {/* サムネイル用に変換 */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button
+                                onClick={() => setShowThumbnailModal(true)}
+                                className="w-full p-3 hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><ImageIcon className="h-3.5 w-3.5" /></div>
+                                    <div className="text-left flex-1">
+                                        <h4 className="text-xs font-semibold text-gray-900">
+                                            サムネイル用に変換
+                                        </h4>
+                                        <p className="text-[10px] text-gray-500">参考サムネイルを元に変換</p>
+                                    </div>
+                                    <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+                                </div>
+                            </button>
+                        </div>
+
+                        {/* 資料にする */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button
+                                onClick={() => setShowDocumentModal(true)}
+                                className="w-full p-3 hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><FileText className="h-3.5 w-3.5" /></div>
+                                    <div className="text-left flex-1">
+                                        <h4 className="text-xs font-semibold text-gray-900">
+                                            資料にする
+                                        </h4>
+                                        <p className="text-[10px] text-gray-500">スライド風の資料を作成</p>
+                                    </div>
+                                    <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* 整理・やり直し */}
                     <div className="space-y-2">
                         <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">整理・やり直し</p>
@@ -5470,6 +5519,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     }}
                 />
             )}
+
+            {/* サムネイル変換モーダル */}
+            <ThumbnailTransformModal
+                isOpen={showThumbnailModal}
+                onClose={() => setShowThumbnailModal(false)}
+                sections={sections}
+            />
+
+            {/* 資料化モーダル */}
+            <DocumentTransformModal
+                isOpen={showDocumentModal}
+                onClose={() => setShowDocumentModal(false)}
+                sections={sections}
+            />
 
 
         </div>
