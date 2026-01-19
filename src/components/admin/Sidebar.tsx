@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, Inbox } from 'lucide-react';
 import clsx from 'clsx';
@@ -115,7 +116,13 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             )}>
                 <div className="flex h-16 items-center justify-between px-6 border-b border-border">
                     <div className="flex items-center gap-3">
-                        <div className="h-6 w-6 bg-primary rounded-sm" />
+                        <Image
+                            src="/lp-builder-logo.png"
+                            alt="Logo"
+                            width={24}
+                            height={24}
+                            className="h-6 w-6 object-contain"
+                        />
                         <span className="text-lg font-bold tracking-tight text-foreground">LP Builder</span>
                     </div>
                     {/* モバイル用閉じるボタン */}
