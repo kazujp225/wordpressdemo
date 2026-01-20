@@ -3805,43 +3805,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         </div>
                     </div>
 
-                    {/* スマホで見やすくする */}
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">スマホで見やすくする</p>
-
-                        {/* スマホ表示の調整 */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white opacity-60">
-                            <div className="p-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-400"><Smartphone className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left flex-1">
-                                        <h4 className="text-xs font-semibold text-gray-500 flex items-center gap-2">
-                                            スマホ表示の調整
-                                            <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">準備中</span>
-                                        </h4>
-                                        <p className="text-[10px] text-gray-400">近日公開予定</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* LP比較 */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white opacity-60">
-                            <div className="p-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-400"><Layers className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left flex-1">
-                                        <h4 className="text-xs font-semibold text-gray-500 flex items-center gap-2">
-                                            LP比較
-                                            <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">準備中</span>
-                                        </h4>
-                                        <p className="text-[10px] text-gray-400">複数LPを並べていいとこ取り</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* もっと魅力的にする */}
                     <div className="space-y-2">
                         <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">もっと魅力的にする</p>
