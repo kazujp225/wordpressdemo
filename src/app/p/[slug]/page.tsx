@@ -204,6 +204,13 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                             sandbox="allow-scripts allow-forms allow-same-origin"
                                             title="Embedded content"
                                         />
+                                    ) : section.role === 'html-embed' ? (
+                                        <div className="flex flex-col h-48 items-center justify-center bg-yellow-50 text-yellow-700 p-4">
+                                            <p className="font-bold">HTML Embed (コンテンツなし)</p>
+                                            <p className="text-xs mt-2">config keys: {JSON.stringify(Object.keys(config))}</p>
+                                            <p className="text-xs mt-1">raw config type: {typeof section.config}</p>
+                                            <p className="text-xs mt-1">raw config: {String(section.config).slice(0, 200)}</p>
+                                        </div>
                                     ) : (
                                         <div className="flex h-48 items-center justify-center bg-gray-100 text-gray-400">
                                             セクション: {section.role} (画像なし)
