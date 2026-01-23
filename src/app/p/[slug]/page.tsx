@@ -168,8 +168,6 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                     } else if (parsed.clickableAreas) {
                                         config.clickableAreas = parsed.clickableAreas;
                                     }
-                                    // デバッグ用ログ
-                                    console.log(`[Public] Section ${section.role} clickableAreas:`, config.clickableAreas);
                                 }
                             } catch (e) {
                                 console.error(`[Public] Failed to parse config for section ${section.role}:`, e);
@@ -200,20 +198,13 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                         <iframe
                                             srcDoc={config.htmlContent}
                                             className="w-full border-0"
-                                            style={{ minHeight: '600px', height: '100vh', maxHeight: '1200px' }}
-                                            sandbox="allow-scripts allow-forms allow-same-origin"
+                                            style={{ minHeight: '400px', height: '800px' }}
+                                            sandbox="allow-scripts allow-forms"
                                             title="Embedded content"
                                         />
-                                    ) : section.role === 'html-embed' ? (
-                                        <div className="flex flex-col h-48 items-center justify-center bg-yellow-50 text-yellow-700 p-4">
-                                            <p className="font-bold">HTML Embed (コンテンツなし)</p>
-                                            <p className="text-xs mt-2">config keys: {JSON.stringify(Object.keys(config))}</p>
-                                            <p className="text-xs mt-1">raw config type: {typeof section.config}</p>
-                                            <p className="text-xs mt-1">raw config: {String(section.config).slice(0, 200)}</p>
-                                        </div>
                                     ) : (
                                         <div className="flex h-48 items-center justify-center bg-gray-100 text-gray-400">
-                                            セクション: {section.role} (画像なし)
+                                            {section.role === 'html-embed' ? 'コンテンツを読み込み中...' : `セクション: ${section.role}`}
                                         </div>
                                     )}
 

@@ -1417,11 +1417,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             const method = pageId === 'new' ? 'POST' : 'PUT';
             const url = pageId === 'new' ? '/api/pages' : `/api/pages/${pageId}`;
 
-            // デバッグ: 保存前のデータを確認
-            const heroSection = sectionsToSave.find(s => s.role === 'hero');
-            console.log('handleSave - hero config:', heroSection?.config);
-            console.log('handleSave - hero clickableAreas:', heroSection?.config?.clickableAreas);
-
             const res = await fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
@@ -3503,16 +3498,24 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             {/* 右サイドバー - 編集メニュー */}
             <div className="fixed right-0 top-0 h-full w-[320px] bg-white border-l border-gray-200 z-40 flex flex-col font-sans">
                 {/* ヘッダー */}
-                <div className="flex items-center gap-2 border-b border-gray-100 p-3">
-                    <PenTool className="h-4 w-4 text-gray-900" />
-                    <span className="text-sm font-semibold text-gray-900">編集メニュー</span>
+                <div className="flex items-center gap-3 border-b border-gray-100 p-5 bg-white sticky top-0 z-10">
+                    <div className="bg-gray-100 p-2 rounded-lg text-gray-700">
+                        <PenTool className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <span className="text-base font-bold text-gray-900 block">編集メニュー</span>
+                        <span className="text-xs text-gray-500">Page Actions</span>
+                    </div>
                 </div>
 
                 {/* メニュー */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     {/* 基本操作 */}
-                    <div className="space-y-3">
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">基本操作</p>
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                            <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
+                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">基本操作</p>
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             {/* チュートリアル */}
                             <button
@@ -3591,8 +3594,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                     {/* 見た目を調整する */}
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">見た目を調整する</p>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
+                            <span className="w-1 h-4 bg-indigo-500 rounded-full"></span>
+                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">見た目を調整する</p>
+                        </div>
 
                         {/* 画像を切り取る */}
                         <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -3605,8 +3611,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <Scissors className="h-3.5 w-3.5" />
                                     </div>
                                     <div className="text-left">
-                                        <h4 className="text-xs font-semibold text-gray-900">画像を切り取る</h4>
-                                        <p className="text-[10px] text-gray-500">余白や不要な部分をカット</p>
+                                        <h4 className="text-sm font-bold text-gray-900">画像を切り取る</h4>
+                                        <p className="text-xs text-gray-500 mt-0.5">余白や不要な部分をカット</p>
                                     </div>
                                 </div>
                                 {expandedTools.has('crop') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
@@ -3657,8 +3663,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <Layers className="h-3.5 w-3.5" />
                                     </div>
                                     <div className="text-left">
-                                        <h4 className="text-xs font-semibold text-gray-900">ボタン・文字を重ねる</h4>
-                                        <p className="text-[10px] text-gray-500">画像の上に追加できます</p>
+                                        <h4 className="text-sm font-bold text-gray-900">ボタン・文字を重ねる</h4>
+                                        <p className="text-xs text-gray-500 mt-0.5">画像の上に追加できます</p>
                                     </div>
                                 </div>
                                 {expandedTools.has('overlay') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
@@ -3717,8 +3723,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </div>
                                     <div className="text-left">
-                                        <h4 className="text-xs font-semibold text-gray-900">ブロックを削除</h4>
-                                        <p className="text-[10px] text-gray-500">いらない部分を外す</p>
+                                        <h4 className="text-sm font-bold text-gray-900">ブロックを削除</h4>
+                                        <p className="text-xs text-gray-500 mt-0.5">いらない部分を外す</p>
                                     </div>
                                 </div>
                                 {expandedTools.has('delete') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
@@ -3750,8 +3756,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <Palette className="h-3.5 w-3.5" />
                                     </div>
                                     <div className="text-left">
-                                        <h4 className="text-xs font-semibold text-gray-900">背景色をそろえる</h4>
-                                        <p className="text-[10px] text-gray-400">全体の背景を同じ色に</p>
+                                        <h4 className="text-sm font-bold text-gray-900">背景色をそろえる</h4>
+                                        <p className="text-xs text-gray-500 mt-0.5">全体の背景を同じ色に</p>
                                     </div>
                                 </div>
                                 <button
@@ -3773,7 +3779,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             <button onClick={() => toggleTool('color-palette')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Droplet className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">色の組み合わせ</h4><p className="text-[10px] text-gray-500">ページ全体の色を選ぶ</p></div>
+                                    <div className="text-left"><h4 className="text-sm font-bold text-gray-900">色の組み合わせ</h4><p className="text-xs text-gray-500 mt-0.5">ページ全体の色を選ぶ</p></div>
                                 </div>
                                 {expandedTools.has('color-palette') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
                             </button>
@@ -3786,15 +3792,18 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                     {/* 内容を編集する */}
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">内容を編集する</p>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
+                            <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
+                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">内容を編集する</p>
+                        </div>
 
                         {/* 文章をまとめて書き直す */}
                         <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
                             <button onClick={() => toggleTool('copy-edit')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Type className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">文章をまとめて書き直す</h4><p className="text-[10px] text-gray-500">AIがテキストを作成</p></div>
+                                    <div className="text-left"><h4 className="text-sm font-bold text-gray-900">文章をまとめて書き直す</h4><p className="text-xs text-gray-500 mt-0.5">AIがテキストを作成</p></div>
                                 </div>
                                 {expandedTools.has('copy-edit') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
                             </button>
@@ -3810,7 +3819,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             <button onClick={() => toggleTool('cta')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><MousePointer className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left"><h4 className="text-xs font-semibold text-gray-900">ボタンのリンク先</h4><p className="text-[10px] text-gray-500">押したときの移動先を変更</p></div>
+                                    <div className="text-left"><h4 className="text-sm font-bold text-gray-900">ボタンのリンク先</h4><p className="text-xs text-gray-500 mt-0.5">押したときの移動先を変更</p></div>
                                 </div>
                                 {expandedTools.has('cta') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
                             </button>
@@ -3823,8 +3832,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                     {/* もっと魅力的にする */}
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">もっと魅力的にする</p>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
+                            <span className="w-1 h-4 bg-amber-500 rounded-full"></span>
+                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">もっと魅力的にする</p>
+                        </div>
 
                         {/* 動画を埋め込む */}
                         <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -3832,8 +3844,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 <div className="flex items-center gap-3">
                                     <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Video className="h-3.5 w-3.5" /></div>
                                     <div className="text-left">
-                                        <h4 className="text-xs font-semibold text-gray-900 flex items-center gap-2">動画を埋め込む<span className="flex items-center gap-0.5 text-[8px] px-1.5 py-0 bg-gray-900 text-white rounded-sm font-medium">Max</span></h4>
-                                        <p className="text-[10px] text-gray-500">YouTube等の動画を追加</p>
+                                        <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">動画を埋め込む<span className="flex items-center gap-0.5 text-[8px] px-1.5 py-0 bg-gray-900 text-white rounded-sm font-medium">Max</span></h4>
+                                        <p className="text-xs text-gray-500 mt-0.5">YouTube等の動画を追加</p>
                                     </div>
                                 </div>
                                 {expandedTools.has('video') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
@@ -3847,8 +3859,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                     {/* 別の用途で使う */}
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">別の用途で使う</p>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
+                            <span className="w-1 h-4 bg-purple-500 rounded-full"></span>
+                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">別の用途で使う</p>
+                        </div>
 
                         {/* サムネイル用に変換 */}
                         <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -3859,10 +3874,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 <div className="flex items-center gap-3">
                                     <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><ImageIcon className="h-3.5 w-3.5" /></div>
                                     <div className="text-left flex-1">
-                                        <h4 className="text-xs font-semibold text-gray-900">
+                                        <h4 className="text-sm font-bold text-gray-900">
                                             サムネイル用に変換
                                         </h4>
-                                        <p className="text-[10px] text-gray-500">参考サムネイルを元に変換</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">参考サムネイルを元に変換</p>
                                     </div>
                                     <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
                                 </div>
@@ -3878,10 +3893,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 <div className="flex items-center gap-3">
                                     <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><FileText className="h-3.5 w-3.5" /></div>
                                     <div className="text-left flex-1">
-                                        <h4 className="text-xs font-semibold text-gray-900">
+                                        <h4 className="text-sm font-bold text-gray-900">
                                             資料にする
                                         </h4>
-                                        <p className="text-[10px] text-gray-500">スライド風の資料を作成</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">スライド風の資料を作成</p>
                                     </div>
                                     <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
                                 </div>
@@ -3890,8 +3905,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                     {/* AIコード生成 */}
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">AIコード生成</p>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
+                            <span className="w-1 h-4 bg-gray-900 rounded-full"></span>
+                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">AIコード生成</p>
+                        </div>
 
                         {/* AIコード生成 */}
                         <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -3904,10 +3922,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <Code2 className="h-3.5 w-3.5 text-white" />
                                     </div>
                                     <div className="text-left flex-1">
-                                        <h4 className="text-xs font-semibold text-gray-900 font-mono">
+                                        <h4 className="text-sm font-bold text-gray-900 font-mono">
                                             claude-codegen
                                         </h4>
-                                        <p className="text-[10px] text-gray-500 font-mono">sonnet-4 | html/css/js</p>
+                                        <p className="text-xs text-gray-500 font-mono mt-0.5">sonnet-4 | html/css/js</p>
                                     </div>
                                     <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
                                 </div>
@@ -3916,8 +3934,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                     {/* 整理・やり直し */}
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">整理・やり直し</p>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
+                            <span className="w-1 h-4 bg-rose-500 rounded-full"></span>
+                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">整理・やり直し</p>
+                        </div>
 
                         {/* 操作をやり直す */}
                         <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -3927,8 +3948,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <Undo2 className="h-3.5 w-3.5" />
                                     </div>
                                     <div className="text-left">
-                                        <h4 className="text-xs font-semibold text-gray-900">操作をやり直す</h4>
-                                        <p className="text-[10px] text-gray-400">前の状態に戻せます</p>
+                                        <h4 className="text-sm font-bold text-gray-900">操作をやり直す</h4>
+                                        <p className="text-xs text-gray-400 mt-0.5">前の状態に戻せます</p>
                                     </div>
                                 </div>
                                 <div className="text-[10px] text-gray-500 bg-gray-50 rounded p-1.5 text-center">
@@ -3945,8 +3966,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <RefreshCw className="h-3.5 w-3.5" />
                                     </div>
                                     <div className="text-left">
-                                        <h4 className="text-xs font-semibold text-gray-900">まとめて作り直す</h4>
-                                        <p className="text-[10px] text-gray-400">AIでページ全体を再生成</p>
+                                        <h4 className="text-sm font-bold text-gray-900">まとめて作り直す</h4>
+                                        <p className="text-xs text-gray-400 mt-0.5">AIでページ全体を再生成</p>
                                     </div>
                                 </div>
                                 <button
@@ -4367,18 +4388,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     defaultLabel: headerConfig.ctaText || 'お問い合わせ',
                 }}
                 onApply={(updatedSections, globalConfig) => {
-                    // デバッグ: CTAデータを確認
-                    console.log('CTA onApply - updatedSections:', updatedSections);
-                    console.log('CTA onApply - hero section config:', updatedSections.find(s => s.role === 'hero')?.config);
-
                     setSections(updatedSections);
                     setHeaderConfig((prev: any) => ({
                         ...prev,
                         ctaLink: globalConfig.defaultUrl,
                         ctaText: globalConfig.defaultLabel,
                     }));
-                    // CTAエリアをデータベースに保存
-                    console.log('CTA onApply - calling handleSave');
                     handleSave(updatedSections);
                 }}
             />
@@ -4755,8 +4770,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 <label
                                                     key={section.id}
                                                     className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${selectedUpscaleSections.includes(section.id)
-                                                            ? 'bg-violet-100 border-2 border-violet-300'
-                                                            : 'bg-white border-2 border-gray-100 hover:border-gray-200'
+                                                        ? 'bg-violet-100 border-2 border-violet-300'
+                                                        : 'bg-white border-2 border-gray-100 hover:border-gray-200'
                                                         }`}
                                                 >
                                                     <input
@@ -5589,7 +5604,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     sections={sections}
                     designDefinition={designDefinition}
                     layoutMode={sections[0]?.config?.layout === 'desktop' ? 'desktop' : 'responsive'}
-                    onInsertHtml={(html, insertIndex, meta) => {
+                    onInsertHtml={async (html, insertIndex, meta) => {
+                        if (!html || html.trim().length === 0) {
+                            toast.error('生成されたHTMLが空です');
+                            return;
+                        }
                         const newSection = {
                             id: `temp-${Date.now()}`,
                             role: 'html-embed',
@@ -5613,7 +5632,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         newSections.push(newSection);
                         const sorted = newSections.sort((a, b) => a.order - b.order);
                         setSections(sorted);
-                        handleSave(sorted);
+                        await handleSave(sorted);
                     }}
                 />
             )}

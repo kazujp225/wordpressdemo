@@ -19,7 +19,7 @@ interface ClaudeCodeGeneratorModalProps {
   sections: Section[];
   designDefinition?: DesignContext | null;
   layoutMode: 'desktop' | 'responsive';
-  onInsertHtml: (html: string, insertIndex: number, meta: { templateType: string; prompt: string }) => void;
+  onInsertHtml: (html: string, insertIndex: number, meta: { templateType: string; prompt: string }) => void | Promise<void>;
 }
 
 type Step = 'template' | 'fields' | 'prompt' | 'generating' | 'preview' | 'insert';
