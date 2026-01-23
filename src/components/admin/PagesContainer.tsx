@@ -40,9 +40,9 @@ export function PagesContainer({ initialPages, headerContent }: PagesContainerPr
 
     return (
         <>
-            <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-between border-b border-border pb-8">
+            <div className="mb-6 sm:mb-8 flex flex-col gap-4 sm:gap-6 sm:flex-row sm:items-end sm:justify-between border-b border-border pb-6 sm:pb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                         <span>Pages</span>
                     </h1>
                     <p className="text-muted-foreground mt-1 text-sm font-medium">
@@ -50,10 +50,10 @@ export function PagesContainer({ initialPages, headerContent }: PagesContainerPr
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     <button
                         onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                        className={`flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-bold transition-all active:scale-[0.98] ${
+                        className={`flex items-center gap-2 rounded-md px-3 sm:px-4 py-2.5 text-sm font-bold transition-all active:scale-[0.98] min-h-[44px] ${
                             showFavoritesOnly
                                 ? 'bg-yellow-400 text-white shadow-sm hover:bg-yellow-500'
                                 : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
@@ -92,7 +92,7 @@ export function PagesContainer({ initialPages, headerContent }: PagesContainerPr
                     </p>
                 </div>
             ) : (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {displayPages.map((page) => (
                         <PageCard
                             key={page.id}

@@ -151,47 +151,47 @@ export default function SettingsPage() {
 
     return (
         <div className="min-h-screen bg-gray-50/50">
-            <div className="max-w-5xl mx-auto px-6 py-12 pb-32">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-12 pb-24 sm:pb-32">
                 {/* ヘッダー */}
-                <div className="mb-10 flex justify-between items-start">
+                <div className="mb-6 sm:mb-10 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-gray-900">設定</h1>
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">設定</h1>
                         <p className="text-gray-500 mt-1 text-sm">アカウントとプランの管理</p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4">
                         {user && (
-                            <div className="text-right">
+                            <div className="text-right min-w-0 flex-1 sm:flex-initial">
                                 <p className="text-xs text-gray-400 font-medium">ログイン中</p>
-                                <p className="text-sm font-medium text-gray-900">{user.email}</p>
+                                <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
                             </div>
                         )}
                         <button
                             onClick={handleLogout}
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                            className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors min-h-[44px] flex-shrink-0"
                         >
                             <LogOut className="h-4 w-4" />
-                            ログアウト
+                            <span className="hidden xs:inline">ログアウト</span>
                         </button>
                     </div>
                 </div>
 
                 {/* プランステータスカード */}
-                <div className="mb-10 rounded-xl border border-gray-200 bg-white p-8">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-6">
-                            <div className="p-4 rounded-full bg-gray-50 border border-gray-100">
-                                <Crown className="h-6 w-6 text-gray-900" />
+                <div className="mb-6 sm:mb-10 rounded-xl border border-gray-200 bg-white p-4 sm:p-8">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-4 sm:gap-6">
+                            <div className="p-3 sm:p-4 rounded-full bg-gray-50 border border-gray-100 flex-shrink-0">
+                                <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-gray-900" />
                             </div>
-                            <div>
-                                <div className="flex items-center gap-3">
-                                    <h2 className="text-xl font-bold tracking-tight text-gray-900">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                    <h2 className="text-lg sm:text-xl font-bold tracking-tight text-gray-900">
                                         {planInfo.name}プラン
                                     </h2>
                                     <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
                                         {planInfo.priceDisplay}
                                     </span>
                                 </div>
-                                <p className="mt-1.5 text-sm text-gray-500 font-medium">
+                                <p className="mt-1 sm:mt-1.5 text-sm text-gray-500 font-medium">
                                     {isFreePlan
                                         ? 'APIキーを設定して利用中'
                                         : `クレジット残高: $${creditBalance?.toFixed(4) || '0.0000'}`
@@ -200,12 +200,12 @@ export default function SettingsPage() {
                             </div>
                         </div>
                         {isFreePlan ? (
-                            <button className="flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm">
+                            <button className="flex items-center justify-center gap-2 bg-gray-900 text-white px-5 sm:px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm min-h-[44px] w-full sm:w-auto">
                                 <Rocket className="h-4 w-4" />
                                 アップグレード
                             </button>
                         ) : (
-                            <button className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+                            <button className="flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 sm:px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors min-h-[44px] w-full sm:w-auto">
                                 <CreditCard className="h-4 w-4" />
                                 クレジット購入
                             </button>
@@ -214,7 +214,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* タブナビゲーション */}
-                <div className="flex gap-1 mb-8 border-b border-gray-100 pb-1">
+                <div className="flex gap-1 mb-6 sm:mb-8 border-b border-gray-100 pb-1 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
                     <TabButton
                         active={activeTab === 'plan'}
                         onClick={() => setActiveTab('plan')}
@@ -329,7 +329,7 @@ export default function SettingsPage() {
 
                     {/* APIキータブ（Freeプランのみ） */}
                     {activeTab === 'apikey' && canSetApiKey && (
-                        <div className="rounded-xl border border-gray-200 bg-white p-8">
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-8">
                             <div className="flex items-start gap-4 mb-8">
                                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <Sparkles className="h-5 w-5 text-gray-900" />
@@ -404,7 +404,7 @@ export default function SettingsPage() {
 
                     {/* 一般設定タブ */}
                     {activeTab === 'general' && (
-                        <div className="rounded-xl border border-gray-200 bg-white p-8">
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-8">
                             <div className="flex items-start gap-4 mb-8">
                                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <Globe className="h-5 w-5 text-gray-900" />
@@ -429,7 +429,7 @@ export default function SettingsPage() {
 
                     {/* GitHub連携タブ */}
                     {activeTab === 'github' && (
-                        <div className="rounded-xl border border-gray-200 bg-white p-8">
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-8">
                             <div className="flex items-start gap-4 mb-8">
                                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <Github className="h-5 w-5 text-gray-900" />
@@ -480,15 +480,15 @@ export default function SettingsPage() {
                 </div>
 
                 {/* 保存ボタン（フローティング） */}
-                <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-gray-200 p-4 z-50">
-                    <div className="max-w-5xl mx-auto flex justify-between items-center">
-                        <p className="text-sm text-gray-500 font-medium">
+                <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-gray-200 p-3 sm:p-4 z-50">
+                    <div className="max-w-5xl mx-auto flex justify-between items-center gap-3">
+                        <p className="text-xs sm:text-sm text-gray-500 font-medium hidden sm:block">
                             {isSaving ? '保存中...' : saveStatus === 'success' ? '保存完了' : '変更を保存してください'}
                         </p>
                         <button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className="flex items-center gap-2 bg-gray-900 text-white px-8 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-50 shadow-sm"
+                            className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 sm:px-8 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-50 shadow-sm min-h-[44px] w-full sm:w-auto"
                         >
                             {isSaving ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -523,7 +523,7 @@ function TabButton({
     return (
         <button
             onClick={onClick}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all relative ${active
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all relative whitespace-nowrap min-h-[44px] ${active
                     ? 'text-gray-900 bg-gray-100'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}

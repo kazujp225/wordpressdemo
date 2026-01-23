@@ -46,7 +46,7 @@ export default async function PagesPage() {
     }));
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
+        <div className="px-4 py-4 sm:px-6 sm:py-6 lg:p-8 max-w-7xl mx-auto">
             <PagesContainer
                 initialPages={pagesData}
                 headerContent={<PagesHeader />}

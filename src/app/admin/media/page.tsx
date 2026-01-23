@@ -152,11 +152,11 @@ export default function MediaLibrary() {
     }, [media, searchTerm]);
 
     return (
-        <div className="p-8 max-w-7xl mx-auto relative min-h-screen">
+        <div className="px-4 py-4 sm:px-6 sm:py-6 lg:p-8 max-w-7xl mx-auto relative min-h-screen">
             {/* AI Generation Modal */}
             {showAIModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-6">
-                    <div className="w-full max-w-xl overflow-hidden rounded-lg border border-border bg-background shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-0 sm:p-6">
+                    <div className="w-full max-w-xl overflow-hidden rounded-t-2xl sm:rounded-lg border border-border bg-background shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
                         <div className="relative h-32 bg-gradient-to-tr from-primary/20 to-primary/5 p-8 border-b border-border">
                             <button
                                 onClick={() => setShowAIModal(false)}
@@ -213,35 +213,38 @@ export default function MediaLibrary() {
                 </div>
             )}
 
-            <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">メディアライブラリ</h1>
-                    <p className="text-sm text-muted-foreground mt-1">アップロードまたは生成されたすべてのアセットを管理します。</p>
+            <div className="mb-6 sm:mb-10 flex flex-col gap-4 sm:gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">メディアライブラリ</h1>
+                        <p className="text-sm text-muted-foreground mt-1 hidden sm:block">アップロードまたは生成されたすべてのアセットを管理します。</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <button
+                            onClick={() => setShowAIModal(true)}
+                            className="flex items-center gap-2 rounded-md bg-foreground px-3 sm:px-5 py-2.5 text-sm font-bold text-background hover:bg-foreground/90 transition-all min-h-[44px]"
+                        >
+                            <Sparkles className="h-4 w-4 text-primary-foreground" />
+                            <span className="hidden xs:inline">AI生成</span>
+                        </button>
+                        <label className="flex cursor-pointer items-center gap-2 rounded-md bg-primary px-3 sm:px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all min-h-[44px]">
+                            <Upload className="h-4 w-4" />
+                            {uploading ? '...' : <span className="hidden xs:inline">アップロード</span>}
+                            <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="hidden" />
+                        </label>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="relative group">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        <input
-                            type="text"
-                            placeholder="画像を検索..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="rounded-md border border-input bg-background pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all w-64 placeholder:text-muted-foreground"
-                        />
-                    </div>
-                    <button
-                        onClick={() => setShowAIModal(true)}
-                        className="flex items-center gap-2 rounded-md bg-foreground px-5 py-2.5 text-sm font-bold text-background hover:bg-foreground/90 transition-all"
-                    >
-                        <Sparkles className="h-4 w-4 text-primary-foreground" />
-                        AI生成
-                    </button>
-                    <label className="flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all">
-                        <Upload className="h-4 w-4" />
-                        {uploading ? '...' : 'アップロード'}
-                        <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="hidden" />
-                    </label>
+                <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <input
+                        type="text"
+                        placeholder="画像を検索..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="rounded-md border border-input bg-background pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all w-full sm:w-64 placeholder:text-muted-foreground min-h-[44px]"
+                    />
                 </div>
             </div>
 
@@ -258,7 +261,7 @@ export default function MediaLibrary() {
                     <p className="text-muted-foreground text-sm mt-1">新しい画像をアップロードして開始してください。</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                <div className="grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {filteredMedia.map((item: any) => (
                         <div
                             key={item.id}
@@ -302,7 +305,7 @@ export default function MediaLibrary() {
 
             {/* Detail Sidebar */}
             {selectedMedia && (
-                <div className="fixed inset-y-0 right-0 z-[110] w-[28rem] bg-background shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right duration-300 border-l border-border">
+                <div className="fixed inset-0 sm:inset-y-0 sm:left-auto sm:right-0 z-[110] w-full sm:w-[28rem] bg-background shadow-2xl p-4 sm:p-6 overflow-y-auto animate-in slide-in-from-right duration-300 sm:border-l border-border">
                     <div className="mb-6 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="rounded-md bg-surface-100 p-2 text-foreground">

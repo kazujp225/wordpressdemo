@@ -159,10 +159,10 @@ export default function AiGeneratorPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-12 sm:space-y-20">
         {/* Hero */}
-        <div className="text-center space-y-6">
-          <h1 className="text-4xl lg:text-6xl font-black tracking-tight text-slate-900">
+        <div className="text-center space-y-4 sm:space-y-6">
+          <h1 className="text-3xl sm:text-4xl lg:text-6xl font-black tracking-tight text-slate-900">
             Design to Code, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Instantly.</span>
           </h1>
           <p className="max-w-2xl mx-auto text-lg text-slate-600 leading-relaxed">
@@ -181,21 +181,21 @@ export default function AiGeneratorPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 sm:grid-cols-2 lg:grid-cols-5">
             {TEMPLATES.map((template) => (
               <button
                 key={template.id}
                 onClick={() => handleTemplateSelect(template.id)}
-                className={`group relative flex flex-col p-6 bg-white rounded-2xl shadow-sm border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 text-left h-full ${selectedTemplateId === template.id
+                className={`group relative flex flex-col p-4 sm:p-6 bg-white rounded-xl sm:rounded-2xl shadow-sm border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 text-left h-full min-h-[44px] ${selectedTemplateId === template.id
                   ? "ring-2 ring-blue-600 border-transparent shadow-lg shadow-blue-600/10"
                   : "border-slate-200 hover:border-blue-400"
                   }`}
               >
-                <div className={`text-3xl mb-5 p-4 rounded-xl w-fit transition-all duration-300 ${selectedTemplateId === template.id ? "bg-blue-600 text-white scale-110" : "bg-slate-50 text-slate-700 group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:scale-110"
+                <div className={`text-2xl sm:text-3xl mb-3 sm:mb-5 p-3 sm:p-4 rounded-lg sm:rounded-xl w-fit transition-all duration-300 ${selectedTemplateId === template.id ? "bg-blue-600 text-white scale-110" : "bg-slate-50 text-slate-700 group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:scale-110"
                   }`}>
                   {template.icon}
                 </div>
-                <h3 className={`text-lg font-bold mb-2 transition-colors ${selectedTemplateId === template.id ? "text-blue-700" : "text-slate-900"}`}>
+                <h3 className={`text-sm sm:text-lg font-bold mb-1 sm:mb-2 transition-colors ${selectedTemplateId === template.id ? "text-blue-700" : "text-slate-900"}`}>
                   {template.name}
                 </h3>
                 <p className="text-sm text-slate-500 line-clamp-3 leading-relaxed">
@@ -251,7 +251,7 @@ export default function AiGeneratorPage() {
                       <button
                         key={mod.label}
                         onClick={() => addModifier(mod.value)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all active:scale-95"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all active:scale-95 min-h-[36px]"
                       >
                         {mod.icon}
                         {mod.label}
@@ -349,17 +349,17 @@ export default function AiGeneratorPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleDownload}
-                  className="inline-flex items-center px-4 py-2.5 border border-slate-200 shadow-sm text-sm font-medium rounded-xl text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  className="inline-flex items-center px-3 sm:px-4 py-2.5 border border-slate-200 shadow-sm text-sm font-medium rounded-xl text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all min-h-[44px]"
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  HTML保存
+                  <Download className="h-4 w-4 mr-1.5 sm:mr-2" />
+                  <span className="hidden xs:inline">HTML</span>保存
                 </button>
                 <button
                   onClick={handleCopyCode}
-                  className="button-shine inline-flex items-center px-5 py-2.5 border border-transparent shadow-lg shadow-slate-900/20 text-sm font-bold rounded-xl text-white bg-slate-900 hover:bg-slate-800 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                  className="button-shine inline-flex items-center px-4 sm:px-5 py-2.5 border border-transparent shadow-lg shadow-slate-900/20 text-sm font-bold rounded-xl text-white bg-slate-900 hover:bg-slate-800 transition-all hover:-translate-y-0.5 active:translate-y-0 min-h-[44px]"
                 >
-                  <Copy className="h-4 w-4 mr-2" />
-                  コードをコピー
+                  <Copy className="h-4 w-4 mr-1.5 sm:mr-2" />
+                  コピー
                 </button>
               </div>
             </div>

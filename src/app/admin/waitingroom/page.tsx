@@ -200,71 +200,71 @@ export default function WaitingRoomPage() {
     }
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="px-4 py-4 sm:px-6 sm:py-6 max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Inbox className="w-6 h-6" />
-                        申請管理
+            <div className="flex items-center justify-between mb-4 sm:mb-6 gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <Inbox className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                        <span className="truncate">申請管理</span>
                     </h1>
-                    <p className="text-gray-600 mt-1">
+                    <p className="text-sm text-gray-600 mt-1 hidden sm:block">
                         ウェイティングリストの申請を管理・返信します
                     </p>
                 </div>
                 <button
                     onClick={fetchEntries}
                     disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center justify-center gap-2 min-w-[44px] min-h-[44px] px-3 sm:px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
                 >
                     <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    更新
+                    <span className="hidden sm:inline">更新</span>
                 </button>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-6">
                 <div
-                    className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${statusFilter === 'all' ? 'ring-2 ring-blue-500' : ''}`}
+                    className={`bg-white rounded-lg border p-2 sm:p-4 cursor-pointer transition-all min-h-[44px] ${statusFilter === 'all' ? 'ring-2 ring-blue-500' : ''}`}
                     onClick={() => setStatusFilter('all')}
                 >
-                    <p className="text-sm text-gray-500">全て</p>
-                    <p className="text-2xl font-bold text-gray-900">{entries.length}</p>
+                    <p className="text-xs sm:text-sm text-gray-500">全て</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{entries.length}</p>
                 </div>
                 <div
-                    className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-amber-500' : ''}`}
+                    className={`bg-white rounded-lg border p-2 sm:p-4 cursor-pointer transition-all min-h-[44px] ${statusFilter === 'pending' ? 'ring-2 ring-amber-500' : ''}`}
                     onClick={() => setStatusFilter('pending')}
                 >
-                    <p className="text-sm text-gray-500">未対応</p>
-                    <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
+                    <p className="text-xs sm:text-sm text-gray-500">未対応</p>
+                    <p className="text-lg sm:text-2xl font-bold text-amber-600">{pendingCount}</p>
                 </div>
                 <div
-                    className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${statusFilter === 'approved' ? 'ring-2 ring-green-500' : ''}`}
+                    className={`bg-white rounded-lg border p-2 sm:p-4 cursor-pointer transition-all min-h-[44px] ${statusFilter === 'approved' ? 'ring-2 ring-green-500' : ''}`}
                     onClick={() => setStatusFilter('approved')}
                 >
-                    <p className="text-sm text-gray-500">承認済</p>
-                    <p className="text-2xl font-bold text-green-600">{entries.filter(e => e.status === 'approved').length}</p>
+                    <p className="text-xs sm:text-sm text-gray-500">承認済</p>
+                    <p className="text-lg sm:text-2xl font-bold text-green-600">{entries.filter(e => e.status === 'approved').length}</p>
                 </div>
                 <div
-                    className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${statusFilter === 'rejected' ? 'ring-2 ring-red-500' : ''}`}
+                    className={`bg-white rounded-lg border p-2 sm:p-4 cursor-pointer transition-all min-h-[44px] ${statusFilter === 'rejected' ? 'ring-2 ring-red-500' : ''}`}
                     onClick={() => setStatusFilter('rejected')}
                 >
-                    <p className="text-sm text-gray-500">却下</p>
-                    <p className="text-2xl font-bold text-red-600">{entries.filter(e => e.status === 'rejected').length}</p>
+                    <p className="text-xs sm:text-sm text-gray-500">却下</p>
+                    <p className="text-lg sm:text-2xl font-bold text-red-600">{entries.filter(e => e.status === 'rejected').length}</p>
                 </div>
                 <div
-                    className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${statusFilter === 'invited' ? 'ring-2 ring-blue-500' : ''}`}
+                    className={`bg-white rounded-lg border p-2 sm:p-4 cursor-pointer transition-all min-h-[44px] ${statusFilter === 'invited' ? 'ring-2 ring-blue-500' : ''}`}
                     onClick={() => setStatusFilter('invited')}
                 >
-                    <p className="text-sm text-gray-500">招待済</p>
-                    <p className="text-2xl font-bold text-blue-600">{entries.filter(e => e.status === 'invited').length}</p>
+                    <p className="text-xs sm:text-sm text-gray-500">招待済</p>
+                    <p className="text-lg sm:text-2xl font-bold text-blue-600">{entries.filter(e => e.status === 'invited').length}</p>
                 </div>
                 <div
-                    className={`bg-white rounded-lg border p-4 cursor-pointer transition-all ${statusFilter === 'registered' ? 'ring-2 ring-purple-500' : ''}`}
+                    className={`bg-white rounded-lg border p-2 sm:p-4 cursor-pointer transition-all min-h-[44px] ${statusFilter === 'registered' ? 'ring-2 ring-purple-500' : ''}`}
                     onClick={() => setStatusFilter('registered')}
                 >
-                    <p className="text-sm text-gray-500">登録済</p>
-                    <p className="text-2xl font-bold text-purple-600">{entries.filter(e => e.status === 'registered').length}</p>
+                    <p className="text-xs sm:text-sm text-gray-500">登録済</p>
+                    <p className="text-lg sm:text-2xl font-bold text-purple-600">{entries.filter(e => e.status === 'registered').length}</p>
                 </div>
             </div>
 
@@ -286,93 +286,120 @@ export default function WaitingRoomPage() {
                             <div key={entry.id} className={entry.status === 'pending' ? 'bg-amber-50' : ''}>
                                 {/* Main Row */}
                                 <div
-                                    className="px-4 py-4 flex items-center gap-4 cursor-pointer hover:bg-gray-50"
+                                    className="px-3 sm:px-4 py-3 sm:py-4 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[44px]"
                                     onClick={() => {
                                         const newExpandedId = expandedEntry === entry.id ? null : entry.id;
                                         setExpandedEntry(newExpandedId);
-                                        // 展開時に既存プランを選択状態にセット
                                         if (newExpandedId && entry.plan && !selectedPlan[entry.id]) {
                                             setSelectedPlan(prev => ({ ...prev, [entry.id]: entry.plan! }));
                                         }
                                     }}
                                 >
-                                    {/* Status */}
-                                    <div className="w-24 flex-shrink-0">
-                                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${STATUS_CONFIG[entry.status]?.color || STATUS_CONFIG.pending.color}`}>
-                                            {STATUS_CONFIG[entry.status]?.icon}
-                                            {STATUS_CONFIG[entry.status]?.label || entry.status}
-                                        </span>
-                                    </div>
-
-                                    {/* Account Type */}
-                                    <div className="w-16 flex-shrink-0">
-                                        {entry.accountType === 'corporate' ? (
-                                            <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-                                                <Building2 className="w-3 h-3" />
-                                                法人
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-                                                <User className="w-3 h-3" />
-                                                個人
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Name & Email */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-gray-900 truncate">
+                                    {/* Mobile: stacked card */}
+                                    <div className="flex items-start gap-3 sm:hidden">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_CONFIG[entry.status]?.color || STATUS_CONFIG.pending.color}`}>
+                                                    {STATUS_CONFIG[entry.status]?.icon}
+                                                    {STATUS_CONFIG[entry.status]?.label || entry.status}
+                                                </span>
+                                                {entry.accountType === 'corporate' ? (
+                                                    <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+                                                        <Building2 className="w-3 h-3" />法人
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+                                                        <User className="w-3 h-3" />個人
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900 truncate">
                                                 {entry.companyName && <span className="text-gray-500">{entry.companyName} / </span>}
                                                 {entry.name}
+                                            </p>
+                                            <p className="text-xs text-gray-500 truncate mt-0.5">{entry.email}</p>
+                                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                                                <span>{formatDate(entry.createdAt)}</span>
+                                                {entry.replies.length > 0 && (
+                                                    <span className="flex items-center gap-1">
+                                                        <MessageSquare className="w-3 h-3" />{entry.replies.length}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex-shrink-0">
+                                            {expandedEntry === entry.id ? (
+                                                <ChevronUp className="w-5 h-5 text-gray-400" />
+                                            ) : (
+                                                <ChevronDown className="w-5 h-5 text-gray-400" />
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop: horizontal row */}
+                                    <div className="hidden sm:flex items-center gap-4">
+                                        <div className="w-24 flex-shrink-0">
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${STATUS_CONFIG[entry.status]?.color || STATUS_CONFIG.pending.color}`}>
+                                                {STATUS_CONFIG[entry.status]?.icon}
+                                                {STATUS_CONFIG[entry.status]?.label || entry.status}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <Mail className="w-3 h-3 text-gray-400" />
-                                            <span className="text-xs text-gray-500 truncate">{entry.email}</span>
+                                        <div className="w-16 flex-shrink-0">
+                                            {entry.accountType === 'corporate' ? (
+                                                <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+                                                    <Building2 className="w-3 h-3" />法人
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+                                                    <User className="w-3 h-3" />個人
+                                                </span>
+                                            )}
                                         </div>
-                                    </div>
-
-                                    {/* Plan */}
-                                    <div className="w-20 flex-shrink-0 text-center">
-                                        {entry.plan ? (
-                                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-700">
-                                                {PLAN_OPTIONS.find(p => p.value === entry.plan)?.label || entry.plan}
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-gray-400">-</span>
-                                        )}
-                                    </div>
-
-                                    {/* Reply Count */}
-                                    <div className="w-16 flex-shrink-0 text-center">
-                                        {entry.replies.length > 0 && (
-                                            <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-                                                <MessageSquare className="w-3 h-3" />
-                                                {entry.replies.length}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Date */}
-                                    <div className="w-36 flex-shrink-0 text-right">
-                                        <p className="text-xs text-gray-500">{formatDate(entry.createdAt)}</p>
-                                    </div>
-
-                                    {/* Expand Icon */}
-                                    <div className="w-8 flex-shrink-0 text-center">
-                                        {expandedEntry === entry.id ? (
-                                            <ChevronUp className="w-5 h-5 text-gray-400" />
-                                        ) : (
-                                            <ChevronDown className="w-5 h-5 text-gray-400" />
-                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium text-gray-900 truncate">
+                                                    {entry.companyName && <span className="text-gray-500">{entry.companyName} / </span>}
+                                                    {entry.name}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <Mail className="w-3 h-3 text-gray-400" />
+                                                <span className="text-xs text-gray-500 truncate">{entry.email}</span>
+                                            </div>
+                                        </div>
+                                        <div className="w-20 flex-shrink-0 text-center">
+                                            {entry.plan ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-700">
+                                                    {PLAN_OPTIONS.find(p => p.value === entry.plan)?.label || entry.plan}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-gray-400">-</span>
+                                            )}
+                                        </div>
+                                        <div className="w-16 flex-shrink-0 text-center">
+                                            {entry.replies.length > 0 && (
+                                                <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+                                                    <MessageSquare className="w-3 h-3" />{entry.replies.length}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="w-36 flex-shrink-0 text-right">
+                                            <p className="text-xs text-gray-500">{formatDate(entry.createdAt)}</p>
+                                        </div>
+                                        <div className="w-8 flex-shrink-0 text-center">
+                                            {expandedEntry === entry.id ? (
+                                                <ChevronUp className="w-5 h-5 text-gray-400" />
+                                            ) : (
+                                                <ChevronDown className="w-5 h-5 text-gray-400" />
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Expanded Details */}
                                 {expandedEntry === entry.id && (
-                                    <div className="px-4 py-4 bg-gray-50 border-t">
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="px-3 sm:px-4 py-4 bg-gray-50 border-t">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                             {/* Details */}
                                             <div>
                                                 <h4 className="text-sm font-medium text-gray-900 mb-3">申請内容</h4>
@@ -430,7 +457,7 @@ export default function WaitingRoomPage() {
 
                                                 {/* Plan Selection */}
                                                 <h4 className="text-sm font-medium text-gray-900 mt-4 mb-3">プラン選択</h4>
-                                                <div className="grid grid-cols-2 gap-2 mb-4">
+                                                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 mb-4">
                                                     {PLAN_OPTIONS.map((plan) => (
                                                         <button
                                                             key={plan.value}
@@ -455,7 +482,7 @@ export default function WaitingRoomPage() {
                                                             key={status}
                                                             onClick={() => handleStatusChange(entry.id, status)}
                                                             disabled={processing === entry.id || entry.status === status}
-                                                            className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                                                            className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all min-h-[36px] ${
                                                                 entry.status === status
                                                                     ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200'
                                                                     : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
@@ -525,7 +552,7 @@ export default function WaitingRoomPage() {
                                                             <button
                                                                 onClick={() => handleSendReply(entry.id)}
                                                                 disabled={processing === entry.id || !replyMessage[entry.id]?.trim()}
-                                                                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                                className="px-4 py-2.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-h-[44px]"
                                                             >
                                                                 <Send className="w-4 h-4" />
                                                                 返信を保存
@@ -540,7 +567,7 @@ export default function WaitingRoomPage() {
                                         </div>
 
                                         {/* Additional Info */}
-                                        <div className="mt-4 pt-4 border-t text-xs text-gray-500 flex gap-4">
+                                        <div className="mt-4 pt-4 border-t text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
                                             <p>申請ID: {entry.id}</p>
                                             <p>最終更新: {formatDate(entry.updatedAt)}</p>
                                             {entry.processedAt && <p>処理日時: {formatDate(entry.processedAt)}</p>}

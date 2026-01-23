@@ -34,20 +34,20 @@ export function TypeBreakdownChart({ data }: { data: TypeData[] }) {
     }));
 
     return (
-        <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <Activity className="h-5 w-5 text-blue-600" />
+        <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-4 sm:p-8 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
+                <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                 種類別使用量
             </h3>
-            <div className="h-64">
+            <div className="h-56 sm:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
                             data={formattedData}
                             cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
+                            cy="45%"
+                            innerRadius={40}
+                            outerRadius={65}
                             paddingAngle={2}
                             dataKey="value"
                         >

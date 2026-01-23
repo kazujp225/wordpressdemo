@@ -123,8 +123,8 @@ export default function RenderDeployModal({ onClose, html, templateType, prompt 
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80">
-      <div className="bg-[#0a0a0a] border border-[#222] w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4">
+      <div className="bg-[#0a0a0a] border border-[#222] w-full max-w-lg max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col rounded-t-2xl sm:rounded-xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-[#222] bg-[#111]">
           <div className="flex items-center gap-2">

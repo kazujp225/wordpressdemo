@@ -22,21 +22,21 @@ export function ModelBreakdownChart({ data }: { data: ModelData[] }) {
     }));
 
     return (
-        <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <Cpu className="h-5 w-5 text-purple-600" />
+        <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-4 sm:p-8 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
+                <Cpu className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                 モデル別使用量
             </h3>
-            <div className="h-64">
+            <div className="h-48 sm:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={formattedData} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis type="number" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                        <XAxis type="number" tick={{ fontSize: 10 }} stroke="#9ca3af" />
                         <YAxis
                             dataKey="name"
                             type="category"
-                            tick={{ fontSize: 10 }}
-                            width={100}
+                            tick={{ fontSize: 9 }}
+                            width={80}
                             stroke="#9ca3af"
                         />
                         <Tooltip

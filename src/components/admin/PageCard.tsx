@@ -70,7 +70,7 @@ export function PageCard({ page, onDelete, onToggleFavorite }: PageCardProps) {
                         </span>
                     </div>
                 </Link>
-                <div className="absolute top-4 left-4 z-20">
+                <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-20">
                     <button
                         onClick={(e) => {
                             e.preventDefault();
@@ -79,7 +79,7 @@ export function PageCard({ page, onDelete, onToggleFavorite }: PageCardProps) {
                         }}
                         disabled={favoriteApi.loading}
                         className={clsx(
-                            'rounded-full p-2 transition-all shadow-sm',
+                            'rounded-full p-2.5 sm:p-2 transition-all shadow-sm min-w-[40px] min-h-[40px] flex items-center justify-center',
                             isFavorite
                                 ? 'bg-yellow-400 text-white hover:bg-yellow-500'
                                 : 'bg-white/80 text-muted-foreground hover:bg-white hover:text-yellow-500'
@@ -115,7 +115,7 @@ export function PageCard({ page, onDelete, onToggleFavorite }: PageCardProps) {
                 )}
             </div>
 
-            <div className="p-5">
+            <div className="p-3 sm:p-5">
                 <div className="flex items-start justify-between">
                     <div className="overflow-hidden pr-2">
                         <h3 className="truncate font-bold text-foreground leading-tight text-base">

@@ -154,7 +154,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                                     handleMouseEnter(item.prefetchUrl);
                                 }}
                                 className={clsx(
-                                    'group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200',
+                                    'group flex items-center gap-3 rounded-md px-3 py-2.5 min-h-[44px] text-sm font-medium transition-colors duration-200',
                                     isActive
                                         ? 'bg-primary/5 text-primary'
                                         : 'text-muted-foreground hover:bg-surface-100 hover:text-foreground'
@@ -213,9 +213,10 @@ export function MobileMenuButton({ onClick }: { onClick: () => void }) {
     return (
         <button
             onClick={onClick}
-            className="lg:hidden fixed top-4 left-4 z-30 p-2 rounded-md bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            className="lg:hidden fixed top-2 left-3 z-30 flex items-center justify-center w-11 h-11 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            aria-label="メニューを開く"
         >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5" />
         </button>
     );
 }

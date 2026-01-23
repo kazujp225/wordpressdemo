@@ -118,32 +118,32 @@ export default function ApiUsageDashboard() {
     }
 
     return (
-        <div className="p-10 max-w-7xl mx-auto">
+        <div className="px-4 py-4 sm:px-6 sm:py-6 lg:p-10 max-w-7xl mx-auto">
             {/* Header */}
-            <div className="mb-10 flex justify-between items-end">
+            <div className="mb-6 sm:mb-10 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-gray-900">API使用状況</h1>
-                    <p className="text-gray-500 mt-1">AI APIの使用状況とコスト分析</p>
+                    <h1 className="text-xl sm:text-3xl font-black tracking-tight text-gray-900">API使用状況</h1>
+                    <p className="text-sm text-gray-500 mt-1">AI APIの使用状況とコスト分析</p>
                 </div>
 
                 {/* Period Selector */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     {[7, 30, 90].map((d) => (
                         <button
                             key={d}
                             onClick={() => setPeriod(d)}
-                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                            className={`px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all min-h-[40px] ${
                                 period === d
                                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                         >
-                            {d}日間
+                            {d}日
                         </button>
                     ))}
                     <button
                         onClick={fetchStats}
-                        className="px-4 py-2 rounded-xl text-sm font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+                        className="flex items-center justify-center w-10 h-10 rounded-xl text-sm font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
                     >
                         <RefreshCw className="h-4 w-4" />
                     </button>
@@ -151,7 +151,7 @@ export default function ApiUsageDashboard() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-10">
                 <StatCard
                     title="API呼び出し総数"
                     value={stats?.summary?.totalCalls?.toLocaleString() || 0}
@@ -181,7 +181,7 @@ export default function ApiUsageDashboard() {
             </div>
 
             {/* Additional Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-10">
                 <StatCard
                     title="平均応答時間"
                     value={`${((stats?.summary?.avgDurationMs || 0) / 1000).toFixed(1)}秒`}
@@ -209,19 +209,19 @@ export default function ApiUsageDashboard() {
             </div>
 
             {/* Charts Row 1 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
                 <DailyUsageChart data={stats?.daily || []} />
                 <ModelBreakdownChart data={stats?.byModel || []} />
             </div>
 
             {/* Charts Row 2 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <TypeBreakdownChart data={stats?.byType || []} />
 
                 {/* Cost Breakdown Card */}
-                <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-green-600" />
+                <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-4 sm:p-8 shadow-sm">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                         モデル別コスト
                     </h3>
                     <div className="space-y-4">

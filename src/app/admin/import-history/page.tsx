@@ -36,10 +36,10 @@ export default async function ImportHistoryPage() {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
+        <div className="min-h-screen bg-gray-50 px-4 py-4 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="mb-8">
+                <div className="mb-6 sm:mb-8">
                     <Link
                         href="/admin/pages"
                         className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-4"
@@ -47,7 +47,7 @@ export default async function ImportHistoryPage() {
                         <ArrowLeft className="h-4 w-4" />
                         ページ一覧に戻る
                     </Link>
-                    <h1 className="text-3xl font-black text-gray-900">インポート履歴</h1>
+                    <h1 className="text-xl sm:text-3xl font-black text-gray-900">インポート履歴</h1>
                     <p className="text-gray-500 mt-1">URLからインポートしたスクリーンショットの履歴</p>
                 </div>
 
@@ -67,27 +67,27 @@ export default async function ImportHistoryPage() {
                 ) : (
                     <div className="space-y-8">
                         {importGroups.map((group, groupIdx) => (
-                            <div key={groupIdx} className="bg-white rounded-3xl shadow-sm overflow-hidden">
+                            <div key={groupIdx} className="bg-white rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
                                 {/* Group Header */}
-                                <div className="p-6 border-b border-gray-100">
-                                    <div className="flex items-start justify-between gap-4">
+                                <div className="p-4 sm:p-6 border-b border-gray-100">
+                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <div className="p-2 bg-blue-100 rounded-xl">
-                                                    <Globe className="h-5 w-5 text-blue-600" />
+                                            <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                                                <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg sm:rounded-xl flex-shrink-0">
+                                                    <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                                                 </div>
-                                                <h2 className="text-lg font-bold text-gray-900 truncate">
+                                                <h2 className="text-sm sm:text-lg font-bold text-gray-900 truncate">
                                                     {group.url}
                                                 </h2>
                                             </div>
-                                            <div className="flex items-center gap-4 text-sm text-gray-500">
+                                            <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500">
                                                 <span className="flex items-center gap-1">
-                                                    <Calendar className="h-4 w-4" />
+                                                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
                                                     {new Date(group.createdAt).toLocaleString('ja-JP')}
                                                 </span>
                                                 <span className="flex items-center gap-1">
-                                                    <ImageIcon className="h-4 w-4" />
-                                                    {group.images.length} セグメント
+                                                    <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                    {group.images.length}枚
                                                 </span>
                                             </div>
                                         </div>
@@ -95,17 +95,17 @@ export default async function ImportHistoryPage() {
                                             href={group.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                                            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg sm:rounded-xl transition-colors min-h-[40px] self-start"
                                         >
                                             <ExternalLink className="h-4 w-4" />
-                                            元サイトを開く
+                                            元サイト
                                         </a>
                                     </div>
                                 </div>
 
                                 {/* Image Grid */}
-                                <div className="p-6">
-                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                <div className="p-3 sm:p-6">
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
                                         {group.images.map((img, imgIdx) => (
                                             <div
                                                 key={img.id}

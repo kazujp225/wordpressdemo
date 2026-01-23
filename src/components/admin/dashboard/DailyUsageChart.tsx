@@ -18,12 +18,12 @@ export function DailyUsageChart({ data }: { data: DailyData[] }) {
     }));
 
     return (
-        <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
+        <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-4 sm:p-8 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                 日別API使用量
             </h3>
-            <div className="h-64">
+            <div className="h-48 sm:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={formattedData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />

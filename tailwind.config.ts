@@ -8,6 +8,16 @@ const config: Config = {
     ],
     darkMode: ["class"],
     theme: {
+        screens: {
+            'xs': '360px',
+            'sm': '640px',
+            'md': '768px',
+            'lg': '1024px',
+            'xl': '1280px',
+            '2xl': '1536px',
+            // Landscape-specific: use with @media (orientation: landscape)
+            'landscape': { 'raw': '(orientation: landscape) and (min-width: 640px) and (max-width: 932px)' },
+        },
         extend: {
             fontFamily: {
                 sans: ["var(--font-noto-sans-jp)", "var(--font-manrope)", "sans-serif"],

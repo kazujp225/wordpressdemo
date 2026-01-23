@@ -22,16 +22,16 @@ const colorClasses = {
 
 export function StatCard({ title, value, icon: Icon, color, subValue }: StatCardProps) {
     return (
-        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-4">
-                <div className={clsx('rounded-xl p-3', colorClasses[color])}>
-                    <Icon className="h-5 w-5" />
+        <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-3 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-2 sm:mb-4">
+                <div className={clsx('rounded-lg sm:rounded-xl p-2 sm:p-3', colorClasses[color])}>
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
             </div>
-            <p className="text-2xl font-black text-gray-900 mb-1">{value}</p>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{title}</p>
+            <p className="text-lg sm:text-2xl font-black text-gray-900 mb-0.5 sm:mb-1 truncate">{value}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider sm:tracking-widest leading-tight">{title}</p>
             {subValue && (
-                <p className="text-xs text-gray-500 mt-2">{subValue}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-1 sm:mt-2 truncate">{subValue}</p>
             )}
         </div>
     );

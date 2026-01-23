@@ -24,7 +24,7 @@ export default function AdminLayout({
                 />
 
                 {/* メインコンテンツ */}
-                <main className="flex-1 overflow-y-auto lg:ml-0 pt-16 lg:pt-0">
+                <main className="flex-1 overflow-y-auto overflow-x-hidden lg:ml-0 pt-14 lg:pt-0 min-w-0">
                     {children}
                 </main>
             </div>

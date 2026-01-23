@@ -178,8 +178,8 @@ export default function LoginPage() {
       </div>
 
       {/* Right: Form */}
-      <div className="flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex items-center justify-center px-4 py-8 sm:p-8 bg-background">
+        <div className="w-full max-w-md space-y-6 sm:space-y-8">
           <div className="lg:hidden mb-8 text-center">
             <div className="inline-flex items-center gap-2">
               <span className="text-lg font-black tracking-tighter">LP Builder</span>
@@ -328,7 +328,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 px-6 rounded-md font-bold hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-none"
+              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 px-6 rounded-md font-bold hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-none min-h-[44px]"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

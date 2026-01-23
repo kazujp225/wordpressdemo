@@ -299,9 +299,9 @@ export function PagesHeader() {
         <>
             {/* Modal */}
             {showSelection && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-6 overflow-y-auto">
-                    <div className="w-full max-w-2xl rounded-lg bg-background border border-border shadow-2xl animate-in fade-in zoom-in duration-300 my-auto">
-                        <div className="p-8 max-h-[85vh] overflow-y-auto">
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-0 sm:p-6 overflow-y-auto">
+                    <div className="w-full max-w-2xl rounded-t-2xl sm:rounded-lg bg-background border border-border shadow-2xl animate-in fade-in zoom-in duration-300 sm:my-auto">
+                        <div className="p-4 sm:p-8 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
                             <div className="flex items-center justify-between mb-8">
                                 <h2 className="text-xl font-bold text-foreground tracking-tight"><span>新規ページ作成</span></h2>
                                 <button onClick={() => setShowSelection(false)} className="text-muted-foreground hover:text-foreground transition-colors" disabled={isImporting}>
@@ -630,10 +630,11 @@ export function PagesHeader() {
 
             <button
                 onClick={() => { setShowSelection(true); setMode('select'); }}
-                className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all active:scale-[0.98]"
+                className="flex items-center gap-2 rounded-md bg-primary px-3 sm:px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all active:scale-[0.98] min-h-[44px]"
             >
                 <Plus className="h-4 w-4" />
-                <span>新規ページ作成</span>
+                <span className="hidden xs:inline">新規ページ作成</span>
+                <span className="xs:hidden">新規</span>
             </button>
 
         </>
