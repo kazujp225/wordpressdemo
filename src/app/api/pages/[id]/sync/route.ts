@@ -51,7 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         // 静的HTML生成 (export/route.ts のロジックを簡略化して共通利用)
         // 本来は共通関数化すべきだが、今回は速度優先で直接構築
         const sectionsHtml = await Promise.all(page.sections.map(async (section, index) => {
-            let config = JSON.parse(section.config || '{}');
+            const config = JSON.parse(section.config || '{}');
             const pos = config.position || 'middle';
             const positionClasses = pos === 'top' ? 'top-10 items-start' : pos === 'bottom' ? 'bottom-10 items-end' : 'top-1/2 -translate-y-1/2 items-center';
             const color = config.textColor === 'black' ? 'text-black' : 'text-white';

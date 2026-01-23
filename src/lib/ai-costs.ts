@@ -40,6 +40,28 @@ export const GEMINI_PRICING = {
   }
 } as const;
 
+// Claude API Pricing (per 1M tokens)
+// Source: https://docs.anthropic.com/en/docs/about-claude/pricing
+export const CLAUDE_PRICING = {
+  'claude-sonnet-4-20250514': {
+    input: 3.0,    // $3.00 per 1M input tokens
+    output: 15.0,  // $15.00 per 1M output tokens
+    type: 'text' as const,
+  },
+} as const;
+
+export function estimateClaudeCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number
+): number {
+  const pricing = CLAUDE_PRICING[model as keyof typeof CLAUDE_PRICING];
+  if (!pricing) return 0;
+
+  return (inputTokens / 1_000_000) * pricing.input +
+         (outputTokens / 1_000_000) * pricing.output;
+}
+
 export type ModelName = keyof typeof GEMINI_PRICING;
 
 export function estimateTextCost(
@@ -85,6 +107,7 @@ export function getModelDisplayName(model: string): string {
     'gemini-3-pro-image-preview': 'Gemini 3 Pro Image',
     'gemini-2.5-flash-preview-image-generation': 'Gemini 2.5 Flash Image',
     'veo-2.0-generate-001': 'Veo 2 Video',
+    'claude-sonnet-4-20250514': 'Claude Sonnet 4',
   };
   return displayNames[model] || model;
 }

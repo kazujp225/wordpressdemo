@@ -8,7 +8,7 @@ import { logGeneration, createTimer } from '@/lib/generation-logger';
 
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
-    let prompt = '';
+    const prompt = '';
 
     // ユーザー認証
     const supabase = await createClient();

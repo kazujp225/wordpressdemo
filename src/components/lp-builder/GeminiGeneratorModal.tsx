@@ -182,7 +182,7 @@ export const GeminiGeneratorModal: React.FC<GeminiGeneratorModalProps> = ({
                                         )}
                                     </div>
                                     <p className="text-xs text-gray-500 mb-6 leading-relaxed font-medium">
-                                        Upload a reference image (screenshot or design), and the AI will analyze its "vibe" and color palette to match your page.
+                                        Upload a reference image (screenshot or design), and the AI will analyze its &quot;vibe&quot; and color palette to match your page.
                                     </p>
 
                                     {!designImage && !designDefinition ? (

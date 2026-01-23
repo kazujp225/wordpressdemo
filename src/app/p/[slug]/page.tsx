@@ -34,8 +34,11 @@ export default async function PublicPage({ params }: { params: { slug: string } 
     if (!page) return notFound();
 
     // Parse Configs & Global Navigation Integration (Safe access for runtime sync issues)
-    const globalNav = await (prisma as any).globalConfig?.findUnique({ where: { key: 'navigation' } }).catch(() => null);
-    const globalNavValue = globalNav ? JSON.parse(globalNav.value) : null;
+    let globalNavValue: any = null;
+    try {
+        const globalNav = await prisma.globalConfig.findUnique({ where: { key: 'navigation' } });
+        if (globalNav) globalNavValue = JSON.parse(globalNav.value);
+    } catch { /* GlobalConfig table may not exist yet */ }
 
     let headerConfig = {
         title: page.title,
@@ -97,7 +100,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                     : 'max-w-md md:max-w-xl lg:max-w-2xl' // モバイル: 縦長中央
             }`}>
                 {page.sections.map((section) => (
-                    <section key={section.id} id={section.role} className="relative w-full overflow-hidden group">
+                    <section key={section.id} id={section.role} className={`relative w-full group ${section.role !== 'html-embed' ? 'overflow-hidden' : ''}`}>
                         {/* Visual Adjustments & Text Overlay */}
                         {(() => {
                             let config: {
@@ -108,6 +111,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                 grayscale: number;
                                 overlayColor: string;
                                 overlayOpacity: number;
+                                htmlContent?: string;
                                 clickableAreas?: ClickableArea[];
                                 properties?: {
                                     clickableAreas?: ClickableArea[];
@@ -189,6 +193,14 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                             className="block w-full h-auto transition-all duration-500"
                                             style={imgStyle}
                                             loading="lazy"
+                                        />
+                                    ) : section.role === 'html-embed' && config.htmlContent ? (
+                                        <iframe
+                                            srcDoc={config.htmlContent}
+                                            className="w-full border-0"
+                                            style={{ minHeight: '600px', height: '100vh', maxHeight: '1200px' }}
+                                            sandbox="allow-scripts allow-forms allow-same-origin"
+                                            title="Embedded content"
                                         />
                                     ) : (
                                         <div className="flex h-48 items-center justify-center bg-gray-100 text-gray-400">

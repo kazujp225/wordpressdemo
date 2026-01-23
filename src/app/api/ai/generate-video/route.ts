@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
 
         // 動画URLを抽出
         let videoUrl = '';
-        let videoDuration = duration;
+        const videoDuration = duration;
 
         if (videoData.generatedVideos && videoData.generatedVideos[0]) {
             const generatedVideo = videoData.generatedVideos[0];

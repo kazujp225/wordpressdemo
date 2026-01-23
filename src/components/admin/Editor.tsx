@@ -25,7 +25,8 @@ import SectionCropModal from '@/components/admin/SectionCropModal';
 import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
 import ThumbnailTransformModal from '@/components/admin/ThumbnailTransformModal';
 import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
-import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText } from 'lucide-react';
+import ClaudeCodeGeneratorModal from '@/components/admin/ClaudeCodeGeneratorModal';
+import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2 } from 'lucide-react';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -209,6 +210,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // 画像変換モーダル
     const [showThumbnailModal, setShowThumbnailModal] = useState(false);
     const [showDocumentModal, setShowDocumentModal] = useState(false);
+
+    // AIコード生成モーダル
+    const [showClaudeGeneratorModal, setShowClaudeGeneratorModal] = useState(false);
 
     // セクション挿入モーダル
     const [showInsertModal, setShowInsertModal] = useState(false);
@@ -2763,6 +2767,19 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             </div>
                                                         )}
                                                     </>
+                                                ) : section.role === 'html-embed' && section.config?.htmlContent ? (
+                                                    <div className="relative group/embed">
+                                                        <div className="absolute top-2 left-2 z-10 bg-black/80 text-white text-[10px] font-mono px-2 py-1 rounded">
+                                                            HTML EMBED
+                                                        </div>
+                                                        <iframe
+                                                            srcDoc={section.config.htmlContent}
+                                                            className="w-full border-0"
+                                                            style={{ minHeight: '300px', height: '600px' }}
+                                                            sandbox="allow-scripts allow-forms"
+                                                            title={`HTML embed - ${section.config.templateType || 'custom'}`}
+                                                        />
+                                                    </div>
                                                 ) : (
                                                     <div className="h-48 bg-gray-100 flex items-center justify-center">
                                                         <span className="text-gray-400">画像なし</span>
@@ -3865,6 +3882,32 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             資料にする
                                         </h4>
                                         <p className="text-[10px] text-gray-500">スライド風の資料を作成</p>
+                                    </div>
+                                    <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* AIコード生成 */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest pl-1">AIコード生成</p>
+
+                        {/* AIコード生成 */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <button
+                                onClick={() => setShowClaudeGeneratorModal(true)}
+                                className="w-full p-3 hover:bg-gray-50 transition-colors group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="h-7 w-7 bg-gray-900 flex items-center justify-center">
+                                        <Code2 className="h-3.5 w-3.5 text-white" />
+                                    </div>
+                                    <div className="text-left flex-1">
+                                        <h4 className="text-xs font-semibold text-gray-900 font-mono">
+                                            claude-codegen
+                                        </h4>
+                                        <p className="text-[10px] text-gray-500 font-mono">sonnet-4 | html/css/js</p>
                                     </div>
                                     <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
                                 </div>
@@ -5539,6 +5582,41 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 sections={sections}
             />
 
+            {/* AIコード生成モーダル */}
+            {showClaudeGeneratorModal && (
+                <ClaudeCodeGeneratorModal
+                    onClose={() => setShowClaudeGeneratorModal(false)}
+                    sections={sections}
+                    designDefinition={designDefinition}
+                    layoutMode={sections[0]?.config?.layout === 'desktop' ? 'desktop' : 'responsive'}
+                    onInsertHtml={(html, insertIndex, meta) => {
+                        const newSection = {
+                            id: `temp-${Date.now()}`,
+                            role: 'html-embed',
+                            imageId: null,
+                            image: null,
+                            mobileImageId: null,
+                            mobileImage: null,
+                            order: insertIndex,
+                            config: {
+                                htmlContent: html,
+                                templateType: meta.templateType,
+                                prompt: meta.prompt,
+                            }
+                        };
+                        const newSections = [...sections];
+                        for (let i = 0; i < newSections.length; i++) {
+                            if (newSections[i].order >= insertIndex) {
+                                newSections[i] = { ...newSections[i], order: newSections[i].order + 1 };
+                            }
+                        }
+                        newSections.push(newSection);
+                        const sorted = newSections.sort((a, b) => a.order - b.order);
+                        setSections(sorted);
+                        handleSave(sorted);
+                    }}
+                />
+            )}
 
         </div>
     );

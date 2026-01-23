@@ -217,6 +217,29 @@ model WaitingRoomReply {
 }
 
 // ========================================
+// デプロイ管理
+// ========================================
+
+model Deployment {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  pageId          Int?
+  serviceName     String
+  renderServiceId String?
+  siteUrl         String?
+  status          String   @default("pending") // pending | building | live | failed
+  generatedHtml   String?  @db.Text
+  templateType    String?
+  prompt          String?  @db.Text
+  githubRepoUrl   String?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ========================================
 // クレジット・課金関連テーブル
 // ========================================
 

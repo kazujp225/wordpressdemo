@@ -290,7 +290,7 @@ async function generateSectionImage(
 
             // Primary Model: Gemini 3 Pro Image (Nano Banana Pro)
             let usedModel: string = MODELS.IMAGE_PRIMARY;
-            let response = await fetch(
+            const response = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.IMAGE_PRIMARY}:generateContent?key=${apiKey}`,
                 {
                     method: 'POST',

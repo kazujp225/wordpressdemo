@@ -308,7 +308,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
  */
 async function createMaskImage(width: number, height: number, masks: MaskArea[]): Promise<Buffer> {
     // 黒背景を作成
-    let image = sharp({
+    const image = sharp({
         create: {
             width,
             height,

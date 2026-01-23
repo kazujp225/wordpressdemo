@@ -127,7 +127,7 @@ export async function GET(
         const segNumber = section.order;
 
         // 同じタイムスタンプ（同じインポートセッション）のseg画像だけを探す
-        let originalImages: any[] = [];
+        const originalImages: any[] = [];
         for (const ts of timestamps) {
             const images = await prisma.mediaImage.findMany({
                 where: {

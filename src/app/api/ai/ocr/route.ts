@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         }
 
         // クロップ処理（選択範囲がある場合）
-        let processedBuffers: Buffer[] = [];
+        const processedBuffers: Buffer[] = [];
 
         if (areas.length > 0) {
             // 複数の選択範囲それぞれをクロップ

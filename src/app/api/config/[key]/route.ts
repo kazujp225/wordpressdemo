@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest, { params }: { params: { key: string } }) {
     try {
-        const config = await (prisma as any).globalConfig?.findUnique({
+        const config = await prisma.globalConfig.findUnique({
             where: { key: params.key }
         }).catch(() => null);
         return NextResponse.json(config ? JSON.parse(config.value) : null);
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: { key: str
 export async function POST(request: NextRequest, { params }: { params: { key: string } }) {
     try {
         const body = await request.json();
-        const config = await (prisma as any).globalConfig?.upsert({
+        const config = await prisma.globalConfig.upsert({
             where: { key: params.key },
             update: { value: JSON.stringify(body) },
             create: { key: params.key, value: JSON.stringify(body) }

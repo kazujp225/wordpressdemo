@@ -490,7 +490,7 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
                 const totalHeight = topExtensionHeight + currentHeight + bottomExtensionHeight;
 
                 // ベース画像（透明）を作成
-                let compositeBase = sharp({
+                const compositeBase = sharp({
                     create: {
                         width: currentWidth,
                         height: totalHeight,

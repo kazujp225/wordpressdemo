@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { estimateTextCost, estimateImageCost, estimateTokens } from './ai-costs';
+import { estimateTextCost, estimateImageCost, estimateTokens, estimateClaudeCost } from './ai-costs';
 
 export type GenerationType =
   | 'copy'
@@ -23,7 +23,8 @@ export type GenerationType =
   | 'ocr'
   | 'text-fix'
   | 'upscale'
-  | 'video-generate';
+  | 'video-generate'
+  | 'claude-generate';
 
 export interface LogGenerationParams {
   userId?: string | null;
@@ -74,6 +75,8 @@ export async function logGeneration(params: LogGenerationParams): Promise<LogGen
   let estimatedCost = 0;
   if (imageCount > 0) {
     estimatedCost = estimateImageCost(model, imageCount);
+  } else if (model.startsWith('claude-')) {
+    estimatedCost = estimateClaudeCost(model, inputTokens, outputTokens);
   } else {
     estimatedCost = estimateTextCost(model, inputTokens, outputTokens);
   }

@@ -41,8 +41,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         const zip = new AdmZip();
 
         // グローバルナビゲーションの取得 (ランタイム同期エラー対策のため安全なアクセスを行う)
-        const globalNav = await (prisma as any).globalConfig?.findUnique({ where: { key: 'navigation' } }).catch(() => null);
-        const globalNavValue = globalNav ? JSON.parse(globalNav.value) : null;
+        let globalNavValue: any = null;
+        try {
+            const globalNav = await prisma.globalConfig.findUnique({ where: { key: 'navigation' } });
+            if (globalNav) globalNavValue = JSON.parse(globalNav.value);
+        } catch { /* GlobalConfig table may not exist yet */ }
 
         // ヘッダー設定の構築
         let headerConfig = {
