@@ -58,7 +58,7 @@ function SortableSectionWrapper({ id, children }: { id: string; children: React.
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute -left-10 top-4 z-50 cursor-grab active:cursor-grabbing bg-white border border-gray-200 rounded-lg p-2 opacity-0 group-hover/section:opacity-100 transition-opacity shadow-lg hover:shadow-xl hover:bg-gray-50"
+                className="absolute -left-10 top-4 z-50 cursor-grab active:cursor-grabbing bg-white border border-gray-200 rounded-lg p-2 opacity-0 group-hover/section:opacity-100 transition-opacity shadow-lg hover:shadow-xl hover:bg-gray-50 hidden sm:block"
                 title="ドラッグして並び替え"
             >
                 <GripVertical className="h-5 w-5 text-gray-400" />
@@ -121,6 +121,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [inpaintSectionId, setInpaintSectionId] = useState<string | null>(null);
     const [inpaintImageUrl, setInpaintImageUrl] = useState<string | null>(null);
     const [inpaintMobileImageUrl, setInpaintMobileImageUrl] = useState<string | null>(null);
+
+    // モバイル用メニューサイドバー表示
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
 
     // デュアルスクリーンショット取り込みモーダル
     const [showDualImportModal, setShowDualImportModal] = useState(false);
@@ -1853,9 +1856,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     };
 
     return (
-        <div className={clsx("min-h-screen bg-gray-100 transition-all", showLPComparePanel ? "pr-[680px]" : "pr-[360px]")}>
-            {/* フローティングツールバー（必須機能のみ） */}
-            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl px-4 py-2.5 border border-gray-200" style={{ transform: 'translateX(calc(-50% - 180px))' }}>
+        <div className={clsx("min-h-screen bg-gray-100 transition-all", showLPComparePanel ? "lg:pr-[680px]" : "lg:pr-[360px]")}>
+            {/* フローティングツールバー - デスクトップ版 */}
+            <div className="hidden lg:flex fixed top-4 left-1/2 -translate-x-1/2 z-50 items-center gap-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl px-4 py-2.5 border border-gray-200" style={{ transform: 'translateX(calc(-50% - 180px))' }}>
                 {/* HD高画質化 */}
                 <button
                     onClick={() => setShow4KModal(true)}
@@ -1889,7 +1892,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 {/* 履歴ボタン */}
                 <button
                     onClick={() => {
-                        // セクションがあれば最初のセクションの履歴パネルを開く（サーバー履歴も含む）
                         if (sections.length > 0) {
                             handleOpenHistoryPanel(sections[0].id);
                         } else {
@@ -1905,7 +1907,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                 <div className="w-px h-6 bg-gray-200" />
 
-                {/* プレビューボタン - 新規タブでフルスクリーン表示 */}
+                {/* プレビューボタン */}
                 <button
                     onClick={() => window.open(`/preview/page/${pageId}?mode=${viewMode}`, '_blank')}
                     className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm"
@@ -1929,6 +1931,52 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 </button>
             </div>
 
+            {/* モバイル用ボトムツールバー */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200 shadow-2xl px-3 py-2 safe-area-bottom">
+                <div className="flex items-center justify-between gap-2">
+                    {/* 保存 */}
+                    <button
+                        onClick={() => handleSave()}
+                        disabled={isSaving}
+                        className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 min-h-[44px]"
+                    >
+                        {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        <span>{isSaving ? '保存中' : '保存'}</span>
+                    </button>
+
+                    {/* プレビュー */}
+                    <button
+                        onClick={() => window.open(`/preview/page/${pageId}?mode=${viewMode}`, '_blank')}
+                        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2.5 rounded-lg text-xs font-bold transition-all min-h-[44px]"
+                    >
+                        <Eye className="h-4 w-4" />
+                        <span>プレビュー</span>
+                    </button>
+
+                    {/* HD */}
+                    <button
+                        onClick={() => setShow4KModal(true)}
+                        className="flex items-center gap-1 bg-violet-600 text-white px-2.5 py-2.5 rounded-lg text-xs font-bold min-h-[44px]"
+                    >
+                        <span className="font-black text-[10px]">HD</span>
+                    </button>
+
+                    {/* メニュー開閉 */}
+                    <button
+                        onClick={() => setShowMobileMenu(!showMobileMenu)}
+                        className={clsx(
+                            "flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-bold transition-all min-h-[44px]",
+                            showMobileMenu
+                                ? "bg-gray-900 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        )}
+                    >
+                        {showMobileMenu ? <X className="h-4 w-4" /> : <PenTool className="h-4 w-4" />}
+                        <span>{showMobileMenu ? '閉じる' : 'メニュー'}</span>
+                    </button>
+                </div>
+            </div>
+
             {/* Hidden file input */}
             <input
                 id="file-upload-input"
@@ -1940,7 +1988,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             />
 
             {/* 完全LPプレビュー - メインビュー */}
-            <div className="flex justify-center py-20 px-4">
+            <div className="flex justify-center pt-4 pb-24 lg:py-20 px-2 sm:px-4">
                 <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl bg-white shadow-2xl">
                     {/* ヘッダー - 設定がある場合のみ表示 */}
                     {(headerConfig.logoText || headerConfig.ctaText || (headerConfig.navItems && headerConfig.navItems.length > 0)) && (
@@ -3495,21 +3543,39 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 </div>
             )}
 
+            {/* モバイル用オーバーレイ */}
+            {showMobileMenu && (
+                <div
+                    className="lg:hidden fixed inset-0 bg-black/40 z-[45] backdrop-blur-sm"
+                    onClick={() => setShowMobileMenu(false)}
+                />
+            )}
+
             {/* 右サイドバー - 編集メニュー */}
-            <div className="fixed right-0 top-0 h-full w-[320px] bg-white border-l border-gray-200 z-40 flex flex-col font-sans">
+            <div className={clsx(
+                "fixed right-0 top-0 h-full w-[300px] sm:w-[320px] bg-white border-l border-gray-200 z-[46] flex flex-col font-sans transition-transform duration-300",
+                "lg:translate-x-0",
+                showMobileMenu ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+            )}>
                 {/* ヘッダー */}
-                <div className="flex items-center gap-3 border-b border-gray-100 p-5 bg-white sticky top-0 z-10">
+                <div className="flex items-center gap-3 border-b border-gray-100 p-4 sm:p-5 bg-white sticky top-0 z-10">
                     <div className="bg-gray-100 p-2 rounded-lg text-gray-700">
                         <PenTool className="h-5 w-5" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                         <span className="text-base font-bold text-gray-900 block">編集メニュー</span>
                         <span className="text-xs text-gray-500">Page Actions</span>
                     </div>
+                    <button
+                        onClick={() => setShowMobileMenu(false)}
+                        className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
                 </div>
 
                 {/* メニュー */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-5 sm:space-y-6 pb-24 lg:pb-4">
                     {/* 基本操作 */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
@@ -3520,7 +3586,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             {/* チュートリアル */}
                             <button
                                 onClick={() => setShowTutorialModal(true)}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-violet-50 text-violet-700 text-xs font-medium border border-violet-200 hover:border-violet-300 hover:bg-violet-100 transition-all"
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-violet-50 text-violet-700 text-xs font-medium border border-violet-200 hover:border-violet-300 hover:bg-violet-100 transition-all min-h-[40px]"
                             >
                                 <HelpCircle className="h-3.5 w-3.5" />
                                 使い方
@@ -3528,7 +3594,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             {/* 画像追加 */}
                             <button
                                 onClick={() => document.getElementById('file-upload-input')?.click()}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all min-h-[40px]"
                             >
                                 <Plus className="h-3.5 w-3.5 text-gray-400" />
                                 画像追加
@@ -3537,7 +3603,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             <Link
                                 href={`/p/${initialSlug || pageId}`}
                                 target="_blank"
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all min-h-[40px]"
                             >
                                 <Eye className="h-3.5 w-3.5 text-gray-400" />
                                 プレビュー
@@ -3545,7 +3611,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             {/* ダウンロード */}
                             <button
                                 onClick={handleExport}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all"
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all min-h-[40px]"
                             >
                                 <Download className="h-3.5 w-3.5 text-gray-400" />
                                 ZIP出力
@@ -3554,7 +3620,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             <button
                                 onClick={handleExportPdf}
                                 disabled={isExportingPdf}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
                             >
                                 {isExportingPdf ? (
                                     <Loader2 className="h-3.5 w-3.5 text-gray-400 animate-spin" />
