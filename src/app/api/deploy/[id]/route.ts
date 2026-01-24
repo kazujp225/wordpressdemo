@@ -30,7 +30,7 @@ export async function GET(
     return NextResponse.json({ error: 'Deployment not found' }, { status: 404 });
   }
 
-  // If already live or failed, return cached status
+  // 確定済みステータスはキャッシュから返す
   if (deployment.status === 'live' || deployment.status === 'failed') {
     return NextResponse.json({
       id: deployment.id,
@@ -42,7 +42,7 @@ export async function GET(
     });
   }
 
-  // Get user's Render API key for polling
+  // ポーリング用のRender APIキーを取得
   const userSettings = await prisma.userSettings.findUnique({
     where: { userId: user.id },
     select: { renderApiKey: true },
@@ -57,13 +57,13 @@ export async function GET(
     });
   }
 
-  // Poll Render API for current status
+  // Render APIで現在のステータスを確認
   if (deployment.renderServiceId) {
     try {
       const apiKey = decrypt(userSettings.renderApiKey);
       const { status, url } = await getServiceStatus(deployment.renderServiceId, apiKey);
 
-      // Update DB if status changed
+      // ステータス変更時にDB更新
       if (status !== deployment.status || (url && !deployment.siteUrl)) {
         await prisma.deployment.update({
           where: { id: deploymentId },
@@ -126,13 +126,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Deployment not found' }, { status: 404 });
   }
 
-  // Get user's Render API key for deletion
+  // 削除用のRender APIキーを取得
   const userSettings = await prisma.userSettings.findUnique({
     where: { userId: user.id },
     select: { renderApiKey: true },
   });
 
-  // Delete Render service if exists
+  // Renderサービスを削除
   if (deployment.renderServiceId && userSettings?.renderApiKey) {
     try {
       const apiKey = decrypt(userSettings.renderApiKey);
@@ -142,7 +142,7 @@ export async function DELETE(
     }
   }
 
-  // Delete from DB
+  // DBから削除
   await prisma.deployment.delete({
     where: { id: deploymentId },
   });

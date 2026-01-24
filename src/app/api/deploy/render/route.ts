@@ -5,7 +5,7 @@ import { createDeployRepo, deleteGithubRepo } from '@/lib/github-deploy';
 import { createStaticSite } from '@/lib/render-api';
 import { decrypt } from '@/lib/encryption';
 
-// Simple in-memory rate limiter: max 5 deploys per user per 10 minutes
+// レート制限: ユーザーあたり10分間に最大5回
 const deployRateMap = new Map<string, number[]>();
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Rate limit check
+  // レート制限チェック
   if (!checkRateLimit(user.id)) {
     return NextResponse.json(
       { error: 'レート制限', message: 'デプロイ頻度が高すぎます。10分間に最大5回までです。' },
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Fetch user's deploy credentials from DB
+  // DBからデプロイ資格情報を取得
   const userSettings = await prisma.userSettings.findUnique({
     where: { userId: user.id },
     select: { renderApiKey: true, githubToken: true, githubDeployOwner: true },
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Validate service name format
+  // サイト名のバリデーション
   const sanitizedName = serviceName.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
   if (sanitizedName.length < 3) {
     return NextResponse.json(
@@ -74,22 +74,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Create unique repo name with timestamp
+  // タイムスタンプ付きのユニークなリポジトリ名
   const repoName = `lp-${sanitizedName}-${Date.now()}`;
 
-  // Decrypt credentials
+  // 資格情報を復号
   const githubToken = decrypt(userSettings.githubToken);
   const githubOwner = userSettings.githubDeployOwner;
   const renderApiKey = decrypt(userSettings.renderApiKey);
 
   try {
-    // 1. Create GitHub repository with the generated HTML (public/index.html)
+    // 1. GitHubリポジトリにHTMLをpush
     const { repoUrl, htmlUrl } = await createDeployRepo(repoName, html, {
       githubToken,
       githubOwner,
     });
 
-    // 2. Create Render Static Site pointing to the GitHub repo
+    // 2. Render Static Siteを作成
     let renderService;
     try {
       renderService = await createStaticSite({
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         apiKey: renderApiKey,
       });
     } catch (renderError: any) {
-      // Cleanup: delete the orphaned GitHub repo
+      // 失敗時: 孤立したリポジトリを削除
       try {
         await deleteGithubRepo(repoName, { githubToken, githubOwner });
       } catch (cleanupError) {
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       throw renderError;
     }
 
-    // 3. Save deployment record
+    // 3. デプロイレコードを保存
     const deployment = await prisma.deployment.create({
       data: {
         userId: user.id,
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Deployment error:', error);
 
-    // Save failed deployment record
+    // エラー記録を保存
     try {
       await prisma.deployment.create({
         data: {

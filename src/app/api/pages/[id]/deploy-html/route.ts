@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { generateExportCSS } from '@/lib/export-styles';
 
-// Generate a standalone HTML file for deployment (with absolute image URLs)
+// デプロイ用スタンドアロンHTMLを生成（画像は絶対URL）
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,7 +39,7 @@ export async function GET(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Header config
+  // ヘッダー設定
   let globalNavValue: any = null;
   try {
     const globalNav = await prisma.globalConfig.findUnique({ where: { key: 'navigation' } });
@@ -63,7 +63,11 @@ export async function GET(
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 
-  // Build sections HTML with absolute image URLs
+  // HTMLエスケープ
+  const escapeHtml = (str: string) =>
+    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+  // セクションHTMLを構築（画像は絶対URL）
   const sectionsHtml = page.sections.map((section, index) => {
     let config: any = {
       text: '',
@@ -78,7 +82,7 @@ export async function GET(
       if (section.config) config = { ...config, ...JSON.parse(section.config) };
     } catch {}
 
-    // html-embed sections
+    // html-embedセクション
     if (section.role === 'html-embed' && config.htmlContent) {
       return config.htmlContent;
     }
@@ -92,7 +96,7 @@ export async function GET(
     const textColor = config.textColor === 'black' ? '#000' : '#fff';
     const textShadow = config.textColor === 'black' ? 'none' : '0 2px 4px rgba(0,0,0,0.5)';
 
-    // Use absolute Supabase URLs for images
+    // 画像はSupabaseの絶対URLを使用
     let desktopSrc = '';
     if (section.image?.filePath) {
       desktopSrc = section.image.filePath.startsWith('http')
@@ -114,7 +118,7 @@ export async function GET(
     const textHtml = config.text
       ? `<div style="position:absolute;left:0;right:0;z-index:20;padding:0 32px;display:flex;flex-direction:column;pointer-events:none;${posStyle}">
           <div style="max-width:560px;text-align:center;white-space:pre-wrap;font-size:clamp(1.5rem,4vw,2.5rem);font-weight:900;letter-spacing:-0.025em;line-height:1.2;color:${textColor};text-shadow:${textShadow};">
-            ${config.text.replace(/\n/g, '<br>')}
+            ${escapeHtml(config.text).replace(/\n/g, '<br>')}
           </div>
         </div>`
       : '';
@@ -128,19 +132,19 @@ export async function GET(
       </section>`;
     }
 
-    // Desktop + mobile responsive image
+    // レスポンシブ画像（デスクトップ+モバイル）
     const mobileImgHtml = mobileSrc
       ? `<img src="${mobileSrc}" alt="" style="display:none;width:100%;height:auto;${filterStyle}" class="mobile-img" />`
       : '';
 
     return `<section style="position:relative;width:100%;overflow:hidden;">
       ${overlayHtml}${textHtml}
-      <img src="${desktopSrc}" alt="${section.role || ''}" style="display:block;width:100%;height:auto;${filterStyle}" class="desktop-img" />
+      <img src="${desktopSrc}" alt="${escapeHtml(section.role || '')}" style="display:block;width:100%;height:auto;${filterStyle}" class="desktop-img" />
       ${mobileImgHtml}
     </section>`;
   });
 
-  // Build responsive CSS
+  // レスポンシブCSS
   const mobileMediaQuery = sectionsHtml.some(h => h.includes('mobile-img'))
     ? `@media (max-width: 768px) {
         .desktop-img { display: none !important; }
@@ -155,7 +159,7 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${page.title}</title>
+  <title>${escapeHtml(page.title)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
   <style>${cssContent}
   ${mobileMediaQuery}
@@ -170,14 +174,14 @@ export async function GET(
 </head>
 <body>
   <header class="header">
-    <div class="header-logo">${headerConfig.logoText}</div>
-    <a href="${headerConfig.ctaLink}" class="header-cta">${headerConfig.ctaText}</a>
+    <div class="header-logo">${escapeHtml(headerConfig.logoText)}</div>
+    <a href="${escapeHtml(headerConfig.ctaLink)}" class="header-cta">${escapeHtml(headerConfig.ctaText)}</a>
   </header>
   <main class="main-content">
     ${sectionsHtml.join('\n    ')}
   </main>
   <footer class="footer">
-    <p>&copy; ${new Date().getFullYear()} ${headerConfig.logoText}. All rights reserved.</p>
+    <p>&copy; ${new Date().getFullYear()} ${escapeHtml(headerConfig.logoText)}</p>
   </footer>
 </body>
 </html>`;

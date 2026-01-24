@@ -3674,19 +3674,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 }
                                 setShowPageDeployModal(true);
                             }}
-                            className="group w-full relative overflow-hidden rounded-xl transition-all hover:shadow-lg hover:shadow-emerald-200/30 mt-2"
+                            className="group w-full flex items-center gap-3 px-4 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all shadow-sm mt-2"
                         >
-                            <div className="relative flex items-center gap-3 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-4 py-3">
-                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 rounded-xl" />
-                                <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 relative">
-                                    <Rocket className="h-3.5 w-3.5 text-white" />
-                                </div>
-                                <div className="text-left relative flex-1">
-                                    <span className="text-xs font-bold text-white block leading-tight">ページを公開</span>
-                                    <span className="text-[10px] text-white/60">ワンクリックでWebサイトに</span>
-                                </div>
-                                <ArrowRight className="h-3.5 w-3.5 text-white/50 group-hover:text-white group-hover:translate-x-0.5 transition-all relative" />
+                            <div className="h-5 w-5 flex items-center justify-center">
+                                <Rocket className="h-4 w-4 text-gray-300 group-hover:text-white transition-colors" />
                             </div>
+                            <div className="text-left flex-1">
+                                <span className="text-sm font-bold block leading-none">ページを公開</span>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-gray-500 group-hover:text-white transition-colors" />
                         </button>
 
                         {/* 表示切替 */}
