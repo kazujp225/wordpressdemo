@@ -96,21 +96,24 @@ model GlobalConfig {
 }
 
 model UserSettings {
-  id           Int       @id @default(autoincrement())
-  userId       String    @unique
-  email        String?
-  role         String    @default("user") // 'user' | 'admin'
-  plan         String    @default("free")
-  googleApiKey String?
-  isApproved   Boolean   @default(false)
-  approvedAt   DateTime?
-  approvedBy   String?
-  isBanned     Boolean   @default(false)
-  bannedAt     DateTime?
-  bannedBy     String?
-  banReason    String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  userId            String    @unique
+  email             String?
+  role              String    @default("user") // 'user' | 'admin'
+  plan              String    @default("free")
+  googleApiKey      String?
+  renderApiKey      String?
+  githubToken       String?
+  githubDeployOwner String?
+  isApproved        Boolean   @default(false)
+  approvedAt        DateTime?
+  approvedBy        String?
+  isBanned          Boolean   @default(false)
+  bannedAt          DateTime?
+  bannedBy          String?
+  banReason         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 model InpaintHistory {

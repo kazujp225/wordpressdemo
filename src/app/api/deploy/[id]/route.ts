@@ -41,10 +41,25 @@ export async function GET(
     });
   }
 
+  // Get user's Render API key for polling
+  const userSettings = await prisma.userSettings.findUnique({
+    where: { userId: user.id },
+    select: { renderApiKey: true },
+  });
+
+  if (!userSettings?.renderApiKey) {
+    return NextResponse.json({
+      id: deployment.id,
+      status: deployment.status,
+      serviceName: deployment.serviceName,
+      errorMessage: 'Render APIキーが見つかりません',
+    });
+  }
+
   // Poll Render API for current status
   if (deployment.renderServiceId) {
     try {
-      const { status, url } = await getServiceStatus(deployment.renderServiceId);
+      const { status, url } = await getServiceStatus(deployment.renderServiceId, userSettings.renderApiKey);
 
       // Update DB if status changed
       if (status !== deployment.status || (url && !deployment.siteUrl)) {
@@ -109,12 +124,17 @@ export async function DELETE(
     return NextResponse.json({ error: 'Deployment not found' }, { status: 404 });
   }
 
+  // Get user's Render API key for deletion
+  const userSettings = await prisma.userSettings.findUnique({
+    where: { userId: user.id },
+    select: { renderApiKey: true },
+  });
+
   // Delete Render service if exists
-  if (deployment.renderServiceId) {
+  if (deployment.renderServiceId && userSettings?.renderApiKey) {
     try {
-      await deleteService(deployment.renderServiceId);
+      await deleteService(deployment.renderServiceId, userSettings.renderApiKey);
     } catch (error) {
-      // Continue even if Render deletion fails
       console.error('Failed to delete Render service:', error);
     }
   }

@@ -40,7 +40,11 @@ export async function GET() {
         role: settings.role,
         hasApiKey: !!settings.googleApiKey,
         canSetApiKey: plan.limits.canSetApiKey, // Freeプランのみtrue
-        userId: user.id
+        userId: user.id,
+        // Deploy settings
+        hasRenderApiKey: !!settings.renderApiKey,
+        hasGithubToken: !!settings.githubToken,
+        githubDeployOwner: settings.githubDeployOwner || '',
     });
 }
 
@@ -53,7 +57,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { googleApiKey } = await request.json();
+    const body = await request.json();
+    const { googleApiKey, renderApiKey, githubToken, githubDeployOwner } = body;
 
     // プランを確認してAPIキー設定が許可されているかチェック
     const currentSettings = await prisma.userSettings.findUnique({
@@ -61,24 +66,42 @@ export async function POST(request: NextRequest) {
     });
     const planId = currentSettings?.plan || 'free';
 
-    // Freeプラン以外はAPIキー設定を拒否
+    // Freeプラン以外はgoogle APIキー設定を拒否
     if (!isFreePlan(planId) && googleApiKey) {
         return NextResponse.json({
             error: '有料プランではAPIキーの設定はできません。自社のAPIを使用します。'
         }, { status: 403 });
     }
 
+    // Build update data
+    const updateData: any = {};
+    const createData: any = {
+        userId: user.id,
+        email: user.email || null,
+        plan: 'free',
+    };
+
+    if (googleApiKey !== undefined) {
+        updateData.googleApiKey = googleApiKey || null;
+        createData.googleApiKey = googleApiKey || null;
+    }
+    if (renderApiKey !== undefined) {
+        updateData.renderApiKey = renderApiKey || null;
+        createData.renderApiKey = renderApiKey || null;
+    }
+    if (githubToken !== undefined) {
+        updateData.githubToken = githubToken || null;
+        createData.githubToken = githubToken || null;
+    }
+    if (githubDeployOwner !== undefined) {
+        updateData.githubDeployOwner = githubDeployOwner || null;
+        createData.githubDeployOwner = githubDeployOwner || null;
+    }
+
     await prisma.userSettings.upsert({
         where: { userId: user.id },
-        update: {
-            googleApiKey: googleApiKey || undefined
-        },
-        create: {
-            userId: user.id,
-            email: user.email || null,
-            plan: 'free',
-            googleApiKey: googleApiKey || null
-        }
+        update: updateData,
+        create: createData,
     });
 
     return NextResponse.json({ success: true });

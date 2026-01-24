@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Save, Globe, Github, Loader2, CheckCircle, Sparkles, LogOut,
     Crown, Zap, ArrowUpRight, CreditCard, Key, Settings2,
-    ChevronRight, AlertCircle, Star, Rocket
+    ChevronRight, AlertCircle, Star, Rocket, Upload
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -62,7 +62,12 @@ export default function SettingsPage() {
     });
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success'>('idle');
-    const [activeTab, setActiveTab] = useState<'plan' | 'apikey' | 'general' | 'github'>('plan');
+    const [activeTab, setActiveTab] = useState<'plan' | 'apikey' | 'general' | 'github' | 'deploy'>('plan');
+    const [renderApiKey, setRenderApiKey] = useState('');
+    const [githubToken, setGithubToken] = useState('');
+    const [githubDeployOwner, setGithubDeployOwner] = useState('');
+    const [hasRenderApiKey, setHasRenderApiKey] = useState(false);
+    const [hasGithubToken, setHasGithubToken] = useState(false);
 
     useEffect(() => {
         const getUser = async () => {
@@ -78,6 +83,9 @@ export default function SettingsPage() {
                 setHasApiKey(data.hasApiKey || false);
                 setCanSetApiKey(data.canSetApiKey || false);
                 setCurrentPlan(data.plan || 'free');
+                setHasRenderApiKey(data.hasRenderApiKey || false);
+                setHasGithubToken(data.hasGithubToken || false);
+                if (data.githubDeployOwner) setGithubDeployOwner(data.githubDeployOwner);
             } catch (e) {
                 console.error('Failed to fetch user settings', e);
             }
@@ -112,16 +120,35 @@ export default function SettingsPage() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
+            // Save user-level settings (API keys, deploy credentials)
+            const userSettingsPayload: any = {};
             if (googleApiKey && canSetApiKey) {
-                await fetch('/api/user/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ googleApiKey })
-                });
-                setHasApiKey(true);
-                setGoogleApiKey('');
+                userSettingsPayload.googleApiKey = googleApiKey;
+            }
+            if (renderApiKey) {
+                userSettingsPayload.renderApiKey = renderApiKey;
+            }
+            if (githubToken) {
+                userSettingsPayload.githubToken = githubToken;
+            }
+            if (githubDeployOwner !== undefined) {
+                userSettingsPayload.githubDeployOwner = githubDeployOwner;
             }
 
+            if (Object.keys(userSettingsPayload).length > 0) {
+                const userRes = await fetch('/api/user/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userSettingsPayload)
+                });
+                if (userRes.ok) {
+                    if (googleApiKey) { setHasApiKey(true); setGoogleApiKey(''); }
+                    if (renderApiKey) { setHasRenderApiKey(true); setRenderApiKey(''); }
+                    if (githubToken) { setHasGithubToken(true); setGithubToken(''); }
+                }
+            }
+
+            // Save global config
             const res = await fetch('/api/admin/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -238,6 +265,14 @@ export default function SettingsPage() {
                         icon={<Settings2 className="h-4 w-4" />}
                     >
                         一般設定
+                    </TabButton>
+                    <TabButton
+                        active={activeTab === 'deploy'}
+                        onClick={() => setActiveTab('deploy')}
+                        icon={<Upload className="h-4 w-4" />}
+                        badge={!hasRenderApiKey || !hasGithubToken}
+                    >
+                        デプロイ
                     </TabButton>
                     <TabButton
                         active={activeTab === 'github'}
@@ -423,6 +458,117 @@ export default function SettingsPage() {
                                     onChange={e => setConfig({ ...config, siteName: e.target.value })}
                                     className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all text-gray-900"
                                 />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* デプロイ設定タブ */}
+                    {activeTab === 'deploy' && (
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-8">
+                            <div className="flex items-start gap-4 mb-8">
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                    <Upload className="h-5 w-5 text-gray-900" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-gray-900">デプロイ設定</h3>
+                                    <p className="text-sm text-gray-500 mt-1">AIで生成したHTMLをRenderにデプロイするための設定</p>
+                                </div>
+                            </div>
+
+                            {/* Status */}
+                            {hasRenderApiKey && hasGithubToken && githubDeployOwner ? (
+                                <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg mb-8">
+                                    <CheckCircle className="h-5 w-5 text-gray-900" />
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-900">デプロイ設定完了</p>
+                                        <p className="text-xs text-gray-600">AI Code Generatorからデプロイが可能です</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg mb-8">
+                                    <AlertCircle className="h-5 w-5 text-gray-900" />
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-900">設定が必要です</p>
+                                        <p className="text-xs text-gray-600">下記の項目を全て設定してください</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-6">
+                                {/* Render API Key */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Render APIキー
+                                        {hasRenderApiKey && <span className="ml-2 text-xs text-green-600 font-normal">設定済み</span>}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={renderApiKey}
+                                        placeholder={hasRenderApiKey ? '••••••••（変更する場合のみ入力）' : 'rnd_...'}
+                                        onChange={e => setRenderApiKey(e.target.value)}
+                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all font-mono text-gray-900 placeholder:text-gray-400"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        <a href="https://render.com/docs/api#creating-an-api-key" target="_blank" rel="noopener noreferrer"
+                                            className="text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900 transition-all inline-flex items-center gap-1 font-medium">
+                                            Render Dashboard → Account Settings → API Keys <ArrowUpRight className="h-3 w-3" />
+                                        </a>
+                                        から取得
+                                    </p>
+                                </div>
+
+                                {/* GitHub Token */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        GitHub Personal Access Token
+                                        {hasGithubToken && <span className="ml-2 text-xs text-green-600 font-normal">設定済み</span>}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={githubToken}
+                                        placeholder={hasGithubToken ? '••••••••（変更する場合のみ入力）' : 'ghp_...'}
+                                        onChange={e => setGithubToken(e.target.value)}
+                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all font-mono text-gray-900 placeholder:text-gray-400"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer"
+                                            className="text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900 transition-all inline-flex items-center gap-1 font-medium">
+                                            GitHub → Settings → Developer settings → Personal access tokens <ArrowUpRight className="h-3 w-3" />
+                                        </a>
+                                        （repoスコープが必要）
+                                    </p>
+                                </div>
+
+                                {/* GitHub Owner */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">GitHubユーザー名</label>
+                                    <input
+                                        type="text"
+                                        value={githubDeployOwner}
+                                        placeholder="your-username"
+                                        onChange={e => setGithubDeployOwner(e.target.value)}
+                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all text-gray-900 placeholder:text-gray-400"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        デプロイ用のリポジトリが作成されるGitHubアカウント名
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* How it works */}
+                            <div className="mt-8 rounded-lg p-6 border border-gray-200 border-dashed">
+                                <h4 className="text-sm font-bold text-gray-900 mb-4">デプロイの仕組み</h4>
+                                <div className="space-y-4">
+                                    <Step number={1}>AI Code GeneratorでHTMLを生成</Step>
+                                    <Step number={2}>「デプロイ」ボタンをクリック</Step>
+                                    <Step number={3}>GitHubに自動でリポジトリが作成される</Step>
+                                    <Step number={4}>RenderがGitHubと連携し、Static Siteとして公開</Step>
+                                </div>
+                                <div className="mt-6 pt-4 border-t border-gray-200 border-dashed">
+                                    <p className="text-xs text-gray-500 leading-relaxed">
+                                        <span className="font-bold text-gray-900">Note:</span> Render Static Siteは無料プランで利用できます。GitHubリポジトリはPublicで作成されます。
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     )}

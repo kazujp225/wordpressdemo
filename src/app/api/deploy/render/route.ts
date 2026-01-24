@@ -12,17 +12,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check required environment variables
-  if (!process.env.RENDER_API_KEY) {
+  // Fetch user's deploy credentials from DB
+  const userSettings = await prisma.userSettings.findUnique({
+    where: { userId: user.id },
+    select: { renderApiKey: true, githubToken: true, githubDeployOwner: true },
+  });
+
+  if (!userSettings?.renderApiKey) {
     return NextResponse.json(
-      { error: 'Server configuration error', message: 'RENDER_API_KEY is not configured' },
-      { status: 500 }
+      { error: 'デプロイ設定が未完了です', message: 'Render APIキーが設定されていません。設定画面から設定してください。' },
+      { status: 400 }
     );
   }
-  if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_DEPLOY_OWNER) {
+  if (!userSettings?.githubToken || !userSettings?.githubDeployOwner) {
     return NextResponse.json(
-      { error: 'Server configuration error', message: 'GitHub deploy credentials are not configured' },
-      { status: 500 }
+      { error: 'デプロイ設定が未完了です', message: 'GitHub設定が完了していません。設定画面から設定してください。' },
+      { status: 400 }
     );
   }
 
@@ -40,7 +45,7 @@ export async function POST(request: NextRequest) {
   const sanitizedName = serviceName.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
   if (sanitizedName.length < 3) {
     return NextResponse.json(
-      { error: 'Service name must be at least 3 characters' },
+      { error: 'サイト名は3文字以上にしてください' },
       { status: 400 }
     );
   }
@@ -50,13 +55,16 @@ export async function POST(request: NextRequest) {
 
   try {
     // 1. Create GitHub repository with the generated HTML (public/index.html)
-    const { repoUrl, htmlUrl } = await createDeployRepo(repoName, html);
+    const { repoUrl, htmlUrl } = await createDeployRepo(repoName, html, {
+      githubToken: userSettings.githubToken,
+      githubOwner: userSettings.githubDeployOwner,
+    });
 
     // 2. Create Render Static Site pointing to the GitHub repo
-    // Use htmlUrl (https://github.com/owner/repo) format for Render
     const renderService = await createStaticSite({
       name: sanitizedName,
       repoUrl: repoUrl,
+      apiKey: userSettings.renderApiKey,
     });
 
     // 3. Save deployment record
@@ -106,7 +114,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Deployment failed', message: error.message },
+      { error: 'デプロイに失敗しました', message: error.message },
       { status: 500 }
     );
   }

@@ -1,10 +1,6 @@
 const GITHUB_API_BASE = 'https://api.github.com';
 
-function getGithubHeaders(): HeadersInit {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error('GITHUB_TOKEN is not set');
-  }
+function getGithubHeaders(token: string): HeadersInit {
   return {
     'Authorization': `token ${token}`,
     'Accept': 'application/vnd.github.v3+json',
@@ -12,25 +8,23 @@ function getGithubHeaders(): HeadersInit {
   };
 }
 
-function getOwner(): string {
-  const owner = process.env.GITHUB_DEPLOY_OWNER;
-  if (!owner) {
-    throw new Error('GITHUB_DEPLOY_OWNER is not set');
-  }
-  return owner;
-}
-
 export interface CreateDeployRepoResult {
   repoUrl: string;
   htmlUrl: string;
 }
 
+export interface DeployCredentials {
+  githubToken: string;
+  githubOwner: string;
+}
+
 export async function createDeployRepo(
   repoName: string,
-  htmlContent: string
+  htmlContent: string,
+  credentials: DeployCredentials
 ): Promise<CreateDeployRepoResult> {
-  const owner = getOwner();
-  const headers = getGithubHeaders();
+  const { githubToken, githubOwner } = credentials;
+  const headers = getGithubHeaders(githubToken);
 
   // 1. Create repository
   const createRepoResponse = await fetch(`${GITHUB_API_BASE}/user/repos`, {
@@ -46,7 +40,10 @@ export async function createDeployRepo(
 
   if (!createRepoResponse.ok) {
     const error = await createRepoResponse.text();
-    throw new Error(`Failed to create repo: ${createRepoResponse.status} - ${error}`);
+    if (createRepoResponse.status === 401) {
+      throw new Error('GitHub認証エラー: トークンを確認してください');
+    }
+    throw new Error(`GitHubリポジトリ作成エラー: ${createRepoResponse.status} - ${error}`);
   }
 
   const repo = await createRepoResponse.json();
@@ -56,12 +53,12 @@ export async function createDeployRepo(
 
   // 2. Get default branch SHA
   const refResponse = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repoName}/git/ref/heads/main`,
+    `${GITHUB_API_BASE}/repos/${githubOwner}/${repoName}/git/ref/heads/main`,
     { headers }
   );
 
   if (!refResponse.ok) {
-    throw new Error('Failed to get repo ref');
+    throw new Error('リポジトリの初期化待機中にエラーが発生しました');
   }
 
   const refData = await refResponse.json();
@@ -69,15 +66,15 @@ export async function createDeployRepo(
 
   // 3. Get the tree of the latest commit
   const commitResponse = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repoName}/git/commits/${latestCommitSha}`,
+    `${GITHUB_API_BASE}/repos/${githubOwner}/${repoName}/git/commits/${latestCommitSha}`,
     { headers }
   );
   const commitData = await commitResponse.json();
   const baseTreeSha = commitData.tree.sha;
 
-  // 4. Create blob for index.html in public/ directory (Render static site publishPath)
+  // 4. Create blob for index.html in public/ directory
   const blobResponse = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repoName}/git/blobs`,
+    `${GITHUB_API_BASE}/repos/${githubOwner}/${repoName}/git/blobs`,
     {
       method: 'POST',
       headers,
@@ -89,14 +86,14 @@ export async function createDeployRepo(
   );
 
   if (!blobResponse.ok) {
-    throw new Error('Failed to create blob for index.html');
+    throw new Error('HTMLファイルのアップロードに失敗しました');
   }
 
   const blobData = await blobResponse.json();
 
   // 5. Create tree with public/index.html
   const treeResponse = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repoName}/git/trees`,
+    `${GITHUB_API_BASE}/repos/${githubOwner}/${repoName}/git/trees`,
     {
       method: 'POST',
       headers,
@@ -115,14 +112,14 @@ export async function createDeployRepo(
   );
 
   if (!treeResponse.ok) {
-    throw new Error('Failed to create tree');
+    throw new Error('Gitツリーの作成に失敗しました');
   }
 
   const treeData = await treeResponse.json();
 
   // 6. Create commit
   const newCommitResponse = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repoName}/git/commits`,
+    `${GITHUB_API_BASE}/repos/${githubOwner}/${repoName}/git/commits`,
     {
       method: 'POST',
       headers,
@@ -135,14 +132,14 @@ export async function createDeployRepo(
   );
 
   if (!newCommitResponse.ok) {
-    throw new Error('Failed to create commit');
+    throw new Error('コミットの作成に失敗しました');
   }
 
   const newCommitData = await newCommitResponse.json();
 
   // 7. Update ref
   const updateRefResponse = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repoName}/git/refs/heads/main`,
+    `${GITHUB_API_BASE}/repos/${githubOwner}/${repoName}/git/refs/heads/main`,
     {
       method: 'PATCH',
       headers,
@@ -153,49 +150,11 @@ export async function createDeployRepo(
   );
 
   if (!updateRefResponse.ok) {
-    throw new Error('Failed to update ref');
+    throw new Error('ブランチの更新に失敗しました');
   }
 
   return {
     repoUrl: repo.clone_url,
     htmlUrl: repo.html_url,
   };
-}
-
-export async function updateRepoContent(
-  repoName: string,
-  htmlContent: string
-): Promise<void> {
-  const owner = getOwner();
-  const headers = getGithubHeaders();
-
-  // Get current file SHA
-  const fileResponse = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repoName}/contents/public/index.html`,
-    { headers }
-  );
-
-  if (!fileResponse.ok) {
-    throw new Error('Failed to get current file');
-  }
-
-  const fileData = await fileResponse.json();
-
-  // Update file
-  const updateResponse = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repoName}/contents/public/index.html`,
-    {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        message: 'Update from LP Builder',
-        content: Buffer.from(htmlContent).toString('base64'),
-        sha: fileData.sha,
-      }),
-    }
-  );
-
-  if (!updateResponse.ok) {
-    throw new Error('Failed to update file');
-  }
 }

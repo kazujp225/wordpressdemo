@@ -1,10 +1,6 @@
 const RENDER_API_BASE = 'https://api.render.com/v1';
 
-function getRenderHeaders(): HeadersInit {
-  const apiKey = process.env.RENDER_API_KEY;
-  if (!apiKey) {
-    throw new Error('RENDER_API_KEY is not set');
-  }
+function getRenderHeaders(apiKey: string): HeadersInit {
   return {
     'Authorization': `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
@@ -15,6 +11,7 @@ export interface CreateStaticSiteParams {
   name: string;
   repoUrl: string;
   branch?: string;
+  apiKey: string;
 }
 
 export interface RenderService {
@@ -27,20 +24,20 @@ export interface RenderService {
 }
 
 // Fetch the Render account owner ID (required for service creation)
-async function getOwnerId(): Promise<string> {
+async function getOwnerId(apiKey: string): Promise<string> {
   const response = await fetch(`${RENDER_API_BASE}/owners?limit=1`, {
     method: 'GET',
-    headers: getRenderHeaders(),
+    headers: getRenderHeaders(apiKey),
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Failed to fetch Render owner: ${response.status} - ${errorBody}`);
+    throw new Error(`Render認証エラー: APIキーを確認してください (${response.status})`);
   }
 
   const owners = await response.json();
   if (!owners || owners.length === 0) {
-    throw new Error('No Render owner found for this API key');
+    throw new Error('Renderアカウントのオーナーが見つかりません');
   }
 
   return owners[0].owner.id;
@@ -48,13 +45,13 @@ async function getOwnerId(): Promise<string> {
 
 // Create a Static Site on Render (free tier)
 export async function createStaticSite(params: CreateStaticSiteParams): Promise<RenderService> {
-  const { name, repoUrl, branch = 'main' } = params;
+  const { name, repoUrl, branch = 'main', apiKey } = params;
 
-  const ownerId = await getOwnerId();
+  const ownerId = await getOwnerId(apiKey);
 
   const response = await fetch(`${RENDER_API_BASE}/services`, {
     method: 'POST',
-    headers: getRenderHeaders(),
+    headers: getRenderHeaders(apiKey),
     body: JSON.stringify({
       type: 'static_site',
       name,
@@ -70,7 +67,7 @@ export async function createStaticSite(params: CreateStaticSiteParams): Promise<
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Render API error: ${response.status} - ${errorBody}`);
+    throw new Error(`Renderサービス作成エラー: ${response.status} - ${errorBody}`);
   }
 
   const data = await response.json();
@@ -82,15 +79,10 @@ export async function createStaticSite(params: CreateStaticSiteParams): Promise<
   };
 }
 
-// Legacy alias for backward compatibility
-export async function createWebService(params: CreateStaticSiteParams): Promise<RenderService> {
-  return createStaticSite(params);
-}
-
-export async function getServiceStatus(serviceId: string): Promise<{ status: string; url?: string }> {
+export async function getServiceStatus(serviceId: string, apiKey: string): Promise<{ status: string; url?: string }> {
   const response = await fetch(`${RENDER_API_BASE}/services/${serviceId}`, {
     method: 'GET',
-    headers: getRenderHeaders(),
+    headers: getRenderHeaders(apiKey),
   });
 
   if (!response.ok) {
@@ -102,7 +94,7 @@ export async function getServiceStatus(serviceId: string): Promise<{ status: str
   // Check latest deploy status
   const deploysResponse = await fetch(`${RENDER_API_BASE}/services/${serviceId}/deploys?limit=1`, {
     method: 'GET',
-    headers: getRenderHeaders(),
+    headers: getRenderHeaders(apiKey),
   });
 
   let deployStatus = 'unknown';
@@ -133,10 +125,10 @@ export async function getServiceStatus(serviceId: string): Promise<{ status: str
   return { status, url };
 }
 
-export async function triggerDeploy(serviceId: string): Promise<void> {
+export async function triggerDeploy(serviceId: string, apiKey: string): Promise<void> {
   const response = await fetch(`${RENDER_API_BASE}/services/${serviceId}/deploys`, {
     method: 'POST',
-    headers: getRenderHeaders(),
+    headers: getRenderHeaders(apiKey),
     body: JSON.stringify({}),
   });
 
@@ -145,10 +137,10 @@ export async function triggerDeploy(serviceId: string): Promise<void> {
   }
 }
 
-export async function deleteService(serviceId: string): Promise<void> {
+export async function deleteService(serviceId: string, apiKey: string): Promise<void> {
   const response = await fetch(`${RENDER_API_BASE}/services/${serviceId}`, {
     method: 'DELETE',
-    headers: getRenderHeaders(),
+    headers: getRenderHeaders(apiKey),
   });
 
   if (!response.ok && response.status !== 404) {
