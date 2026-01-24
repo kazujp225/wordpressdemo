@@ -136,20 +136,34 @@ export default function PagePreviewPage() {
                         // モバイルビューでモバイル画像がない場合の警告表示用
                         const isMobileViewWithoutMobileImage = viewMode === 'mobile' && !section.mobileImage?.filePath && section.image?.filePath;
 
-                        // Parse clickable areas from config (handle both string and object)
+                        // Parse config (handle both string and object)
+                        let parsedConfig: any = {};
                         let clickableAreas: ClickableArea[] = [];
                         try {
                             if (section.config) {
-                                // configが文字列の場合はパース、オブジェクトの場合はそのまま使用
-                                const parsed = typeof section.config === 'string'
-                                    ? JSON.parse(section.config)
+                                parsedConfig = typeof section.config === 'string'
+                                    ? JSON.parse(section.config as string)
                                     : section.config;
                                 // LP Builderからの保存形式: properties.clickableAreas または clickableAreas
-                                clickableAreas = parsed.properties?.clickableAreas || parsed.clickableAreas || [];
-                                console.log(`[Preview] Section ${section.role} config:`, parsed, 'clickableAreas:', clickableAreas);
+                                clickableAreas = parsedConfig.properties?.clickableAreas || parsedConfig.clickableAreas || [];
                             }
                         } catch (e) {
                             console.error(`[Preview] Failed to parse config for section ${section.role}:`, e);
+                        }
+
+                        // html-embedセクションはiframeで表示
+                        if (section.role === 'html-embed' && parsedConfig.htmlContent) {
+                            return (
+                                <div key={section.id} className="relative" style={{ margin: 0, padding: 0 }}>
+                                    <iframe
+                                        srcDoc={parsedConfig.htmlContent}
+                                        className="w-full border-0"
+                                        style={{ minHeight: '400px', height: '800px' }}
+                                        sandbox="allow-scripts allow-forms"
+                                        title="Embedded content"
+                                    />
+                                </div>
+                            );
                         }
 
                         if (!imagePath) {
