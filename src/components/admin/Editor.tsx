@@ -27,7 +27,7 @@ import ThumbnailTransformModal from '@/components/admin/ThumbnailTransformModal'
 import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
 import ClaudeCodeGeneratorModal from '@/components/admin/ClaudeCodeGeneratorModal';
 import PageDeployModal from '@/components/admin/PageDeployModal';
-import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight } from 'lucide-react';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -3663,21 +3663,32 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 )}
                                 PDF出力
                             </button>
-                            {/* デプロイ */}
-                            <button
-                                onClick={() => {
-                                    if (pageId === 'new') {
-                                        toast.error('デプロイする前にページを保存してください。');
-                                        return;
-                                    }
-                                    setShowPageDeployModal(true);
-                                }}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 text-xs font-medium border border-emerald-200 hover:border-emerald-300 hover:from-emerald-100 hover:to-teal-100 transition-all min-h-[40px]"
-                            >
-                                <Globe className="h-3.5 w-3.5" />
-                                デプロイ
-                            </button>
                         </div>
+
+                        {/* デプロイ - Premium standalone button */}
+                        <button
+                            onClick={() => {
+                                if (pageId === 'new') {
+                                    toast.error('デプロイする前にページを保存してください。');
+                                    return;
+                                }
+                                setShowPageDeployModal(true);
+                            }}
+                            className="group w-full relative overflow-hidden rounded-xl transition-all hover:shadow-lg hover:shadow-emerald-200/30 mt-2"
+                        >
+                            <div className="relative flex items-center gap-3 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-4 py-3">
+                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 rounded-xl" />
+                                <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 relative">
+                                    <Rocket className="h-3.5 w-3.5 text-white" />
+                                </div>
+                                <div className="text-left relative flex-1">
+                                    <span className="text-xs font-bold text-white block leading-tight">ページを公開</span>
+                                    <span className="text-[10px] text-white/60">ワンクリックでWebサイトに</span>
+                                </div>
+                                <ArrowRight className="h-3.5 w-3.5 text-white/50 group-hover:text-white group-hover:translate-x-0.5 transition-all relative" />
+                            </div>
+                        </button>
+
                         {/* 表示切替 */}
                         <div className="flex items-center justify-center gap-1 pt-2 border-t border-gray-100">
                             <button
