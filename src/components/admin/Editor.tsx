@@ -26,7 +26,8 @@ import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
 import ThumbnailTransformModal from '@/components/admin/ThumbnailTransformModal';
 import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
 import ClaudeCodeGeneratorModal from '@/components/admin/ClaudeCodeGeneratorModal';
-import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles } from 'lucide-react';
+import PageDeployModal from '@/components/admin/PageDeployModal';
+import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe } from 'lucide-react';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -216,6 +217,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // AIコード生成モーダル
     const [showClaudeGeneratorModal, setShowClaudeGeneratorModal] = useState(false);
+
+    // ページデプロイモーダル
+    const [showPageDeployModal, setShowPageDeployModal] = useState(false);
 
     // セクション挿入モーダル
     const [showInsertModal, setShowInsertModal] = useState(false);
@@ -3659,6 +3663,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 )}
                                 PDF出力
                             </button>
+                            {/* デプロイ */}
+                            <button
+                                onClick={() => {
+                                    if (pageId === 'new') {
+                                        toast.error('デプロイする前にページを保存してください。');
+                                        return;
+                                    }
+                                    setShowPageDeployModal(true);
+                                }}
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 text-xs font-medium border border-emerald-200 hover:border-emerald-300 hover:from-emerald-100 hover:to-teal-100 transition-all min-h-[40px]"
+                            >
+                                <Globe className="h-3.5 w-3.5" />
+                                デプロイ
+                            </button>
                         </div>
                         {/* 表示切替 */}
                         <div className="flex items-center justify-center gap-1 pt-2 border-t border-gray-100">
@@ -5730,6 +5748,14 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         setSections(sorted);
                         await handleSave(sorted);
                     }}
+                />
+            )}
+
+            {showPageDeployModal && pageId !== 'new' && (
+                <PageDeployModal
+                    pageId={pageId}
+                    pageTitle={initialSlug || 'my-page'}
+                    onClose={() => setShowPageDeployModal(false)}
                 />
             )}
 
