@@ -112,6 +112,9 @@ model UserSettings {
   bannedAt          DateTime?
   bannedBy          String?
   banReason         String?
+  resendApiKey      String?
+  notificationEmail String?
+  resendFromDomain  String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 }

@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import {
     Save, Globe, Github, Loader2, CheckCircle, Sparkles, LogOut,
     Crown, Zap, ArrowUpRight, CreditCard, Key, Settings2,
-    ChevronRight, AlertCircle, Star, Rocket, Upload
+    ChevronRight, AlertCircle, Star, Rocket, Upload, Mail, ChevronDown
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -76,6 +76,12 @@ function SettingsPage() {
     const [githubDeployOwner, setGithubDeployOwner] = useState('');
     const [hasRenderApiKey, setHasRenderApiKey] = useState(false);
     const [hasGithubToken, setHasGithubToken] = useState(false);
+    // Resend settings
+    const [resendApiKey, setResendApiKey] = useState('');
+    const [notificationEmail, setNotificationEmail] = useState('');
+    const [resendFromDomain, setResendFromDomain] = useState('');
+    const [hasResendApiKey, setHasResendApiKey] = useState(false);
+    const [showDnsGuide, setShowDnsGuide] = useState(false);
 
     // Handle query params (tab, OAuth callback)
     useEffect(() => {
@@ -126,6 +132,9 @@ function SettingsPage() {
                 setHasRenderApiKey(data.hasRenderApiKey || false);
                 setHasGithubToken(data.hasGithubToken || false);
                 if (data.githubDeployOwner) setGithubDeployOwner(data.githubDeployOwner);
+                setHasResendApiKey(data.hasResendApiKey || false);
+                if (data.notificationEmail) setNotificationEmail(data.notificationEmail);
+                if (data.resendFromDomain) setResendFromDomain(data.resendFromDomain);
             } catch (e) {
                 console.error('Failed to fetch user settings', e);
             }
@@ -168,6 +177,15 @@ function SettingsPage() {
             if (renderApiKey) {
                 userSettingsPayload.renderApiKey = renderApiKey;
             }
+            if (resendApiKey) {
+                userSettingsPayload.resendApiKey = resendApiKey;
+            }
+            if (notificationEmail !== undefined) {
+                userSettingsPayload.notificationEmail = notificationEmail;
+            }
+            if (resendFromDomain !== undefined) {
+                userSettingsPayload.resendFromDomain = resendFromDomain;
+            }
 
             if (Object.keys(userSettingsPayload).length > 0) {
                 const userRes = await fetch('/api/user/settings', {
@@ -178,6 +196,7 @@ function SettingsPage() {
                 if (userRes.ok) {
                     if (googleApiKey) { setHasApiKey(true); setGoogleApiKey(''); }
                     if (renderApiKey) { setHasRenderApiKey(true); setRenderApiKey(''); }
+                    if (resendApiKey) { setHasResendApiKey(true); setResendApiKey(''); }
                 }
             }
 
@@ -608,6 +627,121 @@ function SettingsPage() {
                                             で「Create API Key」をクリック
                                         </p>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* 3. Resend Email Notification */}
+                            <div className="mt-8 p-5 rounded-xl border border-gray-200 bg-gray-50/50">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white rounded-lg border border-gray-200">
+                                            <Mail className="h-5 w-5 text-gray-900" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-gray-900">メール通知（Resend）</p>
+                                            <p className="text-xs text-gray-500">フォーム送信時にメール通知を受け取る</p>
+                                        </div>
+                                    </div>
+                                    {hasResendApiKey && notificationEmail ? (
+                                        <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                                            設定済み
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                                            オプション
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 space-y-4">
+                                    {/* Resend API Key */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Resend APIキー</label>
+                                        <input
+                                            type="password"
+                                            value={resendApiKey}
+                                            placeholder={hasResendApiKey ? '••••••••（変更する場合のみ入力）' : 're_...'}
+                                            onChange={e => setResendApiKey(e.target.value)}
+                                            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all font-mono text-gray-900 placeholder:text-gray-400"
+                                        />
+                                    </div>
+
+                                    {/* Notification Email */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">通知先メールアドレス</label>
+                                        <input
+                                            type="email"
+                                            value={notificationEmail}
+                                            placeholder="you@example.com"
+                                            onChange={e => setNotificationEmail(e.target.value)}
+                                            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all text-gray-900 placeholder:text-gray-400"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1.5">フォーム送信の通知を受け取るメールアドレス</p>
+                                    </div>
+
+                                    {/* From Domain (optional) */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">送信ドメイン（オプション）</label>
+                                        <input
+                                            type="text"
+                                            value={resendFromDomain}
+                                            placeholder="example.com"
+                                            onChange={e => setResendFromDomain(e.target.value)}
+                                            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all text-gray-900 placeholder:text-gray-400"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1.5">未設定の場合はResendテスト用アドレスから送信されます</p>
+                                    </div>
+                                </div>
+
+                                {/* Setup Guide */}
+                                <div className="mt-6 rounded-lg p-5 border border-gray-200 border-dashed bg-white">
+                                    <h4 className="text-sm font-bold text-gray-900 mb-3">メール通知の設定（5分で完了）</h4>
+                                    <div className="space-y-3">
+                                        <Step number={1}>
+                                            <a href="https://resend.com" target="_blank" rel="noopener noreferrer"
+                                                className="text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900 transition-all inline-flex items-center gap-1 font-medium">
+                                                resend.com <ArrowUpRight className="h-3 w-3" />
+                                            </a>
+                                            で無料アカウント作成（100通/日まで無料）
+                                        </Step>
+                                        <Step number={2}>API Keysページで「Create API Key」をクリック</Step>
+                                        <Step number={3}>生成されたキー（re_...）を上の欄に貼り付け</Step>
+                                        <Step number={4}>通知を受け取るメールアドレスを入力</Step>
+                                        <Step number={5}>ページ下部の「変更を保存」ボタンを押して完了</Step>
+                                    </div>
+                                </div>
+
+                                {/* DNS Guide (collapsible) */}
+                                <div className="mt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDnsGuide(!showDnsGuide)}
+                                        className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                                    >
+                                        <ChevronDown className={`h-4 w-4 transition-transform ${showDnsGuide ? 'rotate-180' : ''}`} />
+                                        独自ドメイン設定（オプション）
+                                    </button>
+                                    {showDnsGuide && (
+                                        <div className="mt-3 rounded-lg p-5 border border-gray-200 border-dashed bg-white">
+                                            <p className="text-xs text-gray-600 mb-3 leading-relaxed">
+                                                <span className="font-bold text-gray-900">設定しない場合:</span> Resendテスト用アドレスから送信（自分宛のみ有効）<br />
+                                                <span className="font-bold text-gray-900">設定する場合:</span> 独自ドメインから送信可能（第三者にも送信可能）
+                                            </p>
+                                            <div className="space-y-3">
+                                                <Step number={1}>
+                                                    Resend Domainsページで「Add Domain」をクリック
+                                                </Step>
+                                                <Step number={2}>表示されるDNSレコード（MX, TXT, CNAME）をDNS設定に追加</Step>
+                                                <Step number={3}>「Verify」をクリックして認証を確認</Step>
+                                                <Step number={4}>認証したドメインを上の「送信ドメイン」欄に入力</Step>
+                                            </div>
+                                            <div className="mt-4 pt-3 border-t border-gray-200 border-dashed">
+                                                <p className="text-xs text-gray-500 leading-relaxed">
+                                                    <span className="font-bold text-gray-900">ヒント:</span> DNSレコードの追加方法はご利用のドメイン管理サービス（お名前.com、Cloudflare等）のヘルプを参照してください。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

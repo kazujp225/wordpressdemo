@@ -41,6 +41,13 @@ AI駆動のランディングページ自動生成ツール。Next.js 14、Tailw
 - **API使用量ダッシュボード**: 日別/モデル別/タイプ別のAI API使用状況とコスト確認
 - **ナビゲーション設定**: グローバルナビゲーションのカスタマイズ
 
+### メール通知（Resend連携）
+- **フォーム送信通知**: 公開ページのお問い合わせフォームから送信があると、設定したメールアドレスに通知
+- **Resend統合**: Resend APIを利用した信頼性の高いメール配信
+- **DB自動保存**: メール設定の有無に関わらず、全てのフォーム送信はDBに保存
+- **独自ドメイン対応**: Resendでドメイン認証すれば独自アドレスから送信可能
+- **非ブロッキング設計**: メール送信に失敗してもフォーム送信自体は成功扱い
+
 ## 技術スタック
 
 ### フロントエンド
@@ -155,6 +162,8 @@ src/
 │   ├── supabase/           # Supabaseクライアント
 │   ├── db.ts               # Prismaクライアント
 │   ├── auth.ts             # 認証ユーティリティ
+│   ├── email.ts            # Resendメール送信ユーティリティ
+│   ├── encryption.ts       # APIキー暗号化
 │   ├── apiKeys.ts          # APIキー管理
 │   ├── ai-costs.ts         # AIコスト計算
 │   ├── gemini-prompts.ts   # プロンプトテンプレート
@@ -172,7 +181,8 @@ src/
 - **MediaImage**: 画像メタデータ（生成プロンプト、ソース等）
 - **GenerationRun**: AI API呼び出しログ（コスト、トークン数等）
 - **InpaintHistory**: インペインティング履歴
-- **UserSettings**: ユーザー設定（プラン、APIキー等）
+- **UserSettings**: ユーザー設定（プラン、APIキー、Resend設定等）
+- **FormSubmission**: フォーム送信データ（問い合わせ内容、通知状態等）
 - **GlobalConfig**: グローバル設定
 
 ## API エンドポイント
@@ -197,6 +207,8 @@ src/
 | `POST /api/upload` | ファイルアップロード |
 | `GET /api/media` | メディア一覧 |
 | `GET /api/admin/stats` | API使用統計 |
+| `POST /api/form-submissions` | フォーム送信（DB保存+メール通知） |
+| `GET/POST /api/user/settings` | ユーザー設定（Resend含む） |
 
 ## 本番デプロイ (Render/Vercel)
 
@@ -218,6 +230,56 @@ npm start
 - `JWT_SECRET` - JWT署名用シークレット
 - `NEXT_PUBLIC_BASE_URL` - 公開URL
 - `GOOGLE_API_KEY` - Google AI API Key（オプション、ユーザー設定優先）
+
+## メール通知の使い方（Resend）
+
+公開ページのお問い合わせフォームから送信があった際に、メールで通知を受け取る機能です。
+
+### Step 1: Resendアカウント作成
+
+[resend.com](https://resend.com) で無料アカウントを作成します（100通/日まで無料）。
+
+### Step 2: APIキーの取得
+
+Resendダッシュボードの「API Keys」ページで「Create API Key」をクリックし、キーをコピーします。
+
+![Resend APIキー作成](docs/images/resend-api-key.png)
+
+### Step 3: 設定画面で入力
+
+管理画面 → 設定 →「デプロイ」タブを開き、「メール通知（Resend）」セクションで以下を入力：
+
+1. **Resend APIキー** - `re_` で始まるキーを貼り付け
+2. **通知先メールアドレス** - 通知を受け取りたいアドレス
+3. **送信ドメイン（オプション）** - 独自ドメインを設定する場合
+
+![設定画面 - Resendセクション](docs/images/settings-resend-section.png)
+
+### Step 4: 保存して完了
+
+ページ下部の「変更を保存」ボタンをクリックすれば設定完了です。
+
+### Step 5: 動作確認
+
+公開ページ（`/p/your-page-slug`）のお問い合わせフォームから送信すると：
+- DBに `FormSubmission` レコードが作成される
+- 設定したメールアドレスに通知メールが届く
+
+![お問い合わせフォーム](docs/images/contact-form.png)
+
+![通知メール例](docs/images/notification-email.png)
+
+### 独自ドメイン設定（オプション）
+
+デフォルトでは `onboarding@resend.dev` から送信されます（自分宛のみ有効）。
+独自ドメインを設定すると、`notifications@your-domain.com` から送信できます。
+
+1. Resend Domainsページで「Add Domain」
+2. 表示されるDNSレコード（MX, TXT, CNAME）をDNS設定に追加
+3. 「Verify」をクリックして認証を確認
+4. 設定画面の「送信ドメイン」欄に認証したドメインを入力
+
+---
 
 ## 使用モデルとコスト目安
 

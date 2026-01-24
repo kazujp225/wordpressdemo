@@ -236,7 +236,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                 ))}
 
                 {/* Form Section */}
-                <ContactForm />
+                <ContactForm pageSlug={params.slug} />
             </main>
 
             {/* Footer */}

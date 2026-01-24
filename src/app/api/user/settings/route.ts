@@ -46,6 +46,10 @@ export async function GET() {
         hasRenderApiKey: !!settings.renderApiKey,
         hasGithubToken: !!settings.githubToken,
         githubDeployOwner: settings.githubDeployOwner || '',
+        // Resend settings
+        hasResendApiKey: !!settings.resendApiKey,
+        notificationEmail: settings.notificationEmail || '',
+        resendFromDomain: settings.resendFromDomain || '',
     });
 }
 
@@ -59,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { googleApiKey, renderApiKey, githubToken, githubDeployOwner } = body;
+    const { googleApiKey, renderApiKey, githubToken, githubDeployOwner, resendApiKey, notificationEmail, resendFromDomain } = body;
 
     // プランを確認してAPIキー設定が許可されているかチェック
     const currentSettings = await prisma.userSettings.findUnique({
@@ -100,6 +104,19 @@ export async function POST(request: NextRequest) {
     if (githubDeployOwner !== undefined) {
         updateData.githubDeployOwner = githubDeployOwner || null;
         createData.githubDeployOwner = githubDeployOwner || null;
+    }
+    if (resendApiKey !== undefined) {
+        const val = resendApiKey ? encrypt(resendApiKey) : null;
+        updateData.resendApiKey = val;
+        createData.resendApiKey = val;
+    }
+    if (notificationEmail !== undefined) {
+        updateData.notificationEmail = notificationEmail || null;
+        createData.notificationEmail = notificationEmail || null;
+    }
+    if (resendFromDomain !== undefined) {
+        updateData.resendFromDomain = resendFromDomain || null;
+        createData.resendFromDomain = resendFromDomain || null;
     }
 
     await prisma.userSettings.upsert({
