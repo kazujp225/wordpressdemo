@@ -28,6 +28,17 @@ import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
 import ClaudeCodeGeneratorModal from '@/components/admin/ClaudeCodeGeneratorModal';
 import PageDeployModal from '@/components/admin/PageDeployModal';
 import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight } from 'lucide-react';
+import {
+  EditorMenuSection,
+  EditorMenuItem,
+  EditorSectionList,
+  EditorActionButton,
+  EditorInfoBox,
+  EditorBadge,
+  EditorMenuSearch,
+  EditorMenuProvider,
+  EditorIconBox
+} from '@/components/ui/editor-menu';
 import type { ClickableArea } from '@/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -122,6 +133,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [inpaintSectionId, setInpaintSectionId] = useState<string | null>(null);
     const [inpaintImageUrl, setInpaintImageUrl] = useState<string | null>(null);
     const [inpaintMobileImageUrl, setInpaintMobileImageUrl] = useState<string | null>(null);
+    const [inpaintInitialMode, setInpaintInitialMode] = useState<'inpaint' | 'button' | 'text-fix'>('inpaint');
 
     // モバイル用メニューサイドバー表示
     const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -142,6 +154,40 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // ツールアコーディオン展開状態
     const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set([]));
+
+    // メニュー検索
+    const [menuSearch, setMenuSearch] = useState('');
+
+    // メニュー検索フィルタリング用のヘルパー
+    const menuItems = {
+        crop: { title: '画像を切り取る', keywords: ['切り取り', 'カット', 'トリミング', 'crop'] },
+        overlay: { title: 'ボタン・文字を重ねる', keywords: ['オーバーレイ', 'テキスト', 'ボタン'] },
+        delete: { title: 'ブロックを削除', keywords: ['削除', '消す', 'remove'] },
+        background: { title: '背景色をそろえる', keywords: ['背景', '色', 'カラー'] },
+        colorPalette: { title: '色の組み合わせ', keywords: ['配色', 'パレット', 'テーマ'] },
+        copyEdit: { title: '文字を修正', keywords: ['テキスト', 'AI', 'コピー', '編集', '文字', '修正', 'OCR'] },
+        cta: { title: 'ボタンのリンク先', keywords: ['URL', 'リンク', 'ボタン', 'CTA'] },
+        video: { title: '動画を埋め込む', keywords: ['YouTube', '動画', 'ビデオ', 'video'] },
+        thumbnail: { title: 'サムネイル用に変換', keywords: ['サムネ', '画像', '変換'] },
+        document: { title: '資料にする', keywords: ['スライド', 'PDF', '資料', 'ドキュメント'] },
+        claude: { title: 'claude-codegen', keywords: ['AI', 'コード', '生成', 'Claude'] },
+        undo: { title: '操作をやり直す', keywords: ['戻す', '履歴', 'undo'] },
+        regenerate: { title: 'まとめて作り直す', keywords: ['再生成', 'AI', 'リジェネ'] },
+    };
+
+    const isMenuItemVisible = (itemKey: string) => {
+        if (!menuSearch.trim()) return true;
+        const search = menuSearch.toLowerCase();
+        const item = menuItems[itemKey as keyof typeof menuItems];
+        if (!item) return true;
+        return item.title.toLowerCase().includes(search) ||
+            item.keywords.some(k => k.toLowerCase().includes(search));
+    };
+
+    const isSectionVisible = (itemKeys: string[]) => {
+        if (!menuSearch.trim()) return true;
+        return itemKeys.some(key => isMenuItemVisible(key));
+    };
 
     // アコーディオントグル関数
     const toggleTool = (toolId: string) => {
@@ -1064,11 +1110,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     };
 
     // インペインティング（部分編集）モーダルを開く
-    const handleOpenInpaint = (sectionId: string, imageUrl: string, mobileImageUrl?: string) => {
-        console.log('[handleOpenInpaint] Opening with:', { sectionId, imageUrl, mobileImageUrl });
+    const handleOpenInpaint = (sectionId: string, imageUrl: string, mobileImageUrl?: string, mode: 'inpaint' | 'button' | 'text-fix' = 'inpaint') => {
+        console.log('[handleOpenInpaint] Opening with:', { sectionId, imageUrl, mobileImageUrl, mode });
         setInpaintSectionId(sectionId);
         setInpaintImageUrl(imageUrl);
         setInpaintMobileImageUrl(mobileImageUrl || null);
+        setInpaintInitialMode(mode);
         setShowInpaintModal(true);
     };
 
@@ -3592,20 +3639,30 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 showMobileMenu ? "translate-x-0" : "translate-x-full lg:translate-x-0"
             )}>
                 {/* ヘッダー */}
-                <div className="flex items-center gap-3 border-b border-gray-100 p-4 sm:p-5 bg-white sticky top-0 z-10">
-                    <div className="bg-gray-100 p-2 rounded-lg text-gray-700">
-                        <PenTool className="h-5 w-5" />
+                <div className="border-b border-gray-100 bg-white sticky top-0 z-10">
+                    <div className="flex items-center gap-3 p-4 sm:p-5">
+                        <div className="bg-gray-100 p-2 rounded-lg text-gray-700">
+                            <PenTool className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                            <span className="text-base font-bold text-gray-900 block">編集メニュー</span>
+                            <span className="text-xs text-gray-500">Page Actions</span>
+                        </div>
+                        <button
+                            onClick={() => setShowMobileMenu(false)}
+                            className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
                     </div>
-                    <div className="flex-1">
-                        <span className="text-base font-bold text-gray-900 block">編集メニュー</span>
-                        <span className="text-xs text-gray-500">Page Actions</span>
+                    {/* 検索ボックス */}
+                    <div className="px-4 sm:px-5 pb-3">
+                        <EditorMenuSearch
+                            value={menuSearch}
+                            onChange={setMenuSearch}
+                            placeholder="機能を検索..."
+                        />
                     </div>
-                    <button
-                        onClick={() => setShowMobileMenu(false)}
-                        className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
                 </div>
 
                 {/* メニュー */}
@@ -3715,396 +3772,360 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                     {/* 見た目を調整する */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
-                            <span className="w-1 h-4 bg-indigo-500 rounded-full"></span>
-                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">見た目を調整する</p>
-                        </div>
-
+                    {isSectionVisible(['crop', 'overlay', 'delete', 'background', 'colorPalette']) && (
+                    <EditorMenuSection title="見た目を調整する" color="indigo">
                         {/* 画像を切り取る */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button
-                                onClick={() => toggleTool('crop')}
-                                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                        <Scissors className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="text-left">
-                                        <h4 className="text-sm font-bold text-gray-900">画像を切り取る</h4>
-                                        <p className="text-xs text-gray-500 mt-0.5">余白や不要な部分をカット</p>
-                                    </div>
-                                </div>
-                                {expandedTools.has('crop') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                            </button>
-                            {expandedTools.has('crop') && (
-                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                                        {sections.filter(s => s.image?.filePath).map((section, idx) => (
-                                            <button
-                                                key={section.id}
-                                                onClick={() => {
-                                                    if (section?.image?.filePath) {
-                                                        setCropSectionId(String(section.id));
-                                                        setCropImageUrl(section.image.filePath);
-                                                        setShowCropModal(true);
-                                                    }
-                                                }}
-                                                className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 transition-all text-left"
-                                            >
-                                                <div className="w-6 h-6 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                                                    <img
-                                                        src={section.image.filePath}
-                                                        alt=""
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-                                                <span className="text-xs text-gray-600 truncate flex-1">
-                                                    {section.role || `セクション ${idx + 1}`}
-                                                </span>
-                                            </button>
-                                        ))}
-                                        {sections.filter(s => s.image?.filePath).length === 0 && (
-                                            <p className="text-xs text-gray-400 text-center py-2">画像がありません</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        {isMenuItemVisible('crop') && (
+                        <EditorMenuItem
+                            icon={<Scissors className="h-3.5 w-3.5" />}
+                            title="画像を切り取る"
+                            description="余白や不要な部分をカット"
+                            tooltip="画像の余白や不要な部分を切り取ります"
+                            open={expandedTools.has('crop')}
+                            onOpenChange={(open) => {
+                                if (open) {
+                                    setExpandedTools(prev => new Set([...prev, 'crop']));
+                                } else {
+                                    setExpandedTools(prev => {
+                                        const next = new Set(prev);
+                                        next.delete('crop');
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            <EditorSectionList
+                                sections={sections}
+                                onSelect={(section) => {
+                                    if (section?.image?.filePath) {
+                                        setCropSectionId(String(section.id));
+                                        setCropImageUrl(section.image.filePath);
+                                        setShowCropModal(true);
+                                    }
+                                }}
+                            />
+                        </EditorMenuItem>
+                        )}
 
                         {/* ボタン・文字を重ねる */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button
-                                onClick={() => toggleTool('overlay')}
-                                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                        <Layers className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="text-left">
-                                        <h4 className="text-sm font-bold text-gray-900">ボタン・文字を重ねる</h4>
-                                        <p className="text-xs text-gray-500 mt-0.5">画像の上に追加できます</p>
-                                    </div>
-                                </div>
-                                {expandedTools.has('overlay') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                            </button>
-                            {expandedTools.has('overlay') && (
-                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                                        {sections.filter(s => s.image?.filePath).map((section, idx) => (
-                                            <button
-                                                key={section.id}
-                                                onClick={() => {
-                                                    const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
-                                                        ? section.mobileImage.filePath
-                                                        : section.image?.filePath;
-                                                    if (imageUrl) {
-                                                        setOverlayEditSectionId(String(section.id));
-                                                        setOverlayEditImageUrl(imageUrl);
-                                                        setShowOverlayEditor(true);
-                                                    }
-                                                }}
-                                                className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 transition-all text-left"
-                                            >
-                                                <div className="w-6 h-6 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                                                    <img
-                                                        src={section.image?.filePath}
-                                                        alt=""
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="text-xs text-gray-600 truncate block">
-                                                        {section.role || `セクション ${idx + 1}`}
-                                                    </span>
-                                                    <span className="text-[9px] text-gray-400 block -mt-0.5">
-                                                        {section.config?.overlays?.length || 0}件の重ね要素
-                                                    </span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                        {sections.filter(s => s.image?.filePath).length === 0 && (
-                                            <p className="text-xs text-gray-400 text-center py-2">画像がありません</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        {isMenuItemVisible('overlay') && (
+                        <EditorMenuItem
+                            icon={<Layers className="h-3.5 w-3.5" />}
+                            title="ボタン・文字を重ねる"
+                            description="画像の上に追加できます"
+                            tooltip="テキストやボタンを画像に重ねられます"
+                            open={expandedTools.has('overlay')}
+                            onOpenChange={(open) => {
+                                if (open) {
+                                    setExpandedTools(prev => new Set([...prev, 'overlay']));
+                                } else {
+                                    setExpandedTools(prev => {
+                                        const next = new Set(prev);
+                                        next.delete('overlay');
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            <EditorSectionList
+                                sections={sections}
+                                showOverlayCount
+                                onSelect={(section) => {
+                                    const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
+                                        ? section.mobileImage.filePath
+                                        : section.image?.filePath;
+                                    if (imageUrl) {
+                                        setOverlayEditSectionId(String(section.id));
+                                        setOverlayEditImageUrl(imageUrl);
+                                        setShowOverlayEditor(true);
+                                    }
+                                }}
+                            />
+                        </EditorMenuItem>
+                        )}
 
                         {/* ブロックを削除 */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button
-                                onClick={() => toggleTool('delete')}
-                                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+                        {isMenuItemVisible('delete') && (
+                        <EditorMenuItem
+                            icon={<Trash2 className="h-3.5 w-3.5" />}
+                            title="ブロックを削除"
+                            description="いらない部分を外す"
+                            tooltip="不要なセクションを一括で削除できます"
+                            iconVariant="danger"
+                            open={expandedTools.has('delete')}
+                            onOpenChange={(open) => {
+                                if (open) {
+                                    setExpandedTools(prev => new Set([...prev, 'delete']));
+                                } else {
+                                    setExpandedTools(prev => {
+                                        const next = new Set(prev);
+                                        next.delete('delete');
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            <EditorActionButton
+                                onClick={() => {
+                                    setSectionDeleteMode(true);
+                                    setBatchRegenerateMode(false);
+                                    setBackgroundUnifyMode(false);
+                                    setBoundaryFixMode(false);
+                                }}
+                                disabled={sections.length === 0}
+                                icon={<Trash2 className="h-3.5 w-3.5" />}
+                                variant="danger"
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="text-left">
-                                        <h4 className="text-sm font-bold text-gray-900">ブロックを削除</h4>
-                                        <p className="text-xs text-gray-500 mt-0.5">いらない部分を外す</p>
-                                    </div>
-                                </div>
-                                {expandedTools.has('delete') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                            </button>
-                            {expandedTools.has('delete') && (
-                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                    <button
-                                        onClick={() => {
-                                            setSectionDeleteMode(true);
-                                            setBatchRegenerateMode(false);
-                                            setBackgroundUnifyMode(false);
-                                            setBoundaryFixMode(false);
-                                        }}
-                                        disabled={sections.length === 0}
-                                        className="w-full py-2 bg-gray-50 text-gray-600 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                        削除するブロックを選ぶ
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                                削除するブロックを選ぶ
+                            </EditorActionButton>
+                        </EditorMenuItem>
+                        )}
 
                         {/* 背景色をそろえる */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <div className="p-3">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                        <Palette className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="text-left">
-                                        <h4 className="text-sm font-bold text-gray-900">背景色をそろえる</h4>
-                                        <p className="text-xs text-gray-500 mt-0.5">全体の背景を同じ色に</p>
-                                    </div>
-                                </div>
-                                <button
+                        {isMenuItemVisible('background') && (
+                        <EditorMenuItem
+                            icon={<Palette className="h-3.5 w-3.5" />}
+                            title="背景色をそろえる"
+                            description="全体の背景を同じ色に"
+                            tooltip="AIが選択したブロックの背景色を統一します"
+                            action={
+                                <EditorActionButton
                                     onClick={() => {
                                         setBackgroundUnifyMode(true);
                                         setBatchRegenerateMode(false);
                                         setBoundaryFixMode(false);
                                     }}
                                     disabled={sections.filter(s => s.image?.filePath).length === 0}
-                                    className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
                                 >
                                     ブロックを選ぶ
-                                </button>
-                            </div>
-                        </div>
+                                </EditorActionButton>
+                            }
+                        />
+                        )}
 
                         {/* 色の組み合わせ */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button onClick={() => toggleTool('color-palette')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Droplet className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left"><h4 className="text-sm font-bold text-gray-900">色の組み合わせ</h4><p className="text-xs text-gray-500 mt-0.5">ページ全体の色を選ぶ</p></div>
-                                </div>
-                                {expandedTools.has('color-palette') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                            </button>
-                            {expandedTools.has('color-palette') && (
-                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                    <button onClick={() => setShowColorPaletteModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">色を選ぶ</button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                        {isMenuItemVisible('colorPalette') && (
+                        <EditorMenuItem
+                            icon={<Droplet className="h-3.5 w-3.5" />}
+                            title="色の組み合わせ"
+                            description="ページ全体の色を選ぶ"
+                            tooltip="ページ全体の配色テーマを変更できます"
+                            open={expandedTools.has('color-palette')}
+                            onOpenChange={(open) => {
+                                if (open) {
+                                    setExpandedTools(prev => new Set([...prev, 'color-palette']));
+                                } else {
+                                    setExpandedTools(prev => {
+                                        const next = new Set(prev);
+                                        next.delete('color-palette');
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            <EditorActionButton onClick={() => setShowColorPaletteModal(true)}>
+                                色を選ぶ
+                            </EditorActionButton>
+                        </EditorMenuItem>
+                        )}
+                    </EditorMenuSection>
+                    )}
 
                     {/* 内容を編集する */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
-                            <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
-                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">内容を編集する</p>
-                        </div>
-
-                        {/* 文章をまとめて書き直す */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button onClick={() => toggleTool('copy-edit')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Type className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left"><h4 className="text-sm font-bold text-gray-900">文章をまとめて書き直す</h4><p className="text-xs text-gray-500 mt-0.5">AIがテキストを作成</p></div>
-                                </div>
-                                {expandedTools.has('copy-edit') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                            </button>
-                            {expandedTools.has('copy-edit') && (
-                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                    <button onClick={() => setShowCopyEditModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">文章を編集</button>
-                                </div>
-                            )}
-                        </div>
+                    {isSectionVisible(['copyEdit', 'cta']) && (
+                    <EditorMenuSection title="内容を編集する" color="emerald">
+                        {/* 文字を修正 - AI画像編集と同じUIで領域選択 */}
+                        {isMenuItemVisible('copyEdit') && (
+                        <EditorMenuItem
+                            icon={<Type className="h-3.5 w-3.5" />}
+                            title="文字を修正"
+                            description="変更したい部分を囲んでAIで修正"
+                            tooltip="画像上でテキスト領域を選択し、AIで修正します（複数選択OK）"
+                            open={expandedTools.has('copy-edit')}
+                            onOpenChange={(open) => {
+                                if (open) {
+                                    setExpandedTools(prev => new Set([...prev, 'copy-edit']));
+                                } else {
+                                    setExpandedTools(prev => {
+                                        const next = new Set(prev);
+                                        next.delete('copy-edit');
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            <EditorSectionList
+                                sections={sections}
+                                onSelect={(section) => {
+                                    const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
+                                        ? section.mobileImage.filePath
+                                        : section.image?.filePath;
+                                    const mobileImageUrl = section.mobileImage?.filePath;
+                                    if (imageUrl) {
+                                        handleOpenInpaint(String(section.id), imageUrl, mobileImageUrl, 'text-fix');
+                                    }
+                                }}
+                            />
+                        </EditorMenuItem>
+                        )}
 
                         {/* ボタンのリンク先 */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button onClick={() => toggleTool('cta')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><MousePointer className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left"><h4 className="text-sm font-bold text-gray-900">ボタンのリンク先</h4><p className="text-xs text-gray-500 mt-0.5">押したときの移動先を変更</p></div>
-                                </div>
-                                {expandedTools.has('cta') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                            </button>
-                            {expandedTools.has('cta') && (
-                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                    <button onClick={() => setShowCTAModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">リンク先を変更</button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                        {isMenuItemVisible('cta') && (
+                        <EditorMenuItem
+                            icon={<MousePointer className="h-3.5 w-3.5" />}
+                            title="ボタンのリンク先"
+                            description="押したときの移動先を変更"
+                            tooltip="CTAボタンのリンク先URLを変更できます"
+                            open={expandedTools.has('cta')}
+                            onOpenChange={(open) => {
+                                if (open) {
+                                    setExpandedTools(prev => new Set([...prev, 'cta']));
+                                } else {
+                                    setExpandedTools(prev => {
+                                        const next = new Set(prev);
+                                        next.delete('cta');
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            <EditorActionButton onClick={() => setShowCTAModal(true)}>
+                                リンク先を変更
+                            </EditorActionButton>
+                        </EditorMenuItem>
+                        )}
+                    </EditorMenuSection>
+                    )}
 
                     {/* もっと魅力的にする */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
-                            <span className="w-1 h-4 bg-amber-500 rounded-full"></span>
-                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">もっと魅力的にする</p>
-                        </div>
-
+                    {isSectionVisible(['video']) && (
+                    <EditorMenuSection title="もっと魅力的にする" color="amber">
                         {/* 動画を埋め込む */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button onClick={() => toggleTool('video')} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors relative">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><Video className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left">
-                                        <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">動画を埋め込む<span className="flex items-center gap-0.5 text-[8px] px-1.5 py-0 bg-gray-900 text-white rounded-sm font-medium">Max</span></h4>
-                                        <p className="text-xs text-gray-500 mt-0.5">YouTube等の動画を追加</p>
-                                    </div>
-                                </div>
-                                {expandedTools.has('video') ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
-                            </button>
-                            {expandedTools.has('video') && (
-                                <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-2 pt-2">
-                                    <button onClick={() => setShowVideoModal(true)} className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-200">動画を追加</button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                        {isMenuItemVisible('video') && (
+                        <EditorMenuItem
+                            icon={<Video className="h-3.5 w-3.5" />}
+                            title="動画を埋め込む"
+                            description="YouTube等の動画を追加"
+                            badge={<EditorBadge variant="dark">Max</EditorBadge>}
+                            tooltip="YouTubeやVimeoの動画を埋め込めます"
+                            open={expandedTools.has('video')}
+                            onOpenChange={(open) => {
+                                if (open) {
+                                    setExpandedTools(prev => new Set([...prev, 'video']));
+                                } else {
+                                    setExpandedTools(prev => {
+                                        const next = new Set(prev);
+                                        next.delete('video');
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            <EditorActionButton onClick={() => setShowVideoModal(true)} variant="primary">
+                                動画を追加
+                            </EditorActionButton>
+                        </EditorMenuItem>
+                        )}
+                    </EditorMenuSection>
+                    )}
 
                     {/* 別の用途で使う */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
-                            <span className="w-1 h-4 bg-purple-500 rounded-full"></span>
-                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">別の用途で使う</p>
-                        </div>
-
+                    {isSectionVisible(['thumbnail', 'document']) && (
+                    <EditorMenuSection title="別の用途で使う" color="purple">
                         {/* サムネイル用に変換 */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button
-                                onClick={() => setShowThumbnailModal(true)}
-                                className="w-full p-3 hover:bg-gray-50 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><ImageIcon className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left flex-1">
-                                        <h4 className="text-sm font-bold text-gray-900">
-                                            サムネイル用に変換
-                                        </h4>
-                                        <p className="text-xs text-gray-500 mt-0.5">参考サムネイルを元に変換</p>
-                                    </div>
-                                    <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
-                                </div>
-                            </button>
-                        </div>
+                        {isMenuItemVisible('thumbnail') && (
+                        <EditorMenuItem
+                            icon={<ImageIcon className="h-3.5 w-3.5" />}
+                            title="サムネイル用に変換"
+                            description="参考サムネイルを元に変換"
+                            tooltip="LPをYouTubeサムネイル風に変換します"
+                            action={
+                                <EditorActionButton onClick={() => setShowThumbnailModal(true)}>
+                                    変換を開始
+                                </EditorActionButton>
+                            }
+                        />
+                        )}
 
                         {/* 資料にする */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button
-                                onClick={() => setShowDocumentModal(true)}
-                                className="w-full p-3 hover:bg-gray-50 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500"><FileText className="h-3.5 w-3.5" /></div>
-                                    <div className="text-left flex-1">
-                                        <h4 className="text-sm font-bold text-gray-900">
-                                            資料にする
-                                        </h4>
-                                        <p className="text-xs text-gray-500 mt-0.5">スライド風の資料を作成</p>
-                                    </div>
-                                    <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
-                                </div>
-                            </button>
-                        </div>
-                    </div>
+                        {isMenuItemVisible('document') && (
+                        <EditorMenuItem
+                            icon={<FileText className="h-3.5 w-3.5" />}
+                            title="資料にする"
+                            description="スライド風の資料を作成"
+                            tooltip="LPをプレゼン資料形式に変換します"
+                            action={
+                                <EditorActionButton onClick={() => setShowDocumentModal(true)}>
+                                    資料を作成
+                                </EditorActionButton>
+                            }
+                        />
+                        )}
+                    </EditorMenuSection>
+                    )}
 
                     {/* AIコード生成 */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
-                            <span className="w-1 h-4 bg-gray-900 rounded-full"></span>
-                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">AIコード生成</p>
-                        </div>
-
-                        {/* AIコード生成 */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <button
-                                onClick={() => setShowClaudeGeneratorModal(true)}
-                                className="w-full p-3 hover:bg-gray-50 transition-colors group"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="h-7 w-7 bg-gray-900 flex items-center justify-center">
-                                        <Code2 className="h-3.5 w-3.5 text-white" />
-                                    </div>
-                                    <div className="text-left flex-1">
-                                        <h4 className="text-sm font-bold text-gray-900 font-mono">
-                                            claude-codegen
-                                        </h4>
-                                        <p className="text-xs text-gray-500 font-mono mt-0.5">sonnet-4 | html/css/js</p>
-                                    </div>
-                                    <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
-                                </div>
-                            </button>
-                        </div>
-                    </div>
+                    {isSectionVisible(['claude']) && (
+                    <EditorMenuSection title="AIコード生成" color="indigo">
+                        {isMenuItemVisible('claude') && (
+                        <EditorMenuItem
+                            icon={<Code2 className="h-3.5 w-3.5" />}
+                            title="claude-codegen"
+                            description="sonnet-4 | html/css/js"
+                            tooltip="AIがHTML/CSS/JSコードを生成します"
+                            iconVariant="dark"
+                            badge={<EditorBadge variant="new">NEW</EditorBadge>}
+                            action={
+                                <EditorActionButton onClick={() => setShowClaudeGeneratorModal(true)} variant="primary">
+                                    コードを生成
+                                </EditorActionButton>
+                            }
+                        />
+                        )}
+                    </EditorMenuSection>
+                    )}
 
                     {/* 整理・やり直し */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mt-8">
-                            <span className="w-1 h-4 bg-rose-500 rounded-full"></span>
-                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">整理・やり直し</p>
-                        </div>
-
+                    {isSectionVisible(['undo', 'regenerate']) && (
+                    <EditorMenuSection title="整理・やり直し" color="rose">
                         {/* 操作をやり直す */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <div className="p-3">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                        <Undo2 className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="text-left">
-                                        <h4 className="text-sm font-bold text-gray-900">操作をやり直す</h4>
-                                        <p className="text-xs text-gray-400 mt-0.5">前の状態に戻せます</p>
-                                    </div>
-                                </div>
-                                <div className="text-[10px] text-gray-500 bg-gray-50 rounded p-1.5 text-center">
+                        {isMenuItemVisible('undo') && (
+                        <EditorMenuItem
+                            icon={<Undo2 className="h-3.5 w-3.5" />}
+                            title="操作をやり直す"
+                            description="前の状態に戻せます"
+                            tooltip="各ブロックの履歴から以前の状態に戻せます"
+                            action={
+                                <EditorInfoBox variant="info">
                                     各ブロックの「履歴」をクリック
-                                </div>
-                            </div>
-                        </div>
+                                </EditorInfoBox>
+                            }
+                        />
+                        )}
 
                         {/* まとめて作り直す */}
-                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <div className="p-3">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-gray-500">
-                                        <RefreshCw className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="text-left">
-                                        <h4 className="text-sm font-bold text-gray-900">まとめて作り直す</h4>
-                                        <p className="text-xs text-gray-400 mt-0.5">AIでページ全体を再生成</p>
-                                    </div>
-                                </div>
-                                <button
+                        {isMenuItemVisible('regenerate') && (
+                        <EditorMenuItem
+                            icon={<RefreshCw className="h-3.5 w-3.5" />}
+                            title="まとめて作り直す"
+                            description="AIでページ全体を再生成"
+                            tooltip="選択したブロックをAIで一括再生成します"
+                            action={
+                                <EditorActionButton
                                     onClick={() => {
                                         setBatchRegenerateMode(true);
                                         setBoundaryFixMode(false);
                                         setBackgroundUnifyMode(false);
                                     }}
                                     disabled={sections.filter(s => s.image?.filePath).length === 0}
-                                    className="w-full py-2 bg-gray-50 text-gray-700 text-xs font-medium rounded hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200"
                                 >
                                     ブロックを選ぶ
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                                </EditorActionButton>
+                            }
+                        />
+                        )}
+                    </EditorMenuSection>
+                    )}
                 </div>
             </div>
 
@@ -4118,12 +4139,14 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         setInpaintSectionId(null);
                         setInpaintImageUrl(null);
                         setInpaintMobileImageUrl(null);
+                        setInpaintInitialMode('inpaint');
                     }}
                     onSave={handleInpaintSave}
                     sectionId={inpaintSectionId}
                     clickableAreas={sections.find(s => s.id === inpaintSectionId)?.config?.clickableAreas || []}
                     mobileClickableAreas={sections.find(s => s.id === inpaintSectionId)?.config?.mobileClickableAreas || []}
                     onSaveClickableAreas={handleSaveClickableAreas}
+                    initialMode={inpaintInitialMode}
                 />
             )}
 
