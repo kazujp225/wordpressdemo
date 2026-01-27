@@ -36,7 +36,7 @@ const VIDEO_SOURCES = [
     { id: 'youtube', label: 'YouTube', icon: Youtube, description: 'YouTube動画を埋め込み' },
     { id: 'upload', label: 'アップロード', icon: Upload, description: '動画ファイルをアップロード' },
     { id: 'embed', label: '埋め込みコード', icon: Link2, description: 'iframe埋め込みコード' },
-    { id: 'ai-generate', label: 'AI生成', icon: Sparkles, description: 'Veo 2で動画を生成' },
+    { id: 'ai-generate', label: '動画生成', icon: Sparkles, description: 'Veo 2で動画を生成' },
 ];
 
 const DISPLAY_MODES = [
@@ -213,7 +213,7 @@ export default function VideoInsertModal({
             }
         } else if (videoSource === 'ai-generate') {
             if (!generatedVideoUrl) {
-                toast.error('AIで動画を生成してください');
+                toast.error('動画を生成してください');
                 return;
             }
             finalUrl = generatedVideoUrl;

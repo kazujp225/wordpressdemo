@@ -240,7 +240,7 @@ export function TextFixModule({
                             {isFixLoading ? (
                                 <>
                                     <Loader2 className="w-5 h-5 animate-spin" />
-                                    AIが文字を修正中...
+                                    文字を修正中...
                                 </>
                             ) : (
                                 <>
@@ -251,7 +251,7 @@ export function TextFixModule({
                         </button>
 
                         <p className="text-xs text-muted-foreground text-center">
-                            AIが文字を新しく描画し直し、くっきりと読みやすくします
+                            文字を新しく描画し直し、くっきりと読みやすくします
                         </p>
                     </div>
                 </div>

@@ -91,7 +91,7 @@ export function SortableItem(props: SortableItemProps) {
                             <button
                                 onClick={() => props.onInpaintImage?.(props.id, preview)}
                                 className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                                title="AIで編集"
+                                title="画像を編集"
                             >
                                 <Pencil className="h-4 w-4 text-white" />
                             </button>

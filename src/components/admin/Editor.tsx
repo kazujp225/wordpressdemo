@@ -3887,7 +3887,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             icon={<Palette className="h-3.5 w-3.5" />}
                             title="背景色をそろえる"
                             description="全体の背景を同じ色に"
-                            tooltip="AIが選択したブロックの背景色を統一します"
+                            tooltip="選択したブロックの背景色を統一します"
                             action={
                                 <EditorActionButton
                                     onClick={() => {
@@ -3939,8 +3939,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         <EditorMenuItem
                             icon={<Type className="h-3.5 w-3.5" />}
                             title="文字を修正"
-                            description="変更したい部分を囲んでAIで修正"
-                            tooltip="画像上でテキスト領域を選択し、AIで修正します（複数選択OK）"
+                            description="変更したい部分を囲んで修正"
+                            tooltip="画像上でテキスト領域を選択し、修正します（複数選択OK）"
                             open={expandedTools.has('copy-edit')}
                             onOpenChange={(open) => {
                                 if (open) {
@@ -4072,7 +4072,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             icon={<Code2 className="h-3.5 w-3.5" />}
                             title="claude-codegen"
                             description="sonnet-4 | html/css/js"
-                            tooltip="AIがHTML/CSS/JSコードを生成します"
+                            tooltip="HTML/CSS/JSコードを自動生成します"
                             iconVariant="dark"
                             badge={<EditorBadge variant="new">NEW</EditorBadge>}
                             action={
@@ -4108,8 +4108,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         <EditorMenuItem
                             icon={<RefreshCw className="h-3.5 w-3.5" />}
                             title="まとめて作り直す"
-                            description="AIでページ全体を再生成"
-                            tooltip="選択したブロックをAIで一括再生成します"
+                            description="ページ全体を再生成"
+                            tooltip="選択したブロックを一括再生成します"
                             action={
                                 <EditorActionButton
                                     onClick={() => {

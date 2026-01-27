@@ -1404,9 +1404,9 @@ export function ImageInpaintEditor({
                                 </h2>
                                 <p className="text-xs text-muted-foreground font-medium">
                                     {editorMode === 'inpaint'
-                                        ? '変更したい部分を囲んでAIで修正（複数選択OK）'
+                                        ? '変更したい部分を囲んで修正（複数選択OK）'
                                         : editorMode === 'text-fix'
-                                        ? '文字化けした部分を囲んでAIで修正'
+                                        ? '文字化けした部分を囲んで修正'
                                         : '画像上にクリックできるボタン領域を設定'}
                                 </p>
                             </div>

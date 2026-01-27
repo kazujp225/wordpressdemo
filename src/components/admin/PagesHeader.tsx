@@ -363,7 +363,7 @@ export function PagesHeader() {
                                             </div>
                                             <h3 className="text-base font-bold text-foreground mb-1"><span>あらゆる画像を編集できます</span></h3>
                                             <p className="text-xs font-medium text-muted-foreground leading-relaxed">
-                                                <span>画像をアップロードして、AIで自由に編集・加工できます。</span>
+                                                <span>画像をアップロードして、自由に編集・加工できます。</span>
                                             </p>
                                         </button>
 
@@ -400,7 +400,7 @@ export function PagesHeader() {
                                                 </span>
                                             </div>
                                             <p className="text-xs font-medium text-gray-600 leading-relaxed">
-                                                商材情報を入力するだけで、AIが最適なLPを自動生成します。<br />
+                                                商材情報を入力するだけで、最適なLPを自動生成します。<br />
                                                 <span className="text-green-600 font-semibold">スクリーンショット不要・ゼロから作成</span>
                                             </p>
                                         </div>
@@ -642,7 +642,7 @@ export function PagesHeader() {
                                                             className="w-full h-20 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary transition-all disabled:opacity-50 resize-none"
                                                         />
                                                         <p className="mt-1 text-[10px] text-muted-foreground">
-                                                            AIがこの指示を元にデザインを調整します
+                                                            この指示を元にデザインを自動調整します
                                                         </p>
                                                     </div>
                                                 </div>

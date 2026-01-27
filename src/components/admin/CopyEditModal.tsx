@@ -282,7 +282,7 @@ export default function CopyEditModal({
                         <div className="flex flex-col items-center justify-center py-16">
                             <RefreshCw className="h-12 w-12 text-emerald-500 animate-spin mb-4" />
                             <p className="text-lg font-bold text-gray-900 mb-2">コピーを生成中...</p>
-                            <p className="text-sm text-gray-500">AIが最適なキャッチコピーを考えています</p>
+                            <p className="text-sm text-gray-500">最適なキャッチコピーを生成しています</p>
                         </div>
                     )}
 

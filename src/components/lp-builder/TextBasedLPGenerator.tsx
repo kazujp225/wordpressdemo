@@ -119,7 +119,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [aiSuggestLoading, setAiSuggestLoading] = useState<string | null>(null);
+    const [autoSuggestLoading, setAutoSuggestLoading] = useState<string | null>(null);
 
     const {
         register,
@@ -176,9 +176,9 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
         }
     };
 
-    // AI提案機能
-    const handleAiSuggest = async (type: 'benefits' | 'usp' | 'socialProof' | 'guarantees' | 'all') => {
-        setAiSuggestLoading(type);
+    // 自動提案機能
+    const handleAutoSuggest = async (type: 'benefits' | 'usp' | 'socialProof' | 'guarantees' | 'all') => {
+        setAutoSuggestLoading(type);
         setError(null);
 
         try {
@@ -187,7 +187,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
             // 必要な情報が揃っているかチェック
             if (!values.businessName || !values.productDescription || !values.targetAudience || !values.painPoints) {
                 toast.error('基本情報・商品情報・ターゲット情報を先に入力してください');
-                setAiSuggestLoading(null);
+                setAutoSuggestLoading(null);
                 return;
             }
 
@@ -216,7 +216,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.error || 'AI提案の生成に失敗しました');
+                throw new Error(result.error || '提案の生成に失敗しました');
             }
 
             if (result.success && result.suggestions) {
@@ -245,10 +245,10 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                 toast.success(type === 'all' ? '全項目の提案を生成しました' : '提案を生成しました');
             }
         } catch (err: any) {
-            console.error('AI suggest error:', err);
-            toast.error(err.message || 'AI提案の生成に失敗しました');
+            console.error('Auto suggest error:', err);
+            toast.error(err.message || '提案の生成に失敗しました');
         } finally {
-            setAiSuggestLoading(null);
+            setAutoSuggestLoading(null);
         }
     };
 
@@ -581,7 +581,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
             case 4:
                 return (
                     <div className="space-y-6 animate-fadeIn">
-                        {/* AI一括提案ボタン */}
+                        {/* 一括提案ボタン */}
                         <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -589,17 +589,17 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                                         <Wand2 className="h-5 w-5" />
                                     </div>
                                     <div>
-                                        <h4 className="text-sm font-bold text-gray-900">AIが提案</h4>
+                                        <h4 className="text-sm font-bold text-gray-900">自動提案</h4>
                                         <p className="text-[10px] text-gray-500">商材情報から自動でコピーを生成</p>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => handleAiSuggest('all')}
-                                    disabled={aiSuggestLoading !== null}
+                                    onClick={() => handleAutoSuggest('all')}
+                                    disabled={autoSuggestLoading !== null}
                                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
                                 >
-                                    {aiSuggestLoading === 'all' ? (
+                                    {autoSuggestLoading === 'all' ? (
                                         <>
                                             <Loader2 className="h-4 w-4 animate-spin" />
                                             生成中...
@@ -621,16 +621,16 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                                 </label>
                                 <button
                                     type="button"
-                                    onClick={() => handleAiSuggest('benefits')}
-                                    disabled={aiSuggestLoading !== null}
+                                    onClick={() => handleAutoSuggest('benefits')}
+                                    disabled={autoSuggestLoading !== null}
                                     className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 disabled:opacity-50 transition-all"
                                 >
-                                    {aiSuggestLoading === 'benefits' ? (
+                                    {autoSuggestLoading === 'benefits' ? (
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                     ) : (
                                         <Wand2 className="h-3 w-3" />
                                     )}
-                                    AIが提案
+                                    自動提案
                                 </button>
                             </div>
                             <textarea
@@ -651,16 +651,16 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                                 </label>
                                 <button
                                     type="button"
-                                    onClick={() => handleAiSuggest('usp')}
-                                    disabled={aiSuggestLoading !== null}
+                                    onClick={() => handleAutoSuggest('usp')}
+                                    disabled={autoSuggestLoading !== null}
                                     className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 disabled:opacity-50 transition-all"
                                 >
-                                    {aiSuggestLoading === 'usp' ? (
+                                    {autoSuggestLoading === 'usp' ? (
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                     ) : (
                                         <Wand2 className="h-3 w-3" />
                                     )}
-                                    AIが提案
+                                    自動提案
                                 </button>
                             </div>
                             <textarea
@@ -681,16 +681,16 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                                 </label>
                                 <button
                                     type="button"
-                                    onClick={() => handleAiSuggest('socialProof')}
-                                    disabled={aiSuggestLoading !== null}
+                                    onClick={() => handleAutoSuggest('socialProof')}
+                                    disabled={autoSuggestLoading !== null}
                                     className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 disabled:opacity-50 transition-all"
                                 >
-                                    {aiSuggestLoading === 'socialProof' ? (
+                                    {autoSuggestLoading === 'socialProof' ? (
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                     ) : (
                                         <Wand2 className="h-3 w-3" />
                                     )}
-                                    AIが提案
+                                    自動提案
                                 </button>
                             </div>
                             <textarea
@@ -708,16 +708,16 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                                 </label>
                                 <button
                                     type="button"
-                                    onClick={() => handleAiSuggest('guarantees')}
-                                    disabled={aiSuggestLoading !== null}
+                                    onClick={() => handleAutoSuggest('guarantees')}
+                                    disabled={autoSuggestLoading !== null}
                                     className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 disabled:opacity-50 transition-all"
                                 >
-                                    {aiSuggestLoading === 'guarantees' ? (
+                                    {autoSuggestLoading === 'guarantees' ? (
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                     ) : (
                                         <Wand2 className="h-3 w-3" />
                                     )}
-                                    AIが提案
+                                    自動提案
                                 </button>
                             </div>
                             <textarea
@@ -729,7 +729,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                         </div>
 
                         <p className="text-[10px] text-gray-400 text-center mt-2">
-                            ※ AIの提案は参考情報です。実際の内容に合わせて編集してください。
+                            ※ 自動提案は参考情報です。実際の内容に合わせて編集してください。
                         </p>
                     </div>
                 );
@@ -922,7 +922,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                                     テキストベースLP作成
                                 </h2>
                                 <p className="text-[10px] font-bold text-green-600/80 uppercase tracking-widest mt-1 bg-green-50/50 px-2 py-0.5 rounded-full inline-block border border-green-100">
-                                    商材理解からAIが自動生成
+                                    商材理解から自動生成
                                 </p>
                             </div>
                         </div>
