@@ -191,12 +191,12 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+          className="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-purple-600">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-md bg-white/20 flex items-center justify-center">
                 <Search className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -206,7 +206,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
             >
               <X className="w-5 h-5 text-white" />
             </button>
@@ -228,7 +228,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
                   <button
                     key={id}
                     onClick={() => setMode(id as AnalysisMode)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
+                    className={`p-4 rounded-md border-2 transition-all text-left ${
                       mode === id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
@@ -251,7 +251,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
               </label>
               <div className="relative">
                 {imageUrl ? (
-                  <div className="relative rounded-xl overflow-hidden border-2 border-gray-200">
+                  <div className="relative rounded-md overflow-hidden border-2 border-gray-200">
                     <img
                       src={imageUrl}
                       alt="LP Preview"
@@ -262,13 +262,13 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
                         setImageUrl(null);
                         setResult(null);
                       }}
-                      className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center text-white"
+                      className="absolute top-2 right-2 w-8 h-8 rounded bg-red-500 hover:bg-red-600 flex items-center justify-center text-white"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+                  <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
                     <Upload className="w-8 h-8 text-gray-400 mb-2" />
                     <span className="text-sm text-gray-500">クリックして画像をアップロード</span>
                     <span className="text-xs text-gray-400 mt-1">PNG, JPG, WEBP対応</span>
@@ -292,13 +292,13 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
                 value={additionalContext}
                 onChange={(e) => setAdditionalContext(e.target.value)}
                 placeholder="業種、ターゲット層、競合情報など、分析精度を上げるための情報を入力..."
-                className="w-full h-24 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full h-24 px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               />
             </div>
 
             {/* Error */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
                 <span className="text-red-700">{error}</span>
               </div>
@@ -400,7 +400,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
                         <div className="text-xs text-gray-500 mb-2">検索される質問</div>
                         <div className="space-y-2">
                           {result.data.llmo.targetQuestions?.map((q: string, i: number) => (
-                            <div key={i} className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg">
+                            <div key={i} className="flex items-start gap-2 p-2 bg-gray-50 rounded-md">
                               <MessageSquare className="w-4 h-4 text-blue-500 mt-0.5" />
                               <span className="text-sm text-gray-700">{q}</span>
                             </div>
@@ -410,7 +410,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
                       {result.data.llmo.summaryForAI && (
                         <div>
                           <div className="text-xs text-gray-500 mb-2">引用用サマリー</div>
-                          <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-gray-700">
+                          <div className="p-3 bg-blue-50 border border-blue-100 rounded-md text-sm text-gray-700">
                             {result.data.llmo.summaryForAI}
                           </div>
                         </div>
@@ -420,7 +420,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
                           <div className="text-xs text-gray-500 mb-2">FAQ構造化データ</div>
                           <div className="space-y-2">
                             {result.data.llmo.faqItems.map((faq: { q: string; a: string }, i: number) => (
-                              <div key={i} className="p-3 bg-gray-50 rounded-lg">
+                              <div key={i} className="p-3 bg-gray-50 rounded-md">
                                 <div className="font-medium text-sm text-gray-800 mb-1">Q: {faq.q}</div>
                                 <div className="text-sm text-gray-600">A: {faq.a}</div>
                               </div>
@@ -446,12 +446,12 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
                       </div>
                       {result.data.structuredData.jsonLd && (
                         <div className="relative">
-                          <pre className="p-3 bg-gray-900 text-green-400 rounded-lg text-xs overflow-x-auto">
+                          <pre className="p-3 bg-gray-900 text-green-400 rounded-md text-xs overflow-x-auto">
                             {JSON.stringify(result.data.structuredData.jsonLd, null, 2)}
                           </pre>
                           <button
                             onClick={() => copyToClipboard(JSON.stringify(result.data.structuredData.jsonLd, null, 2))}
-                            className="absolute top-2 right-2 p-1 bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            className="absolute top-2 right-2 p-1 bg-gray-700 hover:bg-gray-600 rounded-sm text-white"
                           >
                             <Copy className="w-4 h-4" />
                           </button>
@@ -525,7 +525,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
                 <button
                   onClick={handleSaveToPage}
                   disabled={isSaving}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg transition-all flex items-center gap-2 shadow-lg"
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-md transition-all flex items-center gap-2 shadow-lg"
                   title="見た目を変えずにSEO/LLMO対策を適用"
                 >
                   {isSaving ? (
@@ -539,7 +539,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
               {result?.success && onApplyMetadata && (
                 <button
                   onClick={handleApplyMetadata}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   メタデータを適用
@@ -548,7 +548,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
               <button
                 onClick={handleAnalyze}
                 disabled={!imageUrl || isAnalyzing}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-md transition-colors flex items-center gap-2"
               >
                 {isAnalyzing ? (
                   <>
@@ -580,7 +580,7 @@ const ResultSection: React.FC<{
   onToggle: () => void;
   children: React.ReactNode;
 }> = ({ title, icon: Icon, isExpanded, onToggle, children }) => (
-  <div className="border border-gray-200 rounded-xl overflow-hidden">
+  <div className="border border-gray-200 rounded-md overflow-hidden">
     <button
       onClick={onToggle}
       className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -618,7 +618,7 @@ const MetadataItem: React.FC<{
           <Copy className="w-3 h-3 text-gray-400" />
         </button>
       </div>
-      <div className="p-2 bg-gray-50 rounded-lg text-sm text-gray-700">{value}</div>
+      <div className="p-2 bg-gray-50 rounded-md text-sm text-gray-700">{value}</div>
     </div>
   );
 };
