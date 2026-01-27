@@ -262,7 +262,7 @@ export const GeminiGeneratorModal: React.FC<GeminiGeneratorModalProps> = ({
                                 <div className="flex items-center gap-2">
                                     <DollarSign className="h-5 w-5 text-amber-600" />
                                     <span className="text-sm font-bold text-amber-800">
-                                        この作業のAPI課金費用: 約$0.20〜$0.40
+                                        この作業のAPI課金費用: 約$0.67〜$1.34
                                     </span>
                                 </div>
                                 <p className="text-xs text-amber-600 mt-1 ml-7">

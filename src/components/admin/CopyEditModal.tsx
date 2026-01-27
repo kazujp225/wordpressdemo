@@ -369,7 +369,7 @@ export default function CopyEditModal({
                                 </span>
                             </div>
                             <p className="text-[10px] text-amber-600 mt-1 ml-6">
-                                {generatedCopy.length}件 × $0.04（Gemini 3 Pro Image）
+                                {generatedCopy.length}件 × ${GEMINI_PRICING['gemini-3-pro-image-preview'].perImage.toFixed(3)}（Gemini 3 Pro Image）
                             </p>
                         </div>
                     )}

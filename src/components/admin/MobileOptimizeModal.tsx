@@ -198,7 +198,7 @@ export default function MobileOptimizeModal({
                                     </span>
                                 </div>
                                 <p className="text-[10px] text-gray-600 mt-1 ml-6">
-                                    {selectedSections.size}件 × $0.04（Gemini 3 Pro Image）
+                                    {selectedSections.size}件 × ${GEMINI_PRICING['gemini-3-pro-image-preview'].perImage.toFixed(3)}（Gemini 3 Pro Image）
                                 </p>
                             </div>
                         )}

@@ -173,63 +173,28 @@ Generate the image to EXACTLY match this visual style and color palette.
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Gemini 3 Pro Image API error:', errorText);
+            console.error('Image generation failed:', errorText);
 
-            // Fallback to Gemini 2.5 Flash Image
-            console.log('Trying fallback: gemini-2.5-flash-preview-image-generation');
-            const fallbackResponse = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-image-generation:generateContent?key=${GOOGLE_API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: imagePrompt }]
-                        }],
-                        generationConfig: {
-                            responseModalities: ["IMAGE", "TEXT"]
-                        }
-                    })
-                }
-            );
-
-            if (!fallbackResponse.ok) {
-                const fallbackError = await fallbackResponse.text();
-                console.error('Fallback model error:', fallbackError);
-                throw new Error(`画像生成に失敗しました: ${response.status} - ${errorText}`);
-            }
-
-            const fallbackData = await fallbackResponse.json();
-            modelUsed = 'gemini-2.5-flash-preview-image-generation';
-            const fallbackResult = await processImageResponse(fallbackData, arConfig, user.id);
-
-            // ログ記録（フォールバック成功）
-            const logResult = await logGeneration({
+            // ログ記録（失敗）
+            await logGeneration({
                 userId: user.id,
                 type: 'image',
                 endpoint: '/api/ai/generate-image',
                 model: modelUsed,
                 inputPrompt: imagePrompt,
                 imageCount: 1,
-                status: 'succeeded',
+                status: 'failed',
+                errorMessage: `${response.status} - ${errorText.substring(0, 200)}`,
                 startTime
             });
 
-            // クレジット消費（自分のAPIキー使用時はスキップ）
-            if (logResult && !skipCreditConsumption) {
-                await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
-                    model: modelUsed,
-                    imageCount: 1,
-                });
-            }
-
-            return fallbackResult;
+            throw new Error(`画像生成に失敗しました: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
         const result = await processImageResponse(data, arConfig, user.id);
 
-        // ログ記録（プライマリ成功）
+        // ログ記録（成功）
         const logResult = await logGeneration({
             userId: user.id,
             type: 'image',

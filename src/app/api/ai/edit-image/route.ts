@@ -93,45 +93,9 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Gemini 3 Pro Image API error:', errorText);
+            console.error('Image editing failed:', errorText);
 
-            // Try fallback model (Gemini 2.5 Flash Image / Nano Banana)
-            console.log('Trying fallback model: gemini-2.5-flash-preview-image-generation');
-            const fallbackResponse = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-image-generation:generateContent?key=${GOOGLE_API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: editPrompt },
-                                {
-                                    inlineData: {
-                                        mimeType: mimeType,
-                                        data: base64Data
-                                    }
-                                }
-                            ]
-                        }],
-                        generationConfig: {
-                            responseModalities: ["TEXT", "IMAGE"]
-                        }
-                    })
-                }
-            );
-
-            if (!fallbackResponse.ok) {
-                const fallbackError = await fallbackResponse.text();
-                console.error('Fallback model error:', fallbackError);
-                throw new Error(`Image editing failed: ${response.status} - ${errorText}`);
-            }
-
-            const fallbackData = await fallbackResponse.json();
-            modelUsed = 'gemini-2.5-flash-preview-image-generation';
-            const fallbackResult = await processImageResponse(fallbackData, user.id);
-
-            // ログ記録（フォールバック成功）
+            // ログ記録（失敗）
             await logGeneration({
                 userId: user.id,
                 type: 'edit-image',
@@ -139,11 +103,12 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
                 model: modelUsed,
                 inputPrompt: editPrompt,
                 imageCount: 1,
-                status: 'succeeded',
+                status: 'failed',
+                errorMessage: `${response.status} - ${errorText.substring(0, 200)}`,
                 startTime
             });
 
-            return fallbackResult;
+            throw new Error(`Image editing failed: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();

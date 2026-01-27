@@ -268,7 +268,7 @@ export default function ColorPaletteModal({
                             </span>
                         </div>
                         <p className="text-[10px] text-amber-600 mt-1 ml-6">
-                            {sections.filter(s => s.image?.filePath).length}件 × $0.04（Gemini 3 Pro Image）
+                            {sections.filter(s => s.image?.filePath).length}件 × ${GEMINI_PRICING['gemini-3-pro-image-preview'].perImage.toFixed(3)}（Gemini 3 Pro Image）
                         </p>
                     </div>
 

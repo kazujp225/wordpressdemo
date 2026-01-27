@@ -17,22 +17,20 @@ import { businessInfoSchema, validateRequest } from '@/lib/validations';
 // モデル定数（停止・名称変更に対応しやすくする）
 // ============================================
 const MODELS = {
-    // テキスト生成: gemini-1.5-flash は 2025-09-29 に停止済み → gemini-2.5-flash に移行
+    // テキスト生成
     TEXT: 'gemini-2.5-flash',
-    // 画像生成 Primary: Nano Banana Pro（日本語指示に強い）
-    IMAGE_PRIMARY: 'gemini-3-pro-image-preview',
-    // 画像生成 Fallback: Nano Banana（高速・安価）
-    IMAGE_FALLBACK: 'gemini-2.5-flash-image',
+    // 画像生成: Gemini 3 Pro Image (Nano Banana Pro) - 高品質・日本語指示に強い
+    IMAGE: 'gemini-3-pro-image-preview',
 } as const;
 
-// 9:16の解像度テーブル（モデルごとに微妙に異なる）
+// 9:16の解像度（gemini-3-pro-image-preview）
 const IMAGE_DIMENSIONS = {
-    'gemini-3-pro-image-preview': { width: 768, height: 1376 },
-    'gemini-2.5-flash-image': { width: 768, height: 1344 },
+    width: 768,
+    height: 1376,
 } as const;
 
 // ビジネス情報から不足している変数を自動生成
-function enrichBusinessInfo(info: any): Record<string, string> {
+function enrichBusinessInfo(info: any, enhancedContext?: any): Record<string, string> {
     const toneDescriptions: Record<string, { urgency: string; guarantee: string }> = {
         professional: {
             urgency: '今なら無料相談実施中',
@@ -62,7 +60,8 @@ function enrichBusinessInfo(info: any): Record<string, string> {
 
     const toneConfig = toneDescriptions[tone] || toneDescriptions.professional;
 
-    return {
+    // Base enriched info
+    const enriched: Record<string, string> = {
         businessName,
         industry,
         service,
@@ -82,6 +81,90 @@ function enrichBusinessInfo(info: any): Record<string, string> {
         guarantee: toneConfig.guarantee,
         results: `${strengths}による具体的な成果・効果`,
     };
+
+    // Merge enhancedContext if available (overrides generic defaults)
+    if (enhancedContext && typeof enhancedContext === 'object') {
+        // Product/Service details
+        if (enhancedContext.productName) {
+            enriched.service = enhancedContext.productName;
+        }
+        if (enhancedContext.productCategory) {
+            enriched.industry = enhancedContext.productCategory;
+        }
+        if (enhancedContext.businessType) {
+            enriched.businessName = enhancedContext.businessType;
+        }
+
+        // Target audience refinement
+        const targetParts: string[] = [];
+        if (enhancedContext.targetAge) targetParts.push(enhancedContext.targetAge);
+        if (enhancedContext.targetGender && enhancedContext.targetGender !== '指定なし') {
+            targetParts.push(enhancedContext.targetGender);
+        }
+        if (enhancedContext.targetOccupation) targetParts.push(enhancedContext.targetOccupation);
+
+        if (targetParts.length > 0) {
+            enriched.target = targetParts.join('の');
+        } else if (enhancedContext.targetAudience) {
+            // Fallback: If no specific attributes, use general targetAudience field
+            enriched.target = enhancedContext.targetAudience;
+        }
+
+        // Product description
+        if (enhancedContext.productDescription) {
+            enriched.service = `${enriched.service}（${enhancedContext.productDescription}）`;
+        }
+
+        // Delivery method
+        if (enhancedContext.deliveryMethod) {
+            enriched.process = enhancedContext.deliveryMethod;
+        }
+
+        // Price info
+        if (enhancedContext.priceInfo) {
+            enriched.priceRange = enhancedContext.priceInfo;
+        }
+
+        // Core messaging (most important for image generation)
+        if (enhancedContext.painPoints) {
+            enriched.painPoints = enhancedContext.painPoints;
+        }
+        if (enhancedContext.desiredOutcome) {
+            enriched.results = enhancedContext.desiredOutcome;
+        }
+
+        // Main benefits
+        if (enhancedContext.mainBenefits) {
+            enriched.mainFeatures = enhancedContext.mainBenefits;
+        }
+
+        // USP / Unique Selling Points (CRITICAL FIX)
+        if (enhancedContext.uniqueSellingPoints) {
+            enriched.strengths = enhancedContext.uniqueSellingPoints;
+            // If mainBenefits wasn't provided, use USP for mainFeatures too
+            if (!enhancedContext.mainBenefits) {
+                enriched.mainFeatures = enhancedContext.uniqueSellingPoints;
+            }
+            enriched.differentiators = enhancedContext.uniqueSellingPoints;
+        }
+
+        if (enhancedContext.socialProof) {
+            enriched.results += ` | 実績: ${enhancedContext.socialProof}`;
+        }
+        if (enhancedContext.guarantees) {
+            enriched.guarantee = enhancedContext.guarantees;
+        }
+
+        // CTA and urgency
+        if (enhancedContext.ctaText) {
+            enriched.offer = enhancedContext.ctaText;
+        }
+        if (enhancedContext.urgencyElement) {
+            enriched.urgency = enhancedContext.urgencyElement;
+        }
+    }
+
+    return enriched;
 }
 
 // カラーログ用のヘルパー
@@ -172,12 +255,15 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 ビジュアル方向性:
 - ビジネス: ${info.industry} / ${info.service}
 - ターゲット: ${info.target}
+- ターゲットの課題: ${info.painPoints}
+- 得られる理想の状態: ${info.results}
 - トーン: ${info.tone === 'luxury' ? '洗練された高級感・エレガンス' : info.tone === 'friendly' ? '温かみ・親しみやすさ・明るさ' : info.tone === 'energetic' ? 'ダイナミック・情熱・活気' : info.tone === 'minimal' ? 'クリーン・シンプル・余白美' : 'プロフェッショナル・信頼・安心'}
 - 人物やプロダクトを含める場合は高品質で魅力的に
 
 リード獲得のポイント:
 - 「変化」「成功」「理想の状態」を暗示するビジュアル
-- ターゲットが「自分もこうなりたい」と感じる演出`,
+- ターゲットが「自分もこうなりたい」と感じる演出
+- ${info.painPoints}から${info.results}への変化を視覚的に示唆`,
 
     features: (info) => `【FEATURES - 特徴・メリット紹介セクション】
 ■ 目的: 商品/サービスの価値を視覚的に伝え、理解を深める
@@ -190,6 +276,8 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 - 下端は次セクションへ穏やかにトランジション
 
 ビジュアル方向性:
+- 主な特徴・メリット: ${info.mainFeatures}
+- 差別化ポイント: ${info.differentiators}
 - ${info.strengths}を抽象的に表現するビジュアル要素
 - 信頼性・専門性を感じさせるプロフェッショナルな質感
 - アイコンや図形が映えるニュートラルな領域を確保
@@ -197,7 +285,7 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 
 リード獲得のポイント:
 - 「これなら解決できそう」という期待感を醸成
-- 競合との差別化を暗示する独自性のあるビジュアル`,
+- 競合との差別化（${info.differentiators}）を暗示する独自性のあるビジュアル`,
 
     pricing: (info) => `【PRICING - 料金・プランセクション】
 ■ 目的: 価格への心理的ハードルを下げ、お得感を演出
@@ -210,6 +298,8 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 - 下端は次セクション（通常FAQ/CTA）へ穏やかに移行
 
 ビジュアル方向性:
+- 価格帯: ${info.priceRange}
+- 保証: ${info.guarantee}
 - ${info.tone === 'luxury' ? 'プレミアム感のある上質な背景（ゴールドアクセントOK）' : 'クリーンで信頼感のある背景'}
 - コントラストは控えめ（テキストの可読性優先）
 - 均一な色面積を多めに確保
@@ -217,7 +307,8 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 
 リード獲得のポイント:
 - 「高すぎない」「納得できる」という心理を後押し
-- 投資対効果の良さを暗示するビジュアル`,
+- 投資対効果の良さを暗示するビジュアル
+- ${info.guarantee}で安心感を視覚的に強化`,
 
     testimonials: (info) => `【TESTIMONIALS - お客様の声・実績セクション】
 ■ 目的: 社会的証明で信頼性を高め、不安を払拭
@@ -231,12 +322,13 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 
 ビジュアル方向性:
 - ${info.target}層が共感できる温かみのある雰囲気
+- 実績・成果: ${info.results}
 - 人物のシルエットや抽象的な「つながり」「コミュニティ」表現
 - 信頼・実績・成功を暗示する視覚要素
 - 柔らかい光、穏やかなグラデーション
 
 リード獲得のポイント:
-- 「自分も同じ結果を得られる」という期待感
+- 「自分も同じ結果（${info.results}）を得られる」という期待感
 - 不安や懸念を払拭する安心感の演出`,
 
     faq: (info) => `【FAQ - よくある質問セクション】
@@ -250,6 +342,7 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 - 下端はCTAセクションへの期待感を持たせつつ移行
 
 ビジュアル方向性:
+- 想定される不安・疑問: ${info.concerns}
 - 穏やか・安心・明るいトーン
 - 複雑な要素を排除したシンプルな背景
 - サポート・解決・安心を連想させる視覚要素
@@ -270,13 +363,16 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 - インパクトがありつつ、押しつけがましくない
 
 ビジュアル方向性:
+- オファー: ${info.offer}
+- 緊急性要素: ${info.urgency}
 - ${info.tone === 'energetic' ? 'エネルギッシュ・ダイナミック・情熱的' : info.tone === 'luxury' ? '洗練・高級感・特別感' : info.tone === 'friendly' ? '温かみ・安心・親しみ' : '力強さ・信頼・決断を後押し'}
 - 参照色の範囲内でコントラストを高め、注目を集める
 - 「変化」「成功」「理想の未来」を暗示
 - アクションを促す視覚的エネルギー
 
 リード獲得のポイント:
-- 「今すぐ」という緊急性の演出
+- 「${info.urgency}」という緊急性の演出
+- 「${info.offer}」を視覚的に魅力的に表現
 - アクションを起こす「最後の一押し」となるインパクト
 - ポジティブな未来へのワクワク感`,
 
@@ -292,13 +388,15 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 - 下端は解決策セクションへの期待を持たせる
 
 ビジュアル方向性:
-- ${info.target}が抱える課題・悩みを暗示
+- ターゲット: ${info.target}
+- 具体的な課題・悩み: ${info.painPoints}
+- ${info.target}が抱える課題（${info.painPoints}）を暗示
 - 暗すぎず、しかし「現状の問題」を感じさせる
 - 灰色やくすんだトーンを控えめに使用
 - 「このままではいけない」という危機感を適度に演出
 
 リード獲得のポイント:
-- ターゲットが「自分のことだ」と感じる共感の醸成
+- ターゲットが「${info.painPoints}は自分のことだ」と感じる共感の醸成
 - 課題解決への意欲を高める`,
 
     // 追加セクション: 解決策提示（PASONAのS - Solution）
@@ -313,13 +411,15 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 - 下端は特徴/メリットセクションへ自然に接続
 
 ビジュアル方向性:
+- 解決策: ${info.service}
+- もたらされる結果: ${info.results}
 - ${info.service}が解決策であることを暗示
 - 暗から明へのグラデーション的な変化
 - 希望・光・解放感を感じさせるビジュアル
 - プロダクト/サービスの価値を象徴する要素
 
 リード獲得のポイント:
-- 課題から解決への「変化」を視覚的に表現
+- 課題（${info.painPoints}）から解決（${info.results}）への「変化」を視覚的に表現
 - 商品/サービスへの期待感を最大化`,
 
     // 追加セクション: ベネフィット（得られる未来）
@@ -334,13 +434,16 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 - 下端は次セクションへポジティブな流れを維持
 
 ビジュアル方向性:
-- ${info.target}の理想の状態を暗示
+- ターゲット: ${info.target}
+- 得られる結果: ${info.results}
+- 主なメリット: ${info.mainFeatures}
+- ${info.target}の理想の状態（${info.results}）を暗示
 - 成功・達成・満足・幸福を連想させるビジュアル
 - 明るく、希望に満ちた表現
 - ${info.strengths}がもたらす価値を象徴
 
 リード獲得のポイント:
-- ターゲットが「自分もこうなれる」と想像させる
+- ターゲットが「自分も${info.results}を得られる」と想像させる
 - 購入後の理想の未来へのワクワク感`,
 
     // 追加セクション: 導入の流れ・ステップ
@@ -353,6 +456,9 @@ const SECTION_IMAGE_PROMPTS: Record<string, (info: any) => string> = {
 - ステップ図・フロー図を配置する広い余白
 - クリーンでシンプルな背景
 - 下端は次セクションへスムーズに移行
+
+導入プロセス:
+- ${info.process}
 
 ビジュアル方向性:
 - シンプル・クリーン・整理された印象
@@ -818,9 +924,9 @@ ${designDefinition.colorPreference}を基調とした配色で生成してくだ
             requestParts.push({ text: fullPrompt });
 
             // Primary Model: Gemini 3 Pro Image (Nano Banana Pro)
-            let usedModel: string = MODELS.IMAGE_PRIMARY;
+            let usedModel: string = MODELS.IMAGE;
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.IMAGE_PRIMARY}:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.IMAGE}:generateContent?key=${apiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -840,59 +946,29 @@ ${designDefinition.colorPreference}を基調とした配色で生成してくだ
                 }
             );
 
-            let data;
             if (!response.ok) {
                 const errorText = await response.text();
-                log.warn(`Primary model (${MODELS.IMAGE_PRIMARY}) failed (${response.status}): ${errorText.substring(0, 200)}`);
+                log.error(`Image generation failed (${response.status}): ${errorText.substring(0, 200)}`);
 
-                // Fallback: Gemini 2.5 Flash Image (Nano Banana)
-                log.info(`Trying fallback model (${MODELS.IMAGE_FALLBACK})...`);
-                usedModel = MODELS.IMAGE_FALLBACK;
-
-                const fallbackResponse = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.IMAGE_FALLBACK}:generateContent?key=${apiKey}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: requestParts
-                            }],
-                            generationConfig: {
-                                responseModalities: ["IMAGE"],
-                                imageConfig: {
-                                    aspectRatio: "9:16"
-                                }
-                            }
-                        })
-                    }
-                );
-
-                if (!fallbackResponse.ok) {
-                    const fallbackError = await fallbackResponse.text();
-                    log.error(`Fallback model also failed (${fallbackResponse.status}): ${fallbackError.substring(0, 200)}`);
-
-                    // 429/RESOURCE_EXHAUSTED の場合は長めに待機
-                    if (fallbackResponse.status === 429) {
-                        const waitTime = Math.pow(2, attempt) * 5000; // 10s, 20s, 40s
-                        log.info(`Rate limited. Waiting ${waitTime}ms before retry...`);
-                        await new Promise(resolve => setTimeout(resolve, waitTime));
-                    } else if (attempt < maxRetries) {
-                        const waitTime = Math.pow(2, attempt) * 2000;
-                        log.info(`Waiting ${waitTime}ms before retry...`);
-                        await new Promise(resolve => setTimeout(resolve, waitTime));
-                    }
-
-                    if (attempt >= maxRetries) {
-                        log.error(`[${sectionType}] 画像生成に失敗しました（両モデルでエラー）`);
-                        return { imageId: null, base64: null, usedModel: null };
-                    }
-                    continue;
+                // 429/RESOURCE_EXHAUSTED の場合は長めに待機してリトライ
+                if (response.status === 429) {
+                    const waitTime = Math.pow(2, attempt) * 5000; // 10s, 20s, 40s
+                    log.info(`Rate limited. Waiting ${waitTime}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                } else if (attempt < maxRetries) {
+                    const waitTime = Math.pow(2, attempt) * 2000; // 4s, 8s, 16s
+                    log.info(`Waiting ${waitTime}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
                 }
-                data = await fallbackResponse.json();
-            } else {
-                data = await response.json();
+
+                if (attempt >= maxRetries) {
+                    log.error(`[${sectionType}] 画像生成に失敗しました（${maxRetries}回リトライ後）`);
+                    return { imageId: null, base64: null, usedModel: null };
+                }
+                continue;
             }
+
+            const data = await response.json();
 
             // 画像データを抽出
             const parts = data.candidates?.[0]?.content?.parts || [];
@@ -944,18 +1020,14 @@ ${designDefinition.colorPreference}を基調とした配色で生成してくだ
                 .from('images')
                 .getPublicUrl(filename);
 
-            // v2: 解像度はモデルに応じた値を使用（固定値ではなく）
-            const dimensions = IMAGE_DIMENSIONS[usedModel as keyof typeof IMAGE_DIMENSIONS]
-                || { width: 768, height: 1376 };
-
             // MediaImageレコード作成
             const media = await prisma.mediaImage.create({
                 data: {
                     userId,
                     filePath: publicUrl,
                     mime: 'image/png',
-                    width: dimensions.width,
-                    height: dimensions.height,
+                    width: IMAGE_DIMENSIONS.width,
+                    height: IMAGE_DIMENSIONS.height,
                 },
             });
 
@@ -1023,12 +1095,18 @@ export async function POST(req: NextRequest) {
             }, { status: 500 });
         }
 
-        // Prepare Prompt with enriched business info
-        const enrichedInfo = enrichBusinessInfo(businessInfo);
-        prompt = fillPromptTemplate(FULL_LP_PROMPT, enrichedInfo);
-
-        // Enhanced Context Injection (for text-based mode)
+        // Enhanced Context Extraction (for text-based mode)
         const enhancedContext = body.enhancedContext;
+
+        // Prepare Prompt with enriched business info (merge enhancedContext)
+        const enrichedInfo = enrichBusinessInfo(businessInfo, enhancedContext);
+        if (enhancedContext) {
+            log.success('EnhancedContext merged into enrichedInfo for image generation');
+            log.info(`  - painPoints: ${enrichedInfo.painPoints?.substring(0, 50)}...`);
+            log.info(`  - results: ${enrichedInfo.results?.substring(0, 50)}...`);
+            log.info(`  - target: ${enrichedInfo.target}`);
+        }
+        prompt = fillPromptTemplate(FULL_LP_PROMPT, enrichedInfo);
         if (isTextBasedMode && enhancedContext && typeof enhancedContext === 'object') {
             log.info('Processing enhanced context from text-based mode...');
             const contextDetails = [];
@@ -1213,7 +1291,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
         // Step 1: デザインガイドラインを事前生成（全セクション統一）
         log.progress('Generating design guideline for consistent styling...');
         const designGuideline = await generateDesignGuideline(
-            businessInfo,
+            enrichedInfo,  // Use enriched info with enhancedContext merged
             GOOGLE_API_KEY,
             enhancedContext
         );
@@ -1269,7 +1347,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
 
             const result = await generateSectionImage(
                 section.type,
-                businessInfo,
+                enrichedInfo,  // Use enriched info with enhancedContext merged
                 GOOGLE_API_KEY,
                 user.id,
                 3, // maxRetries
@@ -1339,7 +1417,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
                 userId: user.id,
                 type: 'lp-generate',
                 endpoint: '/api/lp-builder/generate',
-                model: MODELS.IMAGE_PRIMARY,
+                model: MODELS.IMAGE,
                 inputPrompt: `LP image generation for ${sectionsWithImages.length} sections (v2: Anchor+Seam)`,
                 imageCount: successCount,
                 status: 'succeeded',

@@ -5137,7 +5137,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     </span>
                                 </div>
                                 <p className="text-[10px] text-amber-600 mt-1 ml-6">
-                                    画像1枚 × $0.04（Gemini 3 Pro Image）
+                                    画像1枚 × ${GEMINI_PRICING['gemini-3-pro-image-preview'].perImage.toFixed(3)}（Gemini 3 Pro Image）
                                 </p>
                             </div>
 
@@ -5436,7 +5436,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                     この作業のAPI課金費用: 約${totalCost.toFixed(2)}
                                                 </span>
                                                 <p className="text-[10px] text-amber-600">
-                                                    {baseCount}件{includeMobileInBatch ? ' × 2（PC+モバイル）' : ''} × $0.04
+                                                    {baseCount}件{includeMobileInBatch ? ' × 2（PC+モバイル）' : ''} × ${GEMINI_PRICING['gemini-3-pro-image-preview'].perImage.toFixed(3)}
                                                 </p>
                                             </div>
                                         </div>

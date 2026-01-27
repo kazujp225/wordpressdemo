@@ -26,11 +26,7 @@ export const GEMINI_PRICING = {
   },
   // Image Models (per image)
   'gemini-3-pro-image-preview': {
-    perImage: 0.04, // $0.04 per image
-    type: 'image' as const
-  },
-  'gemini-2.5-flash-preview-image-generation': {
-    perImage: 0.02, // $0.02 per image
+    perImage: 0.134, // $0.134 per 1K/2K image (768x1376 = 9:16 aspect ratio)
     type: 'image' as const
   },
   // Video Models (per second)
@@ -101,11 +97,11 @@ export function estimateTokens(text: string): number {
 // Get model display name
 export function getModelDisplayName(model: string): string {
   const displayNames: Record<string, string> = {
+    'gemini-2.5-flash': 'Gemini 2.5 Flash',
     'gemini-2.0-flash': 'Gemini 2.0 Flash',
     'gemini-1.5-flash': 'Gemini 1.5 Flash',
     'gemini-1.5-flash-latest': 'Gemini 1.5 Flash',
-    'gemini-3-pro-image-preview': 'Gemini 3 Pro Image',
-    'gemini-2.5-flash-preview-image-generation': 'Gemini 2.5 Flash Image',
+    'gemini-3-pro-image-preview': 'Gemini 3 Pro Image (Nano Banana Pro)',
     'veo-2.0-generate-001': 'Veo 2 Video',
     'claude-sonnet-4-20250514': 'Claude Sonnet 4',
   };
