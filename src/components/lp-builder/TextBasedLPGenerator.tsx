@@ -258,6 +258,16 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
 
         try {
             // Convert form data to BusinessInfo format for API
+            // Map 6 tones to 4 supported API tones
+            const toneMapping: Record<string, string> = {
+                professional: 'professional',
+                friendly: 'friendly',
+                luxury: 'luxury',
+                energetic: 'energetic',
+                minimal: 'professional', // シンプル → プロフェッショナル
+                playful: 'friendly',     // 遊び心 → フレンドリー
+            };
+
             const businessInfo = {
                 businessName: data.businessName,
                 industry: data.industry,
@@ -266,9 +276,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                 strengths: data.mainBenefits,
                 differentiators: data.uniqueSellingPoints,
                 priceRange: data.priceInfo || '',
-                tone: data.tone === 'minimal' || data.tone === 'playful'
-                    ? 'professional'
-                    : data.tone,
+                tone: toneMapping[data.tone] || 'professional',
             };
 
             // Enhanced context for AI
@@ -290,6 +298,8 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                 urgencyElement: data.urgencyElement,
                 colorPreference: data.colorPreference,
                 imageStyle: data.imageStyle,
+                // 元のトーン情報も保持（'minimal', 'playful'含む）
+                originalTone: data.tone,
             };
 
             const response = await fetch('/api/lp-builder/generate', {

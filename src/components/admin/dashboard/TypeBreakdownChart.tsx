@@ -2,6 +2,10 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Activity } from 'lucide-react';
+import { Card, Typography, Flex, theme } from 'antd';
+
+const { Title, Text } = Typography;
+const { useToken } = theme;
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#6366f1', '#14b8a6', '#f97316', '#84cc16'];
 
@@ -26,6 +30,8 @@ interface TypeData {
 }
 
 export function TypeBreakdownChart({ data }: { data: TypeData[] }) {
+    const { token } = useToken();
+
     const formattedData = data.map((d, i) => ({
         name: TYPE_LABELS[d.type] || d.type,
         value: d.count,
@@ -34,52 +40,62 @@ export function TypeBreakdownChart({ data }: { data: TypeData[] }) {
     }));
 
     return (
-        <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-4 sm:p-8 shadow-sm">
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
-                <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                種類別使用量
-            </h3>
-            <div className="h-56 sm:h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                            data={formattedData}
-                            cx="50%"
-                            cy="45%"
-                            innerRadius={40}
-                            outerRadius={65}
-                            paddingAngle={2}
-                            dataKey="value"
-                        >
-                            {formattedData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                        </Pie>
-                        <Tooltip
-                            contentStyle={{
-                                borderRadius: '12px',
-                                border: 'none',
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                            }}
-                            formatter={(value: any, name: any, props: any) => {
-                                return [
-                                    <span key="value">
-                                        {value}回 (${props.payload.cost.toFixed(4)})
-                                    </span>,
-                                    props.payload.name
-                                ];
-                            }}
-                        />
-                        <Legend
-                            verticalAlign="bottom"
-                            height={36}
-                            formatter={(value) => (
-                                <span className="text-xs font-medium text-gray-600">{value}</span>
-                            )}
-                        />
-                    </PieChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
+        <Card>
+            <Flex vertical gap="middle">
+                <Flex align="center" gap="small">
+                    <Activity
+                        size={20}
+                        color={token.colorPrimary}
+                    />
+                    <Title level={3} style={{ margin: 0 }}>
+                        種類別使用量
+                    </Title>
+                </Flex>
+
+                <Flex style={{ height: 256 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={formattedData}
+                                cx="50%"
+                                cy="45%"
+                                innerRadius={40}
+                                outerRadius={65}
+                                paddingAngle={2}
+                                dataKey="value"
+                            >
+                                {formattedData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                contentStyle={{
+                                    borderRadius: token.borderRadiusLG,
+                                    border: 'none',
+                                    boxShadow: token.boxShadow
+                                }}
+                                formatter={(value: any, name: any, props: any) => {
+                                    return [
+                                        <Text key="value">
+                                            {value}回 (${props.payload.cost.toFixed(4)})
+                                        </Text>,
+                                        props.payload.name
+                                    ];
+                                }}
+                            />
+                            <Legend
+                                verticalAlign="bottom"
+                                height={36}
+                                formatter={(value) => (
+                                    <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                                        {value}
+                                    </Text>
+                                )}
+                            />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </Flex>
+            </Flex>
+        </Card>
     );
 }

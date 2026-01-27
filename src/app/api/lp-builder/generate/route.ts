@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import sharp from 'sharp';
 import {
     SYSTEM_PROMPT,
     FULL_LP_PROMPT,
@@ -427,27 +428,260 @@ const RETRY_COLOR_FIX_PROMPT = `
 `;
 
 // ============================================
-// v2: 画像生成関数（Style Anchor + Seam Reference 方式）
+// v3: 画像生成関数（Style Anchor + Seam Reference + Design Guideline 方式）
 // ============================================
 
-// Seam Reference用：画像の下端20%を切り出す
-async function extractSeamStrip(base64Image: string, stripRatio: number = 0.2): Promise<string> {
-    // Note: 本番環境ではsharpなどのライブラリを使用して正確に切り出す
-    // ここでは簡易的に全体を返す（将来的にsharp導入時に置き換え）
-    // TODO: sharp導入後に下端切り出しを実装
-    // const buffer = Buffer.from(base64Image, 'base64');
-    // const metadata = await sharp(buffer).metadata();
-    // const stripHeight = Math.floor(metadata.height! * stripRatio);
-    // const seamBuffer = await sharp(buffer)
-    //     .extract({ left: 0, top: metadata.height! - stripHeight, width: metadata.width!, height: stripHeight })
-    //     .toBuffer();
-    // return seamBuffer.toString('base64');
-
-    // 暫定：全体を返す（参照としては機能する）
-    return base64Image;
+// デザインガイドライン型定義
+interface DesignGuideline {
+    // カラーパレット
+    primaryColor: string;
+    secondaryColor: string;
+    accentColor: string;
+    backgroundColor: string;
+    gradientDirection: 'top-to-bottom' | 'bottom-to-top' | 'left-to-right' | 'radial';
+    // 境界処理
+    seamStyle: 'gradient-fade' | 'soft-blur' | 'pattern-dissolve' | 'color-blend';
+    seamColorTop: string;
+    seamColorBottom: string;
+    // 全体トーン
+    brightness: 'light' | 'medium' | 'dark';
+    saturation: 'vivid' | 'muted' | 'neutral';
+    contrast: 'high' | 'medium' | 'low';
+    // テクスチャ
+    texture: 'smooth' | 'grainy' | 'glossy' | 'matte';
+    // 視覚的フロー
+    visualFlow: 'centered' | 'left-aligned' | 'right-aligned' | 'diagonal';
 }
 
-// 画像生成関数（v2: Style Anchor + Seam Reference 対応）
+// デザインガイドラインを生成（Hero画像から抽出 or AIで事前生成）
+async function generateDesignGuideline(
+    businessInfo: any,
+    apiKey: string,
+    enhancedContext?: any
+): Promise<DesignGuideline> {
+    const tone = businessInfo.tone || 'professional';
+    const imageStyle = enhancedContext?.imageStyle || 'photo';
+    const colorPreference = enhancedContext?.colorPreference || '';
+
+    // トーンに基づくデフォルトガイドライン
+    const toneDefaults: Record<string, Partial<DesignGuideline>> = {
+        professional: {
+            primaryColor: '#1e3a5f',
+            secondaryColor: '#3b82f6',
+            accentColor: '#60a5fa',
+            backgroundColor: '#f8fafc',
+            brightness: 'light',
+            saturation: 'muted',
+            contrast: 'medium',
+            texture: 'smooth',
+        },
+        friendly: {
+            primaryColor: '#059669',
+            secondaryColor: '#34d399',
+            accentColor: '#fbbf24',
+            backgroundColor: '#f0fdf4',
+            brightness: 'light',
+            saturation: 'vivid',
+            contrast: 'medium',
+            texture: 'smooth',
+        },
+        luxury: {
+            primaryColor: '#1f2937',
+            secondaryColor: '#b8860b',
+            accentColor: '#d4af37',
+            backgroundColor: '#0f0f0f',
+            brightness: 'dark',
+            saturation: 'muted',
+            contrast: 'high',
+            texture: 'glossy',
+        },
+        energetic: {
+            primaryColor: '#dc2626',
+            secondaryColor: '#f97316',
+            accentColor: '#fbbf24',
+            backgroundColor: '#fffbeb',
+            brightness: 'light',
+            saturation: 'vivid',
+            contrast: 'high',
+            texture: 'matte',
+        },
+    };
+
+    const defaults = toneDefaults[tone] || toneDefaults.professional;
+
+    // カラー指定がある場合は上書き
+    let finalPrimaryColor = defaults.primaryColor!;
+    if (colorPreference) {
+        // 簡易的なカラー名→HEXマッピング
+        const colorMap: Record<string, string> = {
+            'ブルー': '#3b82f6', 'blue': '#3b82f6',
+            'グリーン': '#10b981', 'green': '#10b981',
+            'レッド': '#ef4444', 'red': '#ef4444',
+            'パープル': '#8b5cf6', 'purple': '#8b5cf6',
+            'オレンジ': '#f97316', 'orange': '#f97316',
+            'ピンク': '#ec4899', 'pink': '#ec4899',
+            'ゴールド': '#d4af37', 'gold': '#d4af37',
+        };
+        for (const [key, hex] of Object.entries(colorMap)) {
+            if (colorPreference.toLowerCase().includes(key.toLowerCase())) {
+                finalPrimaryColor = hex;
+                break;
+            }
+        }
+        // HEX直接指定の場合
+        const hexMatch = colorPreference.match(/#[0-9A-Fa-f]{6}/);
+        if (hexMatch) {
+            finalPrimaryColor = hexMatch[0];
+        }
+    }
+
+    return {
+        primaryColor: finalPrimaryColor,
+        secondaryColor: defaults.secondaryColor!,
+        accentColor: defaults.accentColor!,
+        backgroundColor: defaults.backgroundColor!,
+        gradientDirection: 'top-to-bottom',
+        seamStyle: 'gradient-fade',
+        seamColorTop: defaults.backgroundColor!,
+        seamColorBottom: defaults.backgroundColor!,
+        brightness: defaults.brightness!,
+        saturation: defaults.saturation!,
+        contrast: defaults.contrast!,
+        texture: defaults.texture!,
+        visualFlow: 'centered',
+    };
+}
+
+// デザインガイドラインをプロンプトに変換
+function guidelineToPrompt(guideline: DesignGuideline): string {
+    const brightnessJa = { light: '明るい', medium: '中間', dark: 'ダーク' };
+    const saturationJa = { vivid: '鮮やか', muted: '落ち着いた', neutral: 'ニュートラル' };
+    const contrastJa = { high: '高コントラスト', medium: '中コントラスト', low: '低コントラスト' };
+    const textureJa = { smooth: 'スムース', grainy: '粒状感', glossy: '光沢', matte: 'マット' };
+    const seamStyleJa = {
+        'gradient-fade': 'グラデーションフェード',
+        'soft-blur': 'ソフトブラー',
+        'pattern-dissolve': 'パターンディゾルブ',
+        'color-blend': 'カラーブレンド',
+    };
+
+    return `
+【デザインガイドライン（全セクション共通・厳守）】
+■ カラーパレット:
+  - プライマリ: ${guideline.primaryColor}
+  - セカンダリ: ${guideline.secondaryColor}
+  - アクセント: ${guideline.accentColor}
+  - 背景ベース: ${guideline.backgroundColor}
+  ※ 上記4色とその中間トーンのみ使用可。新しい色相の追加は禁止。
+
+■ トーン・質感:
+  - 明度: ${brightnessJa[guideline.brightness]}
+  - 彩度: ${saturationJa[guideline.saturation]}
+  - コントラスト: ${contrastJa[guideline.contrast]}
+  - テクスチャ: ${textureJa[guideline.texture]}
+
+■ 境界接続スタイル:
+  - 方式: ${seamStyleJa[guideline.seamStyle]}
+  - グラデーション方向: 上から下へ
+  - 上端は前セクションの下端色（${guideline.seamColorTop}系）に合わせる
+  - 下端は次セクションへ繋がる色（${guideline.seamColorBottom}系）で終わる
+
+■ 視覚的統一ルール:
+  - 各セクションは単独で見ても美しく、縦に並べると1枚の絵に見える
+  - 急激な明度ジャンプ・色相シフトは絶対禁止
+  - パターンや装飾の密度は全セクションで統一
+`;
+}
+
+// Base64文字列のバリデーション
+function isValidBase64(str: string): boolean {
+    if (!str || typeof str !== 'string') return false;
+    // Base64の基本的なパターンチェック
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    return base64Regex.test(str) && str.length > 100; // 最低限の長さも確認
+}
+
+// RGB配列をHEXカラーに変換
+function rgbToHex(r: number, g: number, b: number): string {
+    return '#' + [r, g, b].map(x => {
+        const hex = Math.round(x).toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+    }).join('');
+}
+
+// Seam Reference用：画像の下端を正確に切り出し、支配色も抽出（Sharp使用）
+interface SeamStripResult {
+    base64: string;
+    dominantColor: string;
+    width: number;
+    height: number;
+}
+
+async function extractSeamStrip(
+    base64Image: string,
+    stripRatio: number = 0.15,
+    defaultColor: string = '#f8fafc'
+): Promise<SeamStripResult> {
+    // Base64バリデーション
+    if (!isValidBase64(base64Image)) {
+        log.warn('Invalid base64 input for seam extraction');
+        return { base64: base64Image, dominantColor: defaultColor, width: 0, height: 0 };
+    }
+
+    try {
+        const buffer = Buffer.from(base64Image, 'base64');
+        const metadata = await sharp(buffer).metadata();
+
+        if (!metadata.width || !metadata.height) {
+            log.warn('Could not get image metadata, returning full image');
+            return { base64: base64Image, dominantColor: defaultColor, width: 0, height: 0 };
+        }
+
+        // 最小ストリップ高さを確保（50px以上）
+        let stripHeight = Math.floor(metadata.height * stripRatio);
+        if (stripHeight < 50) {
+            stripHeight = Math.min(50, Math.floor(metadata.height * 0.25));
+            log.info(`Seam strip too small, adjusted to ${stripHeight}px`);
+        }
+
+        // 下端ストリップを切り出し
+        const seamImage = sharp(buffer).extract({
+            left: 0,
+            top: metadata.height - stripHeight,
+            width: metadata.width,
+            height: stripHeight
+        });
+
+        // 支配色を抽出（ストリップの平均色）
+        const { channels } = await seamImage.clone().stats();
+        let dominantColor = defaultColor;
+        if (channels && channels.length >= 3) {
+            // RGB平均値から色を算出
+            const r = channels[0].mean;
+            const g = channels[1].mean;
+            const b = channels[2].mean;
+            dominantColor = rgbToHex(r, g, b);
+            log.info(`Extracted dominant color from seam: ${dominantColor}`);
+        }
+
+        // PNG形式で出力
+        const seamBuffer = await seamImage.png({ quality: 90 }).toBuffer();
+
+        log.info(`Extracted seam strip: ${metadata.width}x${stripHeight} from ${metadata.width}x${metadata.height}`);
+
+        return {
+            base64: seamBuffer.toString('base64'),
+            dominantColor,
+            width: metadata.width,
+            height: stripHeight,
+        };
+    } catch (error: any) {
+        log.warn(`Seam extraction failed: ${error.message}, returning fallback`);
+        return { base64: base64Image, dominantColor: defaultColor, width: 0, height: 0 };
+    }
+}
+
+// 画像生成関数（v3: Style Anchor + Seam Reference + Design Guideline 対応）
 async function generateSectionImage(
     sectionType: string,
     businessInfo: any,
@@ -456,7 +690,10 @@ async function generateSectionImage(
     maxRetries: number = 3,
     styleAnchorBase64?: string,    // Style Anchor: 色・質感の基準（全セクション共通）
     seamReferenceBase64?: string,  // Seam Reference: 前画像の下端ストリップ（境界接続用）
-    designDefinition?: any         // デザイン定義（ユーザーアップロード画像から抽出）
+    designDefinition?: any,        // デザイン定義（ユーザーアップロード画像から抽出）
+    designGuideline?: DesignGuideline, // 事前生成されたデザインガイドライン
+    sectionIndex?: number,         // 現在のセクションインデックス（0始まり）
+    totalSections?: number         // 全セクション数
 ): Promise<{ imageId: number | null; base64: string | null; usedModel: string | null }> {
     const promptGenerator = SECTION_IMAGE_PROMPTS[sectionType];
     if (!promptGenerator) {
@@ -467,9 +704,27 @@ async function generateSectionImage(
     // セクション固有プロンプト
     const sectionPrompt = promptGenerator(businessInfo);
 
-    // デザイン定義からのスタイル指示
+    // デザインガイドラインのプロンプト（最優先）
     let designInstruction = '';
-    if (designDefinition && designDefinition.colorPalette) {
+    if (designGuideline) {
+        designInstruction = guidelineToPrompt(designGuideline);
+
+        // セクション位置に応じた追加指示
+        if (sectionIndex !== undefined && totalSections !== undefined) {
+            const isFirst = sectionIndex === 0;
+            const isLast = sectionIndex === totalSections - 1;
+
+            designInstruction += `
+【セクション位置: ${sectionIndex + 1}/${totalSections}】
+${isFirst ? '- これは最初のセクション。上端は自由だが、下端は次セクションへの接続を意識。' : ''}
+${isLast ? '- これは最後のセクション。上端は前セクションと接続、下端は自然な終わりを意識。' : ''}
+${!isFirst && !isLast ? '- 中間セクション。上端・下端ともに前後セクションとの接続を最優先。' : ''}
+`;
+        }
+    }
+
+    // 既存のデザイン定義からのスタイル指示（フォールバック）
+    if (!designGuideline && designDefinition && designDefinition.colorPalette) {
         const vibe = designDefinition.vibe || 'Modern';
         const primaryColor = designDefinition.colorPalette?.primary || '#000000';
         const bgColor = designDefinition.colorPalette?.background || '#ffffff';
@@ -724,6 +979,7 @@ ${designDefinition.colorPreference}を基調とした配色で生成してくだ
 export async function POST(req: NextRequest) {
     const startTime = createTimer();
     let prompt = '';
+    let isTextBasedMode = false;
 
     // ユーザー認証を確認してAPIキーを取得
     const supabase = await createClient();
@@ -735,11 +991,19 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const { businessInfo } = body;
+        const { businessInfo, mode } = body;
+
+        // Mode detection for logging and behavior adjustment
+        isTextBasedMode = mode === 'text-based';
+        if (isTextBasedMode) {
+            log.info('=== Text-based LP Generation Mode ===');
+        }
 
         if (!businessInfo) {
             return NextResponse.json({
-                error: 'ビジネス情報が入力されていません。フォームに必要事項を入力してください。'
+                error: isTextBasedMode
+                    ? '商品・サービス情報が入力されていません。Step 1-3で必要事項を入力してください。'
+                    : 'ビジネス情報が入力されていません。フォームに必要事項を入力してください。'
             }, { status: 400 });
         }
 
@@ -765,7 +1029,8 @@ export async function POST(req: NextRequest) {
 
         // Enhanced Context Injection (for text-based mode)
         const enhancedContext = body.enhancedContext;
-        if (enhancedContext && typeof enhancedContext === 'object') {
+        if (isTextBasedMode && enhancedContext && typeof enhancedContext === 'object') {
+            log.info('Processing enhanced context from text-based mode...');
             const contextDetails = [];
 
             if (enhancedContext.businessType) {
@@ -939,11 +1204,20 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
         }
 
         // ============================================
-        // v2: Style Anchor + Seam Reference 方式で画像生成
+        // v3: Style Anchor + Seam Reference + Design Guideline 方式で画像生成
         // ============================================
         const sections = generatedData.sections || [];
         const sectionCount = sections.length;
-        log.info(`========== Starting SEQUENTIAL image generation (v2: Anchor + Seam) for ${sectionCount} sections ==========`);
+        log.info(`========== Starting SEQUENTIAL image generation (v3: Anchor + Seam + Guideline) for ${sectionCount} sections ==========`);
+
+        // Step 1: デザインガイドラインを事前生成（全セクション統一）
+        log.progress('Generating design guideline for consistent styling...');
+        const designGuideline = await generateDesignGuideline(
+            businessInfo,
+            GOOGLE_API_KEY,
+            enhancedContext
+        );
+        log.success(`Design guideline generated: Primary=${designGuideline.primaryColor}, BG=${designGuideline.backgroundColor}, Tone=${designGuideline.brightness}`);
 
         // Style Anchor: ユーザーがデザイン画像をアップロードしていればそれを使用
         // なければ最初のheroセクション生成後にheroをAnchorとして固定
@@ -955,19 +1229,36 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
             log.info('Using user-uploaded design image as Style Anchor');
         }
 
-        // 順次生成：Style Anchor（固定）+ Seam Reference（前画像の下端）
+        // 順次生成：Style Anchor（固定）+ Seam Reference（前画像の下端）+ Design Guideline
         const sectionsWithImages: any[] = [];
         let previousImageBase64: string | null = null;
+        let previousSeamColor: string = designGuideline.backgroundColor; // 境界色のトラッキング
 
         for (let index = 0; index < sections.length; index++) {
             const section = sections[index];
             log.progress(`Processing section ${index + 1}/${sections.length}: ${section.type}`);
 
-            // Seam Reference: 前画像の下端ストリップを作成
-            let seamReference: string | undefined;
+            // Seam Reference: 前画像の下端ストリップを作成（sharpで正確に切り出し + 支配色抽出）
+            let seamReferenceBase64: string | undefined;
+            let extractedSeamColor: string = previousSeamColor;
+
             if (previousImageBase64) {
-                seamReference = await extractSeamStrip(previousImageBase64, 0.2);
+                const seamResult = await extractSeamStrip(
+                    previousImageBase64,
+                    0.15, // 15%の下端を切り出し
+                    designGuideline.backgroundColor
+                );
+                seamReferenceBase64 = seamResult.base64;
+                extractedSeamColor = seamResult.dominantColor;
+                log.info(`Seam reference extracted: ${seamResult.width}x${seamResult.height}, color=${extractedSeamColor}`);
             }
+
+            // ガイドラインの境界色を更新（実際に抽出した色を使用）
+            const currentGuideline = {
+                ...designGuideline,
+                seamColorTop: extractedSeamColor,
+                seamColorBottom: designGuideline.backgroundColor,
+            };
 
             // Merge designDefinition with enhancedContext for text-based mode
             const mergedDesignDefinition = {
@@ -983,8 +1274,11 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
                 user.id,
                 3, // maxRetries
                 styleAnchorBase64 || undefined,  // Style Anchor（色・質感の基準）
-                seamReference,                    // Seam Reference（境界接続用）
-                mergedDesignDefinition            // デザイン定義（enhancedContextとマージ）
+                seamReferenceBase64,             // Seam Reference（境界接続用・sharpで切り出し）
+                mergedDesignDefinition,          // デザイン定義（enhancedContextとマージ）
+                currentGuideline,                // デザインガイドライン（統一ルール）
+                index,                           // セクションインデックス
+                sectionCount                     // 全セクション数
             );
 
             sectionsWithImages.push({
@@ -1004,7 +1298,11 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
                     log.info('Hero section set as Style Anchor for remaining sections');
                 }
 
-                log.info(`Seam reference updated for next section`);
+                // 境界色をトラッキング（次セクションの抽出時に実際の色を使用）
+                // extractedSeamColorは次のループで更新されるので、ここでは維持のみ
+                previousSeamColor = extractedSeamColor;
+
+                log.info(`Seam color tracked for next section: ${previousSeamColor}`);
             }
 
             // レート制限回避のため少し待機（previewモデルは制限が厳しめ）
@@ -1018,7 +1316,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
         const failCount = sectionsWithImages.filter(s => !s.imageId).length;
 
         log.info(`========== Image generation complete ==========`);
-        log.success(`Successfully generated: ${successCount}/${sectionsWithImages.length} sections (sequential with reference)`);
+        log.success(`Successfully generated: ${successCount}/${sectionsWithImages.length} sections (v3: Anchor + Seam + Guideline)`);
         if (failCount > 0) {
             log.warn(`Failed to generate: ${failCount} sections`);
         }
@@ -1026,7 +1324,7 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
         // ログ記録（テキスト生成）
         await logGeneration({
             userId: user.id,
-            type: 'lp-generate',
+            type: isTextBasedMode ? 'lp-generate-text-based' : 'lp-generate',
             endpoint: '/api/lp-builder/generate',
             model: MODELS.TEXT,
             inputPrompt: prompt,
@@ -1074,17 +1372,18 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
             },
             meta: {
                 duration: duration,
-                estimatedCost: totalCost
+                estimatedCost: totalCost,
+                mode: isTextBasedMode ? 'text-based' : 'standard'
             }
         });
 
     } catch (error: any) {
-        log.error(`Generation API Error: ${error.message || error}`);
+        log.error(`Generation API Error (${isTextBasedMode ? 'text-based' : 'standard'} mode): ${error.message || error}`);
 
         // ログ記録（エラー）
         await logGeneration({
             userId: user.id,
-            type: 'lp-generate',
+            type: isTextBasedMode ? 'lp-generate-text-based' : 'lp-generate',
             endpoint: '/api/lp-builder/generate',
             model: MODELS.TEXT,
             inputPrompt: prompt || 'Error before prompt',

@@ -30,7 +30,7 @@ export type PageInput = z.infer<typeof pageSchema>;
 // Section Schema
 export const sectionSchema = z.object({
     id: z.string(),
-    type: z.enum(['hero', 'features', 'pricing', 'faq', 'cta', 'testimonials']),
+    type: z.enum(['hero', 'features', 'pricing', 'faq', 'cta', 'testimonials', 'problem', 'solution', 'benefits', 'process', 'guarantee', 'offer', 'custom']),
     name: z.string(),
     role: z.string(),
     order: z.number().int().min(0),

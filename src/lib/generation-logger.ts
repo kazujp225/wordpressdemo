@@ -12,6 +12,7 @@ export type GenerationType =
   | 'generate-nav'
   | 'chat-edit'
   | 'lp-generate'
+  | 'lp-generate-text-based'
   | 'import-arrange'
   | 'design-analysis'
   | 'boundary-connector'

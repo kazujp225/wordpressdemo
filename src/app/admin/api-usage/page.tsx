@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import useSWR from 'swr';
 import dynamic from 'next/dynamic';
 import {
@@ -12,7 +12,25 @@ import {
     MessageSquare,
     RefreshCw
 } from 'lucide-react';
+import {
+    Row,
+    Col,
+    Card,
+    Button,
+    Typography,
+    Space,
+    Flex,
+    Spin,
+    Alert,
+    Skeleton,
+    Descriptions,
+    theme,
+    Empty
+} from 'antd';
 import { StatCard } from '@/components/admin/dashboard/StatCard';
+
+const { Title, Text } = Typography;
+const { useToken } = theme;
 
 // チャートコンポーネントを遅延ロード（初期表示を高速化）
 const DailyUsageChart = dynamic(
@@ -30,11 +48,16 @@ const TypeBreakdownChart = dynamic(
 
 // チャート用スケルトンコンポーネント
 function ChartSkeleton() {
+    const { token } = useToken();
     return (
-        <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm animate-pulse">
-            <div className="h-6 w-32 bg-gray-200 rounded mb-6" />
-            <div className="h-64 bg-gray-100 rounded-xl" />
-        </div>
+        <Card>
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                <Skeleton.Input active style={{ width: 128, height: token.controlHeight }} />
+                <Skeleton.Node active style={{ width: '100%', height: 256 }}>
+                    <Flex style={{ width: '100%', height: 256 }} />
+                </Skeleton.Node>
+            </Space>
+        </Card>
     );
 }
 
@@ -69,6 +92,7 @@ const fetcher = (url: string) => fetch(url).then(res => {
 });
 
 export default function ApiUsageDashboard() {
+    const { token } = useToken();
     const [period, setPeriod] = useState(30);
 
     // SWRでデータを取得（キャッシュ済み、タブ切り替え時に即表示）
@@ -89,166 +113,248 @@ export default function ApiUsageDashboard() {
 
     if (loading) {
         return (
-            <div className="flex h-96 items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-                    <p className="text-gray-500 font-medium">読み込み中...</p>
-                </div>
-            </div>
+            <Flex
+                align="center"
+                justify="center"
+                style={{ minHeight: 384 }}
+            >
+                <Space direction="vertical" align="center" size="large">
+                    <Spin size="large" />
+                    <Text type="secondary" strong>読み込み中...</Text>
+                </Space>
+            </Flex>
         );
     }
 
     if (error) {
         return (
-            <div className="p-10 max-w-7xl mx-auto">
-                <div className="bg-red-50 rounded-3xl p-8 text-center">
-                    <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-red-700 mb-2">データの読み込みエラー</h2>
-                    <p className="text-red-600 mb-4">{error}</p>
-                    <button
-                        onClick={fetchStats}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
-                    >
-                        <RefreshCw className="h-4 w-4" />
-                        再試行
-                    </button>
-                </div>
-            </div>
+            <Flex
+                justify="center"
+                align="center"
+                style={{ padding: token.paddingXL, maxWidth: 1280, margin: '0 auto' }}
+            >
+                <Alert
+                    message="データの読み込みエラー"
+                    description={error.message}
+                    type="error"
+                    showIcon
+                    icon={<AlertTriangle size={48} />}
+                    action={
+                        <Button
+                            type="primary"
+                            danger
+                            icon={<RefreshCw size={16} />}
+                            onClick={fetchStats}
+                        >
+                            再試行
+                        </Button>
+                    }
+                    style={{
+                        borderRadius: token.borderRadiusLG,
+                        padding: token.paddingLG
+                    }}
+                />
+            </Flex>
         );
     }
 
     return (
-        <div className="px-4 py-4 sm:px-6 sm:py-6 lg:p-10 max-w-7xl mx-auto">
+        <Space
+            direction="vertical"
+            size="large"
+            style={{
+                width: '100%',
+                maxWidth: 1280,
+                margin: '0 auto',
+                padding: token.paddingLG
+            }}
+        >
             {/* Header */}
-            <div className="mb-6 sm:mb-10 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
-                <div>
-                    <h1 className="text-xl sm:text-3xl font-black tracking-tight text-gray-900">API使用状況</h1>
-                    <p className="text-sm text-gray-500 mt-1">AI APIの使用状況とコスト分析</p>
-                </div>
+            <Flex justify="space-between" align="flex-end" wrap="wrap" gap="middle">
+                <Space direction="vertical" size="small">
+                    <Title level={1} style={{ margin: 0 }}>
+                        API使用状況
+                    </Title>
+                    <Text type="secondary">AI APIの使用状況とコスト分析</Text>
+                </Space>
 
                 {/* Period Selector */}
-                <div className="flex gap-2 flex-wrap">
+                <Space wrap>
                     {[7, 30, 90].map((d) => (
-                        <button
+                        <Button
                             key={d}
+                            type={period === d ? 'primary' : 'default'}
                             onClick={() => setPeriod(d)}
-                            className={`px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all min-h-[40px] ${
-                                period === d
-                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
+                            style={{ minHeight: 40 }}
                         >
                             {d}日
-                        </button>
+                        </Button>
                     ))}
-                    <button
+                    <Button
+                        icon={<RefreshCw size={16} />}
                         onClick={fetchStats}
-                        className="flex items-center justify-center w-10 h-10 rounded-xl text-sm font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
-                    >
-                        <RefreshCw className="h-4 w-4" />
-                    </button>
-                </div>
-            </div>
+                        style={{ minHeight: 40 }}
+                    />
+                </Space>
+            </Flex>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-10">
-                <StatCard
-                    title="API呼び出し総数"
-                    value={stats?.summary?.totalCalls?.toLocaleString() || 0}
-                    icon={Activity}
-                    color="blue"
-                />
-                <StatCard
-                    title="推定コスト"
-                    value={`$${(stats?.summary?.totalCost || 0).toFixed(4)}`}
-                    icon={DollarSign}
-                    color="green"
-                    subValue={`平均: $${stats?.summary?.totalCalls ? ((stats?.summary?.totalCost || 0) / stats.summary.totalCalls).toFixed(6) : '0'}/回`}
-                />
-                <StatCard
-                    title="生成画像数"
-                    value={stats?.summary?.totalImages?.toLocaleString() || 0}
-                    icon={ImageIcon}
-                    color="purple"
-                />
-                <StatCard
-                    title="エラー率"
-                    value={`${(stats?.errorRate?.rate || 0).toFixed(1)}%`}
-                    icon={AlertTriangle}
-                    color={(stats?.errorRate?.failed || 0) > 0 ? 'red' : 'gray'}
-                    subValue={`${stats?.errorRate?.failed || 0}件失敗 / ${stats?.errorRate?.total || 0}件中`}
-                />
-            </div>
+            <Row gutter={[16, 16]}>
+                <Col xs={12} sm={12} lg={6}>
+                    <StatCard
+                        title="API呼び出し総数"
+                        value={stats?.summary?.totalCalls?.toLocaleString() || 0}
+                        icon={Activity}
+                        color="blue"
+                    />
+                </Col>
+                <Col xs={12} sm={12} lg={6}>
+                    <StatCard
+                        title="推定コスト"
+                        value={`$${(stats?.summary?.totalCost || 0).toFixed(4)}`}
+                        icon={DollarSign}
+                        color="green"
+                        subValue={`平均: $${stats?.summary?.totalCalls ? ((stats?.summary?.totalCost || 0) / stats.summary.totalCalls).toFixed(6) : '0'}/回`}
+                    />
+                </Col>
+                <Col xs={12} sm={12} lg={6}>
+                    <StatCard
+                        title="生成画像数"
+                        value={stats?.summary?.totalImages?.toLocaleString() || 0}
+                        icon={ImageIcon}
+                        color="purple"
+                    />
+                </Col>
+                <Col xs={12} sm={12} lg={6}>
+                    <StatCard
+                        title="エラー率"
+                        value={`${(stats?.errorRate?.rate || 0).toFixed(1)}%`}
+                        icon={AlertTriangle}
+                        color={(stats?.errorRate?.failed || 0) > 0 ? 'red' : 'gray'}
+                        subValue={`${stats?.errorRate?.failed || 0}件失敗 / ${stats?.errorRate?.total || 0}件中`}
+                    />
+                </Col>
+            </Row>
 
             {/* Additional Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-10">
-                <StatCard
-                    title="平均応答時間"
-                    value={`${((stats?.summary?.avgDurationMs || 0) / 1000).toFixed(1)}秒`}
-                    icon={Clock}
-                    color="amber"
-                />
-                <StatCard
-                    title="入力トークン"
-                    value={(stats?.summary?.totalInputTokens || 0).toLocaleString()}
-                    icon={MessageSquare}
-                    color="blue"
-                />
-                <StatCard
-                    title="出力トークン"
-                    value={(stats?.summary?.totalOutputTokens || 0).toLocaleString()}
-                    icon={MessageSquare}
-                    color="purple"
-                />
-                <StatCard
-                    title="合計トークン"
-                    value={((stats?.summary?.totalInputTokens || 0) + (stats?.summary?.totalOutputTokens || 0)).toLocaleString()}
-                    icon={MessageSquare}
-                    color="green"
-                />
-            </div>
+            <Row gutter={[16, 16]}>
+                <Col xs={12} sm={12} lg={6}>
+                    <StatCard
+                        title="平均応答時間"
+                        value={`${((stats?.summary?.avgDurationMs || 0) / 1000).toFixed(1)}秒`}
+                        icon={Clock}
+                        color="amber"
+                    />
+                </Col>
+                <Col xs={12} sm={12} lg={6}>
+                    <StatCard
+                        title="入力トークン"
+                        value={(stats?.summary?.totalInputTokens || 0).toLocaleString()}
+                        icon={MessageSquare}
+                        color="blue"
+                    />
+                </Col>
+                <Col xs={12} sm={12} lg={6}>
+                    <StatCard
+                        title="出力トークン"
+                        value={(stats?.summary?.totalOutputTokens || 0).toLocaleString()}
+                        icon={MessageSquare}
+                        color="purple"
+                    />
+                </Col>
+                <Col xs={12} sm={12} lg={6}>
+                    <StatCard
+                        title="合計トークン"
+                        value={((stats?.summary?.totalInputTokens || 0) + (stats?.summary?.totalOutputTokens || 0)).toLocaleString()}
+                        icon={MessageSquare}
+                        color="green"
+                    />
+                </Col>
+            </Row>
 
             {/* Charts Row 1 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                <DailyUsageChart data={stats?.daily || []} />
-                <ModelBreakdownChart data={stats?.byModel || []} />
-            </div>
+            <Row gutter={[16, 16]}>
+                <Col xs={24} lg={12}>
+                    <DailyUsageChart data={stats?.daily || []} />
+                </Col>
+                <Col xs={24} lg={12}>
+                    <ModelBreakdownChart data={stats?.byModel || []} />
+                </Col>
+            </Row>
 
             {/* Charts Row 2 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <TypeBreakdownChart data={stats?.byType || []} />
+            <Row gutter={[16, 16]}>
+                <Col xs={24} lg={12}>
+                    <TypeBreakdownChart data={stats?.byType || []} />
+                </Col>
 
                 {/* Cost Breakdown Card */}
-                <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-4 sm:p-8 shadow-sm">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                        モデル別コスト
-                    </h3>
-                    <div className="space-y-4">
-                        {(stats?.byModel || []).map((model, idx) => (
-                            <div key={idx} className="flex justify-between items-center">
-                                <span className="text-gray-600 text-sm font-medium truncate max-w-[200px]">
-                                    {model.model.replace('gemini-', '')}
-                                </span>
-                                <span className="font-bold text-gray-900">
-                                    ${model.cost.toFixed(4)}
-                                </span>
-                            </div>
-                        ))}
-                        {(stats?.byModel || []).length === 0 && (
-                            <p className="text-gray-400 text-center py-4">データがありません</p>
-                        )}
-                        {(stats?.byModel || []).length > 0 && (
-                            <div className="border-t border-gray-100 pt-4 flex justify-between items-center">
-                                <span className="text-gray-600 font-bold">合計</span>
-                                <span className="font-black text-green-600 text-xl">
-                                    ${(stats?.summary?.totalCost || 0).toFixed(4)}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+                <Col xs={24} lg={12}>
+                    <Card>
+                        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                            <Flex align="center" gap="small">
+                                <DollarSign
+                                    size={20}
+                                    color={token.colorSuccess}
+                                />
+                                <Title level={3} style={{ margin: 0 }}>
+                                    モデル別コスト
+                                </Title>
+                            </Flex>
+
+                            {(stats?.byModel || []).length === 0 ? (
+                                <Empty description="データがありません" />
+                            ) : (
+                                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                                    {(stats?.byModel || []).map((model, idx) => (
+                                        <Descriptions
+                                            key={idx}
+                                            column={1}
+                                            size="small"
+                                            items={[
+                                                {
+                                                    label: (
+                                                        <Text type="secondary" strong ellipsis>
+                                                            {model.model.replace('gemini-', '')}
+                                                        </Text>
+                                                    ),
+                                                    children: (
+                                                        <Text strong>
+                                                            ${model.cost.toFixed(4)}
+                                                        </Text>
+                                                    )
+                                                }
+                                            ]}
+                                        />
+                                    ))}
+
+                                    {(stats?.byModel || []).length > 0 && (
+                                        <Descriptions
+                                            column={1}
+                                            bordered
+                                            size="small"
+                                            items={[
+                                                {
+                                                    label: <Text strong>合計</Text>,
+                                                    children: (
+                                                        <Title
+                                                            level={4}
+                                                            type="success"
+                                                            style={{ margin: 0 }}
+                                                        >
+                                                            ${(stats?.summary?.totalCost || 0).toFixed(4)}
+                                                        </Title>
+                                                    )
+                                                }
+                                            ]}
+                                        />
+                                    )}
+                                </Space>
+                            )}
+                        </Space>
+                    </Card>
+                </Col>
+            </Row>
+        </Space>
     );
 }

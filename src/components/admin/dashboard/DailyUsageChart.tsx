@@ -2,6 +2,10 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from 'lucide-react';
+import { Card, Typography, Flex, theme } from 'antd';
+
+const { Title } = Typography;
+const { useToken } = theme;
 
 interface DailyData {
     date: string;
@@ -11,6 +15,8 @@ interface DailyData {
 }
 
 export function DailyUsageChart({ data }: { data: DailyData[] }) {
+    const { token } = useToken();
+
     const formattedData = data.map(d => ({
         ...d,
         date: new Date(d.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
@@ -18,46 +24,54 @@ export function DailyUsageChart({ data }: { data: DailyData[] }) {
     }));
 
     return (
-        <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-4 sm:p-8 shadow-sm">
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                日別API使用量
-            </h3>
-            <div className="h-48 sm:h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={formattedData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis
-                            dataKey="date"
-                            tick={{ fontSize: 11 }}
-                            stroke="#9ca3af"
-                            interval="preserveStartEnd"
-                        />
-                        <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" />
-                        <Tooltip
-                            contentStyle={{
-                                borderRadius: '12px',
-                                border: 'none',
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                            }}
-                            formatter={(value: any, name: any) => {
-                                if (name === 'count') return [value, 'API呼び出し'];
-                                if (name === 'cost') return [`$${value.toFixed(4)}`, 'コスト'];
-                                return [value, name];
-                            }}
-                        />
-                        <Line
-                            type="monotone"
-                            dataKey="count"
-                            stroke="#3b82f6"
-                            strokeWidth={3}
-                            dot={{ fill: '#3b82f6', strokeWidth: 2, r: 3 }}
-                            activeDot={{ r: 5 }}
-                            name="count"
-                        />
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
+        <Card>
+            <Flex vertical gap="middle">
+                <Flex align="center" gap="small">
+                    <TrendingUp
+                        size={20}
+                        color={token.colorPrimary}
+                    />
+                    <Title level={3} style={{ margin: 0 }}>
+                        日別API使用量
+                    </Title>
+                </Flex>
+
+                <Flex style={{ height: 256 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={formattedData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={token.colorBorderSecondary} />
+                            <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 11 }}
+                                stroke={token.colorTextSecondary}
+                                interval="preserveStartEnd"
+                            />
+                            <YAxis tick={{ fontSize: 11 }} stroke={token.colorTextSecondary} />
+                            <Tooltip
+                                contentStyle={{
+                                    borderRadius: token.borderRadiusLG,
+                                    border: 'none',
+                                    boxShadow: token.boxShadow
+                                }}
+                                formatter={(value: any, name: any) => {
+                                    if (name === 'count') return [value, 'API呼び出し'];
+                                    if (name === 'cost') return [`$${value.toFixed(4)}`, 'コスト'];
+                                    return [value, name];
+                                }}
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="count"
+                                stroke={token.colorPrimary}
+                                strokeWidth={3}
+                                dot={{ fill: token.colorPrimary, strokeWidth: 2, r: 3 }}
+                                activeDot={{ r: 5 }}
+                                name="count"
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </Flex>
+            </Flex>
+        </Card>
     );
 }

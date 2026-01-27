@@ -1,7 +1,11 @@
 "use client";
 
 import { LucideIcon } from 'lucide-react';
-import clsx from 'clsx';
+import { Card, Flex, Typography, theme, ConfigProvider } from 'antd';
+import type { CSSProperties } from 'react';
+
+const { Text } = Typography;
+const { useToken } = theme;
 
 interface StatCardProps {
     title: string;
@@ -11,28 +15,112 @@ interface StatCardProps {
     subValue?: string;
 }
 
-const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-emerald-50 text-emerald-600',
-    purple: 'bg-purple-50 text-purple-600',
-    red: 'bg-red-50 text-red-600',
-    gray: 'bg-gray-50 text-gray-600',
-    amber: 'bg-amber-50 text-amber-600'
+const colorConfig = {
+    blue: { bg: '#eff6ff', text: '#2563eb' },
+    green: { bg: '#ecfdf5', text: '#059669' },
+    purple: { bg: '#faf5ff', text: '#9333ea' },
+    red: { bg: '#fef2f2', text: '#dc2626' },
+    gray: { bg: '#f9fafb', text: '#6b7280' },
+    amber: { bg: '#fffbeb', text: '#d97706' }
 };
 
 export function StatCard({ title, value, icon: Icon, color, subValue }: StatCardProps) {
+    const { token } = useToken();
+    const colorScheme = colorConfig[color];
+
     return (
-        <div className="rounded-2xl sm:rounded-3xl border border-gray-100 bg-white p-3 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-2 sm:mb-4">
-                <div className={clsx('rounded-lg sm:rounded-xl p-2 sm:p-3', colorClasses[color])}>
-                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-            </div>
-            <p className="text-lg sm:text-2xl font-black text-gray-900 mb-0.5 sm:mb-1 truncate">{value}</p>
-            <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider sm:tracking-widest leading-tight">{title}</p>
-            {subValue && (
-                <p className="text-[10px] sm:text-xs text-gray-500 mt-1 sm:mt-2 truncate">{subValue}</p>
-            )}
-        </div>
+        <ConfigProvider
+            theme={{
+                components: {
+                    Card: {
+                        borderRadiusLG: token.borderRadiusLG,
+                    }
+                }
+            }}
+        >
+            <Card
+                bordered
+                hoverable
+                styles={{
+                    body: {
+                        padding: `${token.paddingSM}px`
+                    }
+                }}
+            >
+                <Flex vertical gap="small">
+                    <Flex justify="flex-start" align="flex-start">
+                        <ConfigProvider
+                            theme={{
+                                token: {
+                                    borderRadiusLG: token.borderRadiusLG,
+                                    colorBgContainer: colorScheme.bg,
+                                    padding: token.paddingSM
+                                }
+                            }}
+                        >
+                            <Flex
+                                align="center"
+                                justify="center"
+                                style={{
+                                    borderRadius: token.borderRadiusLG,
+                                    backgroundColor: colorScheme.bg,
+                                    padding: token.paddingSM,
+                                    width: 'fit-content'
+                                }}
+                            >
+                                <Icon
+                                    size={20}
+                                    color={colorScheme.text}
+                                />
+                            </Flex>
+                        </ConfigProvider>
+                    </Flex>
+
+                    <Flex vertical gap="none">
+                        <Typography.Title
+                            level={2}
+                            style={{
+                                margin: 0,
+                                fontSize: token.fontSizeHeading3,
+                                fontWeight: 900,
+                                lineHeight: 1.2
+                            }}
+                            ellipsis
+                        >
+                            {value}
+                        </Typography.Title>
+
+                        <Text
+                            type="secondary"
+                            strong
+                            style={{
+                                fontSize: token.fontSizeSM,
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                display: 'block',
+                                marginTop: token.marginXXS
+                            }}
+                        >
+                            {title}
+                        </Text>
+
+                        {subValue && (
+                            <Text
+                                type="secondary"
+                                style={{
+                                    fontSize: token.fontSizeSM,
+                                    display: 'block',
+                                    marginTop: token.marginXS
+                                }}
+                                ellipsis
+                            >
+                                {subValue}
+                            </Text>
+                        )}
+                    </Flex>
+                </Flex>
+            </Card>
+        </ConfigProvider>
     );
 }

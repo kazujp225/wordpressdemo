@@ -88,6 +88,8 @@ model GenerationRun {
   @@index([userId])
   @@index([createdAt])
   @@index([type])
+  @@index([userId, createdAt])
+  @@index([userId, status])
 }
 
 model GlobalConfig {
@@ -281,6 +283,7 @@ model CreditTransaction {
   @@index([userId])
   @@index([createdAt])
   @@index([type])
+  @@index([userId, type, createdAt])
 }
 
 // クレジットパッケージ（購入可能な単位）

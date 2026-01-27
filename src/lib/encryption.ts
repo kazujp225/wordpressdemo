@@ -5,7 +5,19 @@ const IV_LENGTH = 16;
 const TAG_LENGTH = 16;
 
 function getEncryptionKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || 'default-key-change-me';
+  const key = process.env.ENCRYPTION_KEY;
+
+  if (!key) {
+    throw new Error(
+      'ENCRYPTION_KEY environment variable is required. ' +
+      'Generate one with: openssl rand -hex 32'
+    );
+  }
+
+  if (key.length < 32) {
+    throw new Error('ENCRYPTION_KEY must be at least 32 characters');
+  }
+
   // Derive a 32-byte key from the secret
   return crypto.createHash('sha256').update(key).digest();
 }

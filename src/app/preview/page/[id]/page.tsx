@@ -151,6 +151,13 @@ export default function PagePreviewPage() {
                             console.error(`[Preview] Failed to parse config for section ${section.role}:`, e);
                         }
 
+                        // テキストコンテンツを取得
+                        const headline = parsedConfig.headline || '';
+                        const subheadline = parsedConfig.subheadline || '';
+                        const description = parsedConfig.description || '';
+                        const items = parsedConfig.items || [];
+                        const ctaText = parsedConfig.cta_text || '';
+
                         // html-embedセクションはiframeで表示
                         if (section.role === 'html-embed' && parsedConfig.htmlContent) {
                             return (
@@ -167,6 +174,18 @@ export default function PagePreviewPage() {
                         }
 
                         if (!imagePath) {
+                            // 画像なしでもテキストがあれば表示
+                            if (headline || description) {
+                                return (
+                                    <div key={section.id} id={section.role} className="relative bg-gradient-to-b from-blue-600 to-blue-800 text-white py-16 px-6">
+                                        <div className="max-w-4xl mx-auto text-center">
+                                            {headline && <h2 className="text-3xl md:text-4xl font-bold mb-4">{headline}</h2>}
+                                            {subheadline && <p className="text-xl md:text-2xl mb-6 opacity-90">{subheadline}</p>}
+                                            {description && <p className="text-base md:text-lg whitespace-pre-line opacity-80">{description}</p>}
+                                        </div>
+                                    </div>
+                                );
+                            }
                             return (
                                 <div key={section.id} className="flex h-48 items-center justify-center bg-gray-100 text-gray-400">
                                     Section: {section.role} (No image)
@@ -174,8 +193,22 @@ export default function PagePreviewPage() {
                             );
                         }
 
+                        // セクションタイプに応じたテキストオーバーレイスタイル
+                        const getTextOverlayStyle = () => {
+                            switch (section.role) {
+                                case 'hero':
+                                    return 'absolute inset-0 flex flex-col justify-center items-center text-center text-white px-6 bg-gradient-to-b from-black/40 via-transparent to-transparent';
+                                case 'cta':
+                                    return 'absolute inset-0 flex flex-col justify-center items-center text-center text-white px-6 bg-gradient-to-t from-black/50 via-black/20 to-transparent';
+                                case 'problem':
+                                    return 'absolute inset-0 flex flex-col justify-center items-center text-center text-white px-6 bg-black/30';
+                                default:
+                                    return 'absolute inset-0 flex flex-col justify-center items-center text-center text-white px-6';
+                            }
+                        };
+
                         return (
-                            <div key={section.id} className="relative" style={{ margin: 0, padding: 0, lineHeight: 0 }}>
+                            <div key={section.id} id={section.role} className="relative" style={{ margin: 0, padding: 0, lineHeight: 0 }}>
                                 {/* モバイルビューでモバイル画像がない場合の警告バッジ */}
                                 {isMobileViewWithoutMobileImage && (
                                     <div className="absolute top-2 right-2 z-10 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-lg">
@@ -193,6 +226,53 @@ export default function PagePreviewPage() {
                                         padding: 0,
                                     }}
                                 />
+
+                                {/* テキストオーバーレイ */}
+                                {(headline || description) && (
+                                    <div className={getTextOverlayStyle()} style={{ lineHeight: 'normal' }}>
+                                        <div className="max-w-4xl mx-auto drop-shadow-lg">
+                                            {headline && (
+                                                <h2 className={`font-bold mb-4 ${viewMode === 'mobile' ? 'text-2xl' : 'text-3xl md:text-5xl'}`}>
+                                                    {headline}
+                                                </h2>
+                                            )}
+                                            {subheadline && (
+                                                <p className={`mb-6 opacity-95 ${viewMode === 'mobile' ? 'text-base' : 'text-xl md:text-2xl'}`}>
+                                                    {subheadline}
+                                                </p>
+                                            )}
+                                            {description && section.role !== 'hero' && (
+                                                <p className={`whitespace-pre-line opacity-90 ${viewMode === 'mobile' ? 'text-sm' : 'text-base md:text-lg'}`}>
+                                                    {description}
+                                                </p>
+                                            )}
+
+                                            {/* アイテムリスト（features, testimonials, faq等） */}
+                                            {items.length > 0 && (
+                                                <div className={`mt-8 grid gap-4 ${viewMode === 'mobile' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3'}`}>
+                                                    {items.slice(0, 6).map((item: any, idx: number) => (
+                                                        <div key={idx} className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-left">
+                                                            {item.title && <h3 className="font-bold text-lg mb-2">{item.title}</h3>}
+                                                            {item.name && <h3 className="font-bold text-lg mb-2">{item.name}</h3>}
+                                                            {item.question && <h3 className="font-bold text-lg mb-2">Q: {item.question}</h3>}
+                                                            {item.content && <p className="text-sm opacity-90">{item.content}</p>}
+                                                            {item.comment && <p className="text-sm opacity-90 italic">{item.comment}</p>}
+                                                            {item.answer && <p className="text-sm opacity-90">A: {item.answer}</p>}
+                                                            {item.description && <p className="text-sm opacity-90">{item.description}</p>}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* CTAボタン */}
+                                            {ctaText && section.role === 'cta' && (
+                                                <button className="mt-8 px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full text-xl shadow-lg transition-all transform hover:scale-105">
+                                                    {ctaText}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                                 {/* Clickable Areas (CTA) - 常に表示（デバッグ用に薄い枠線） */}
                                 {clickableAreas.map((area, idx) => {
                                     const getHref = () => {
