@@ -89,7 +89,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
             follow: true,
         },
         alternates: {
-            canonical: `/${params.slug}`,
+            canonical: `${process.env.NEXT_PUBLIC_APP_URL || ''}/p/${params.slug}`,
         },
     };
 }

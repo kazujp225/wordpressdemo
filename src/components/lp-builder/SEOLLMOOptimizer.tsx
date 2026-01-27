@@ -92,6 +92,7 @@ export const SEOLLMOOptimizer: React.FC<SEOLLMOOptimizerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageUrl,
+          pageId: pageId || undefined, // ページIDを送信してテキストコンテンツを抽出
           mode,
           additionalContext: additionalContext || undefined
         })

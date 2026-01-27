@@ -184,6 +184,77 @@ function getPromptByMode(mode: AnalysisMode): string {
   }
 }
 
+/**
+ * LP全体のテキストコンテンツを抽出
+ */
+async function extractPageText(pageId: number): Promise<string> {
+  try {
+    const { prisma } = await import('@/lib/db');
+    const page = await prisma.page.findUnique({
+      where: { id: pageId },
+      include: {
+        sections: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!page) return '';
+
+    const textParts: string[] = [];
+
+    // ページタイトル
+    textParts.push(`【ページタイトル】${page.title}`);
+
+    // 各セクションのテキストを抽出
+    for (const section of page.sections) {
+      if (section.config) {
+        try {
+          const config = JSON.parse(section.config);
+
+          // 見出し
+          if (config.heading || config.headline) {
+            textParts.push(`【見出し】${config.heading || config.headline}`);
+          }
+
+          // サブタイトル
+          if (config.subheading || config.subtitle) {
+            textParts.push(`【サブタイトル】${config.subheading || config.subtitle}`);
+          }
+
+          // 本文
+          if (config.body || config.description || config.text) {
+            textParts.push(`【本文】${config.body || config.description || config.text}`);
+          }
+
+          // リスト項目
+          if (config.items && Array.isArray(config.items)) {
+            config.items.forEach((item: any) => {
+              if (typeof item === 'string') {
+                textParts.push(`- ${item}`);
+              } else if (item.title || item.text) {
+                textParts.push(`- ${item.title || item.text}`);
+              }
+            });
+          }
+
+          // CTA
+          if (config.ctaText || config.buttonText) {
+            textParts.push(`【CTA】${config.ctaText || config.buttonText}`);
+          }
+        } catch (e) {
+          // JSON parse error - skip
+        }
+      }
+    }
+
+    return textParts.join('\n');
+  } catch (error) {
+    console.error('Text extraction error:', error);
+    return '';
+  }
+}
+
 export async function POST(request: NextRequest) {
   const startTime = createTimer();
   let prompt = '';
@@ -192,10 +263,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       imageUrl,
+      pageId,
       mode = 'combined',
       additionalContext
     }: {
       imageUrl: string;
+      pageId?: number;
       mode?: AnalysisMode;
       additionalContext?: string;
     } = body;
@@ -221,8 +294,19 @@ export async function POST(request: NextRequest) {
     // 画像をBase64に変換
     const base64Content = await getImageBase64(imageUrl);
 
+    // LP全体のテキストを抽出（pageIdがあれば）
+    let pageText = '';
+    if (pageId) {
+      pageText = await extractPageText(pageId);
+    }
+
     // プロンプトを構築
     prompt = getPromptByMode(mode);
+
+    // テキストコンテンツを追加
+    if (pageText) {
+      prompt += `\n\n【LPのテキストコンテンツ】\n${pageText}`;
+    }
 
     if (additionalContext) {
       prompt += `\n\n【追加コンテキスト】\n${additionalContext}`;
