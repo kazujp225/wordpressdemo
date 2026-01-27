@@ -206,12 +206,14 @@ export const FULL_LP_PROMPT = `
 【入力情報 - 基本】
 - ビジネス名: {{businessName}}
 - 業種: {{industry}}
+- ビジネスモデル: {{businessType}}
 - サービス/製品: {{service}}
 - ターゲット顧客: {{target}}
 - 主な強み: {{strengths}}
 - 競合との差別化: {{differentiators}}
 - 価格帯: {{priceRange}}
 - トーン: {{tone}}
+- コンバージョン目標: {{conversionGoal}}
 
 【入力情報 - 詳細コンテキスト】
 - ターゲットの悩み・課題: {{painPoints}}
@@ -251,9 +253,10 @@ export const FULL_LP_PROMPT = `
 - 回答は安心感を与える内容に
 
 ■ CTA（行動喚起）
+- コンバージョン目標（{{conversionGoal}}）に最適化したCTA設計
 - {{urgency}}で緊急性を表現
 - {{guarantee}}でリスクリバーサルを明示
-- CTAは具体的な行動を示す
+- CTAは具体的な行動を示す（目標に応じて「お問い合わせ」「購入」「登録」「ダウンロード」等を使い分ける）
 
 【出力JSON形式】
 {

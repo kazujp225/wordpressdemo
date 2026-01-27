@@ -48,6 +48,14 @@ function enrichBusinessInfo(info: any, enhancedContext?: any): Record<string, st
             urgency: '今すぐ始めよう！期間限定キャンペーン中',
             guarantee: '結果が出なければ全額返金',
         },
+        minimal: {
+            urgency: 'まずはお試しください',
+            guarantee: 'シンプルな料金体系・いつでも解約可能',
+        },
+        playful: {
+            urgency: 'ワクワクする体験を今すぐ！',
+            guarantee: '楽しくなければ全額返金',
+        },
     };
 
     // 安全なデフォルト値を設定
@@ -64,12 +72,14 @@ function enrichBusinessInfo(info: any, enhancedContext?: any): Record<string, st
     const enriched: Record<string, string> = {
         businessName,
         industry,
+        businessType: info.businessType || '',
         service,
         target,
         strengths,
         differentiators: info.differentiators || strengths,
         priceRange: info.priceRange || '詳細はお問い合わせください',
         tone,
+        conversionGoal: 'お問い合わせ獲得',
         // 自動生成される変数（安全に文字列を構築）
         painPoints: `${target}が抱える課題（${service}に関する悩み）`,
         concerns: `${service}の導入・利用に関する不安や疑問`,
@@ -92,7 +102,7 @@ function enrichBusinessInfo(info: any, enhancedContext?: any): Record<string, st
             enriched.industry = enhancedContext.productCategory;
         }
         if (enhancedContext.businessType) {
-            enriched.businessName = enhancedContext.businessType;
+            enriched.businessType = enhancedContext.businessType;
         }
 
         // Target audience refinement
@@ -153,6 +163,19 @@ function enrichBusinessInfo(info: any, enhancedContext?: any): Record<string, st
         }
         if (enhancedContext.guarantees) {
             enriched.guarantee = enhancedContext.guarantees;
+        }
+
+        // Conversion goal
+        if (enhancedContext.conversionGoal) {
+            const goalLabels: Record<string, string> = {
+                inquiry: 'お問い合わせ獲得',
+                purchase: '商品購入',
+                signup: '会員登録',
+                download: '資料ダウンロード',
+                consultation: '無料相談予約',
+                trial: '無料体験申込',
+            };
+            enriched.conversionGoal = goalLabels[enhancedContext.conversionGoal] || enhancedContext.conversionGoal;
         }
 
         // CTA and urgency
@@ -609,6 +632,26 @@ async function generateDesignGuideline(
             brightness: 'light',
             saturation: 'vivid',
             contrast: 'high',
+            texture: 'matte',
+        },
+        minimal: {
+            primaryColor: '#374151',
+            secondaryColor: '#9ca3af',
+            accentColor: '#6b7280',
+            backgroundColor: '#ffffff',
+            brightness: 'light',
+            saturation: 'neutral',
+            contrast: 'low',
+            texture: 'smooth',
+        },
+        playful: {
+            primaryColor: '#7c3aed',
+            secondaryColor: '#ec4899',
+            accentColor: '#f59e0b',
+            backgroundColor: '#fefce8',
+            brightness: 'light',
+            saturation: 'vivid',
+            contrast: 'medium',
             texture: 'matte',
         },
     };
@@ -1114,9 +1157,8 @@ export async function POST(req: NextRequest) {
         if (enhancedContext) {
             const contextValidation = validateRequest(enhancedContextSchema, enhancedContext);
             if (!contextValidation.success) {
-                log.warn('Enhanced context validation failed, using partial data');
-                // 警告のみ、処理は続行（オプショナルなため）
-                enhancedContext = contextValidation.success ? contextValidation.data : undefined;
+                log.warn('Enhanced context validation failed, using raw data as-is');
+                // バリデーション失敗してもraw dataを維持（オプショナルフィールドのため）
             } else {
                 enhancedContext = contextValidation.data;
             }
@@ -1127,9 +1169,8 @@ export async function POST(req: NextRequest) {
         if (designDefinition) {
             const designValidation = validateRequest(designDefinitionSchema, designDefinition);
             if (!designValidation.success) {
-                log.warn('Design definition validation failed, using partial data');
-                // 警告のみ、処理は続行（オプショナルなため）
-                designDefinition = designValidation.success ? designValidation.data : undefined;
+                log.warn('Design definition validation failed, using raw data as-is');
+                // バリデーション失敗してもraw dataを維持（オプショナルフィールドのため）
             } else {
                 designDefinition = designValidation.data;
             }
@@ -1320,10 +1361,14 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
                 throw new Error('AI generated an empty LP structure. Please try again with more detailed information.');
             }
 
-            // セクションの基本構造を検証
+            // セクションの基本構造を検証・正規化
             for (const section of generatedData.sections) {
                 if (!section.type || typeof section.type !== 'string') {
                     throw new Error(`Invalid section structure: missing or invalid 'type' field`);
+                }
+                // dataキーをpropertiesに正規化（AIレスポンスが data or properties を返す可能性）
+                if (section.data && !section.properties) {
+                    section.properties = section.data;
                 }
             }
         } catch (e: any) {
@@ -1489,10 +1534,10 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
         if (successCount > 0) {
             await logGeneration({
                 userId: user.id,
-                type: 'lp-generate',
+                type: isTextBasedMode ? 'lp-generate-text-based' : 'lp-generate',
                 endpoint: '/api/lp-builder/generate',
                 model: MODELS.IMAGE,
-                inputPrompt: `LP image generation for ${sectionsWithImages.length} sections (v2: Anchor+Seam)`,
+                inputPrompt: `LP image generation for ${sectionsWithImages.length} sections (v3: Anchor+Seam+Guideline)`,
                 imageCount: successCount,
                 status: 'succeeded',
                 startTime
@@ -1502,17 +1547,16 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
         const endTime = Date.now();
         const duration = endTime - startTime;
 
-        // Cost Calculation (JPY Estimation)
-        // Gemini 1.5 Flash (Text): ~0.01 JPY / 1k input chars, ~0.03 JPY / 1k output chars
-        // Gemini Image (Flash/Pro): ~0.6 JPY (Flash) - ~4.0 JPY (Pro) per image
-        // *Using conservative estimates for user display*
+        // Cost Calculation (JPY Estimation - token-based, approximate)
+        // Gemini 2.5 Flash (Text): ~0.015 JPY / 1k input tokens, ~0.06 JPY / 1k output tokens
+        // Gemini 3 Pro Image: ~4.0 JPY per image (conservative estimate)
+        // Note: chars ≈ tokens * 0.7 for Japanese, using chars as rough proxy
 
-        const textInputCost = (prompt.length / 1000) * 0.01;
-        const textOutputCost = (text.length / 1000) * 0.03;
+        const textInputCost = (prompt.length / 1000) * 0.015;
+        const textOutputCost = (text.length / 1000) * 0.06;
 
-        // Image usage: successCount images
-        // Assuming mix of Pro/Flash or just strictly estimating roughly 2 JPY per image for safety/clarity
-        const imageCost = successCount * 2.0;
+        // Image usage: Gemini 3 Pro Image Preview
+        const imageCost = successCount * 4.0;
 
         const totalCost = Math.ceil((textInputCost + textOutputCost + imageCost) * 100) / 100; // Round to 2 decimals
 

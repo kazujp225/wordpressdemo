@@ -258,16 +258,6 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
 
         try {
             // Convert form data to BusinessInfo format for API
-            // Map 6 tones to 4 supported API tones
-            const toneMapping: Record<string, string> = {
-                professional: 'professional',
-                friendly: 'friendly',
-                luxury: 'luxury',
-                energetic: 'energetic',
-                minimal: 'professional', // シンプル → プロフェッショナル
-                playful: 'friendly',     // 遊び心 → フレンドリー
-            };
-
             const businessInfo = {
                 businessName: data.businessName,
                 industry: data.industry,
@@ -276,7 +266,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                 strengths: data.mainBenefits,
                 differentiators: data.uniqueSellingPoints,
                 priceRange: data.priceInfo || '',
-                tone: toneMapping[data.tone] || 'professional',
+                tone: data.tone, // minimal/playful含む全6トーンをそのまま送信
             };
 
             // Enhanced context for AI
@@ -302,6 +292,12 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                 originalTone: data.tone,
             };
 
+            // designDefinition: imageStyleとcolorPreferenceをAPI側で活用
+            const designDefinition = {
+                imageStyle: data.imageStyle,
+                colorPreference: data.colorPreference || undefined,
+            };
+
             const response = await fetch('/api/lp-builder/generate', {
                 method: 'POST',
                 headers: {
@@ -310,6 +306,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
                 body: JSON.stringify({
                     businessInfo,
                     enhancedContext,
+                    designDefinition,
                     mode: 'text-based',
                 }),
             });
@@ -321,7 +318,7 @@ export const TextBasedLPGenerator: React.FC<TextBasedLPGeneratorProps> = ({
             }
 
             if (result.success && result.data) {
-                onGenerated(result.data.sections, result.data.meta);
+                onGenerated(result.data.sections, result.meta);
                 onClose();
                 setCurrentStep(1);
             } else {
