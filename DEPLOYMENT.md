@@ -13,12 +13,14 @@ Renderへの自動デプロイ設定ガイド
 
 ## 🚀 Renderの初期設定
 
+⚠️ **重要**: 初回デプロイは必ずRender Dashboard（GUI）から手動で行います。GitHub Actionsや自動デプロイは、初回セットアップ完了後に有効化します。
+
 ### 1. Renderアカウント作成
 
 1. [Render.com](https://render.com) でアカウント作成
 2. GitHubアカウントと連携
 
-### 2. 新規Webサービス作成
+### 2. 新規Webサービス作成（初回は必ずGUIから）
 
 #### ダッシュボードから:
 1. **New +** → **Web Service** をクリック
@@ -35,9 +37,11 @@ Start Command: npm run start
 Plan: Free (または Starter)
 ```
 
-### 3. 環境変数の設定
+### 3. 環境変数の設定（Render Dashboard GUIで設定）
 
-Render Dashboard → Environment で以下を設定:
+サービス作成後、**Render Dashboard → あなたのサービス → Environment** タブで以下を**手動で**設定します:
+
+⚠️ **注意**: これらはアプリケーションが実行時に使用する環境変数です。GitHub ActionsやデプロイAPIとは無関係です。
 
 #### 必須の環境変数
 
@@ -68,58 +72,89 @@ NEXT_PUBLIC_BASE_URL=https://your-app.onrender.com
 # 認証
 INVITE_PASSWORD=your_secure_password
 
-# Render API (デプロイ用)
-RENDER_API_KEY=your_render_api_key
-RENDER_SERVICE_ID=your_service_id
-
-# GitHub (オプション)
-GITHUB_TOKEN=your_github_token
-GITHUB_DEPLOY_OWNER=kazujp225
+# セキュリティ（必須）
+ENCRYPTION_KEY=your_64_char_hex_string
 ```
 
-#### 環境変数の取得方法
+#### ENCRYPTION_KEYの生成方法
 
-**Render API Key:**
-1. Render Dashboard → Account Settings → API Keys
-2. "Create API Key" をクリック
-3. `RENDER_API_KEY` として保存
+```bash
+openssl rand -hex 32
+```
 
-**Render Service ID:**
-1. デプロイしたサービスのダッシュボードを開く
-2. URLから Service ID を取得: `https://dashboard.render.com/web/srv-xxxxxxxxx`
-3. `srv-xxxxxxxxx` 部分が Service ID
+このコマンドで生成された64文字の文字列を `ENCRYPTION_KEY` に設定してください。これはAPIキーの暗号化に使用される重要な値です。
 
-### 4. 自動デプロイ設定
+### 4. 初回デプロイの実行
+
+環境変数を全て設定したら、Render Dashboardから **Manual Deploy** → **Deploy latest commit** をクリックして初回デプロイを実行します。
+
+✅ デプロイが成功したら、アプリが正常に起動することを確認してください。
+
+### 5. Service IDの取得（GitHub Actions用）
+
+初回デプロイ成功後、GitHub Actionsを設定する場合は Service ID を取得します：
+
+1. Render Dashboard でサービスを開く
+2. ブラウザのURLバーを確認: `https://dashboard.render.com/web/srv-xxxxxxxxx`
+3. `srv-xxxxxxxxx` 部分が **Service ID** です
+4. この値を後でGitHub Secretsに設定します
+
+### 6. 自動デプロイ設定（オプション）
+
+Render標準の自動デプロイを有効化する場合（GitHub Actions不要）:
 
 Render Dashboard → Settings → Build & Deploy:
 
-- **Auto-Deploy**: `Yes` (推奨)
+- **Auto-Deploy**: `Yes`
 - **Branch**: `main`
 
 これで `main` ブランチへのpush時に自動デプロイされます。
 
+⚠️ **注意**: Render Auto-DeployとGitHub Actionsの両方を有効にすると二重デプロイになります。どちらか一方のみを使用してください。
+
 ---
 
-## 🤖 GitHub Actionsの設定
+## 🤖 GitHub Actionsの設定（上級者向け）
 
-より高度な制御が必要な場合、GitHub Actionsを使用します。
+⚠️ **前提条件**: Renderでの初回セットアップ（上記）が完了していること
 
-### 1. GitHub Secretsの設定
+より高度な制御（ビルド検証など）が必要な場合、GitHub Actionsを使用します。
 
-1. GitHubリポジトリ → Settings → Secrets and variables → Actions
+### 1. Render API Keyの取得
+
+GitHub ActionsからRenderにデプロイをトリガーするため、API Keyが必要です：
+
+1. Render Dashboard → **Account Settings** → **API Keys**
+2. **Create API Key** をクリック
+3. 名前を入力（例: `GitHub Actions Deploy`）
+4. 生成されたキーをコピー（`rnd_` で始まる文字列）
+5. ⚠️ このキーは一度しか表示されないので安全に保管
+
+### 2. GitHub Secretsの設定
+
+1. GitHubリポジトリ → **Settings** → **Secrets and variables** → **Actions**
 2. **New repository secret** で以下を追加:
 
-```
-DATABASE_URL
-DIRECT_URL
-NEXT_PUBLIC_APP_URL
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-RENDER_API_KEY
-RENDER_SERVICE_ID
-```
+| Secret名 | 説明 | 取得方法 |
+|---------|------|---------|
+| `RENDER_API_KEY` | Render APIキー | 上記手順で取得 |
+| `RENDER_SERVICE_ID` | サービスID | RenderのサービスURLから取得（`srv-xxx`） |
+| `DATABASE_URL` | Supabase接続文字列 | Supabaseダッシュボードから |
+| `DIRECT_URL` | Supabase直接接続 | Supabaseダッシュボードから |
+| `NEXT_PUBLIC_APP_URL` | アプリURL | `https://your-app.onrender.com` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase URL | Supabaseダッシュボードから |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anon Key | Supabaseダッシュボードから |
 
-### 2. GitHub Actionsワークフローの有効化
+⚠️ **注意**: これらの値はRenderの環境変数と同じ値を設定してください（ビルド検証のため）。
+
+### 3. Render Auto-Deployの無効化
+
+GitHub Actionsを使う場合、二重デプロイを防ぐためRender側の自動デプロイを無効化：
+
+Render Dashboard → Settings → Build & Deploy:
+- **Auto-Deploy**: `No`
+
+### 4. GitHub Actionsワークフローの有効化
 
 ワークフローファイルは既に作成済み: `.github/workflows/deploy-to-render.yml`
 
@@ -131,7 +166,9 @@ RENDER_SERVICE_ID
 2. "Deploy to Render" を選択
 3. "Run workflow" をクリック
 
-### 3. デプロイフロー
+### 5. デプロイフロー
+
+設定完了後、以下のフローで自動デプロイされます：
 
 ```
 git push origin main
@@ -140,21 +177,24 @@ GitHub Actions実行
     ↓
 ビルド検証 (npm ci, prisma generate, npm run build)
     ↓
-Render API呼び出し
+✅ ビルド成功 → Render API呼び出し
     ↓
 Renderでデプロイ開始
     ↓
 完了通知
 ```
 
+❌ ビルドが失敗した場合、Renderへのデプロイはトリガーされません。
+
 ---
 
-## 🛠️ 手動デプロイ方法
+## 🛠️ 手動デプロイ方法（緊急時・テスト用）
+
+⚠️ **前提条件**: Renderでサービスが既に作成されていること
 
 ### ローカルからの手動デプロイ
 
-#### 前提条件
-環境変数を設定:
+#### 環境変数を設定
 ```bash
 export RENDER_API_KEY=your_api_key
 export RENDER_SERVICE_ID=srv-xxxxxxxxx
@@ -278,21 +318,26 @@ Service health check failed
 
 ## 📊 デプロイ方式の比較
 
-| 方式 | 自動化 | ビルド検証 | 使用ケース |
-|------|--------|------------|------------|
-| **Render Auto-Deploy** | ✅ 完全自動 | ❌ なし | 本番環境・最もシンプル |
-| **GitHub Actions** | ✅ 完全自動 | ✅ あり | 品質管理が必要な場合 |
-| **手動デプロイ** | ❌ 手動 | ❌ なし | 緊急時・テスト環境 |
+| 方式 | 自動化 | ビルド検証 | 初回セットアップ | 使用ケース |
+|------|--------|------------|------------------|------------|
+| **初回デプロイ（GUI）** | ❌ 手動 | ❌ なし | 必須 | 新規ユーザー・サービス作成時 |
+| **Render Auto-Deploy** | ✅ 完全自動 | ❌ なし | 初回後 | 本番環境・最もシンプル |
+| **GitHub Actions** | ✅ 完全自動 | ✅ あり | 初回後 | 品質管理が必要な場合 |
+| **手動CLIデプロイ** | ❌ 手動 | ❌ なし | 初回後 | 緊急時・テスト環境 |
 
 ### 推奨構成
 
+**新規プロジェクト:**
+1. 初回: Render GUI で手動デプロイ（環境変数設定）
+2. 以降: Render Auto-Deploy または GitHub Actions
+
 **本番環境:**
-- Render Auto-Deploy (main ブランチ)
-- GitHub Actions でビルド検証
+- GitHub Actions（ビルド検証 + 自動デプロイ）
+- Render Auto-Deployは無効化
 
 **開発環境:**
-- 手動デプロイ
-- または develop ブランチでの Auto-Deploy
+- develop ブランチで Render Auto-Deploy
+- または手動CLIデプロイ
 
 ---
 
@@ -319,13 +364,39 @@ Service health check failed
 
 ## 🎯 まとめ
 
-### クイックスタート手順
+### 初回セットアップの正しい手順（新規ユーザー向け）
 
-1. ✅ Renderでサービス作成
-2. ✅ 環境変数を設定
-3. ✅ Auto-Deployを有効化
-4. ✅ GitHub Secretsを設定（オプション）
-5. ✅ `main` ブランチにpush → 自動デプロイ
+#### Step 1: Renderで初回デプロイ（GUI必須）
+1. ✅ Render.comでアカウント作成
+2. ✅ GitHubリポジトリを連携
+3. ✅ New Web Service → リポジトリ選択
+4. ✅ **環境変数を全てGUIで手動設定**（DATABASE_URL、ENCRYPTION_KEY等）
+5. ✅ **Manual Deploy** で初回デプロイ実行
+6. ✅ アプリが正常起動することを確認
+
+#### Step 2: 自動デプロイの設定（どちらか選択）
+
+**オプションA: Render Auto-Deploy（シンプル）**
+1. ✅ Render Dashboard → Settings → Auto-Deploy: `Yes`
+2. ✅ 完了！以降 `git push` で自動デプロイ
+
+**オプションB: GitHub Actions（ビルド検証付き）**
+1. ✅ Render API Keyを取得
+2. ✅ Service IDを取得（サービスURLから）
+3. ✅ GitHub Secretsに設定（RENDER_API_KEY、RENDER_SERVICE_ID等）
+4. ✅ Render Auto-Deployを無効化（二重デプロイ防止）
+5. ✅ 完了！以降 `git push` で自動デプロイ（ビルド検証→Renderトリガー）
+
+### よくある誤解
+
+❌ **間違い**: 最初からGitHub Actionsで全自動デプロイできる
+✅ **正解**: 初回は必ずRender GUIで手動セットアップが必要
+
+❌ **間違い**: RENDER_API_KEYをRenderの環境変数に設定
+✅ **正解**: RENDER_API_KEYはGitHub Secretsに設定（デプロイをトリガーする側）
+
+❌ **間違い**: render.yamlがあれば環境変数は不要
+✅ **正解**: render.yamlは環境変数の**キー名のリスト**のみ。値はGUIで手動設定が必要
 
 ### サポート
 

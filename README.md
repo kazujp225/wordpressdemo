@@ -284,13 +284,20 @@ src/
 | `POST /api/form-submissions` | フォーム送信（DB保存+メール通知） |
 | `GET/POST /api/user/settings` | ユーザー設定（Resend、APIキー等） |
 
-## 本番デプロイ (Render/Vercel)
+## 本番デプロイ (Render)
 
-**📖 詳細なデプロイガイド**: [DEPLOYMENT.md](./DEPLOYMENT.md) を参照してください
-- Renderへの自動デプロイ設定
-- GitHub Actionsによる CI/CD
-- 手動デプロイ方法
-- トラブルシューティング
+⚠️ **初回セットアップは必ずGUIから**: [DEPLOYMENT.md](./DEPLOYMENT.md) の手順に従ってください
+
+### デプロイ手順概要
+
+1. **初回**: Render Dashboardで手動セットアップ（環境変数をGUIで設定）
+2. **以降**: 自動デプロイ（Render Auto-Deploy または GitHub Actions）
+
+**📖 詳細ガイド**: [DEPLOYMENT.md](./DEPLOYMENT.md)
+- ✅ 初回セットアップの正しい手順（新規ユーザー必読）
+- ✅ 環境変数の設定方法（GUI）
+- ✅ Render Auto-Deploy vs GitHub Actions
+- ✅ トラブルシューティング
 
 ### ビルドコマンド
 ```bash

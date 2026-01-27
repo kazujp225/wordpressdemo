@@ -30,9 +30,5 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: RENDER_API_KEY
-        sync: false
-      - key: GITHUB_TOKEN
-        sync: false
-      - key: GITHUB_DEPLOY_OWNER
+      - key: ENCRYPTION_KEY
         sync: false
