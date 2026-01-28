@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Droplet, Sparkles, RefreshCw, Check, Palette, Eye, DollarSign } from 'lucide-react';
+import { X, Sparkles, RefreshCw, Palette, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { GEMINI_PRICING } from '@/lib/ai-costs';
@@ -55,14 +55,6 @@ const PRESET_PALETTES: { name: string; colors: ColorPalette }[] = [
     {
         name: 'ローズピンク',
         colors: { primary: '#e11d48', secondary: '#f43f5e', accent: '#8b5cf6', background: '#fff1f2' }
-    },
-    {
-        name: 'オーシャンティール',
-        colors: { primary: '#0d9488', secondary: '#14b8a6', accent: '#f59e0b', background: '#f0fdfa' }
-    },
-    {
-        name: 'ミッドナイト',
-        colors: { primary: '#1e293b', secondary: '#334155', accent: '#fbbf24', background: '#f8fafc' }
     },
 ];
 
@@ -127,88 +119,104 @@ export default function ColorPaletteModal({
 
     if (!isOpen) return null;
 
+    const imageCount = sections.filter(s => s.image?.filePath).length;
+    const estimatedCost = imageCount * GEMINI_PRICING['gemini-3-pro-image-preview'].perImage;
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-            <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-purple-50">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center shadow-lg">
-                            <Palette className="h-5 w-5 text-white" />
+                        <div className="h-9 w-9 rounded-lg bg-gray-900 flex items-center justify-center">
+                            <Palette className="h-4 w-4 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-gray-900">色変更</h2>
-                            <p className="text-xs text-gray-500">LP全体の配色を管理</p>
+                            <h2 className="text-base font-semibold text-gray-900">配色設定</h2>
+                            <p className="text-xs text-gray-500">LP全体のカラーパレットを管理</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
                         className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                     >
-                        <X className="h-5 w-5 text-gray-500" />
+                        <X className="h-4 w-4 text-gray-500" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    {/* 現在のパレットプレビュー */}
-                    <div className="mb-6">
-                        <h3 className="text-sm font-bold text-gray-900 mb-3">現在の配色</h3>
-                        <div className="flex gap-2 p-4 bg-gray-50 rounded-xl">
+                <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                    {/* 現在の配色 */}
+                    <div>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">現在の配色</h3>
+                        <div className="grid grid-cols-4 gap-3">
                             {Object.entries(palette).map(([key, color]) => (
-                                <div key={key} className="flex-1 text-center">
+                                <div key={key} className="group">
                                     <div
-                                        className="w-full h-16 rounded-lg shadow-inner mb-2"
+                                        className="aspect-[4/3] rounded-lg border border-gray-200 mb-2 cursor-pointer relative overflow-hidden"
                                         style={{ backgroundColor: color }}
-                                    />
-                                    <p className="text-[10px] font-medium text-gray-500 capitalize">{key}</p>
-                                    <p className="text-[10px] text-gray-400">{color}</p>
+                                    >
+                                        <input
+                                            type="color"
+                                            value={color}
+                                            onChange={(e) => {
+                                                setPalette(prev => ({ ...prev, [key]: e.target.value }));
+                                                setSelectedPreset(null);
+                                            }}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                    <p className="text-[11px] font-medium text-gray-700 text-center">
+                                        {key === 'primary' && 'Primary'}
+                                        {key === 'secondary' && 'Secondary'}
+                                        {key === 'accent' && 'Accent'}
+                                        {key === 'background' && 'Background'}
+                                    </p>
+                                    <p className="text-[10px] text-gray-400 text-center font-mono">{color}</p>
                                 </div>
                             ))}
                         </div>
                     </div>
 
                     {/* 自動検出 */}
-                    <div className="mb-6">
-                        <button
-                            onClick={handleAutoDetect}
-                            disabled={isDetecting || sections.length === 0}
-                            className="w-full py-3 border-2 border-dashed border-violet-300 rounded-xl text-violet-600 font-medium hover:bg-violet-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                        >
-                            {isDetecting ? (
-                                <>
-                                    <RefreshCw className="h-4 w-4 animate-spin" />
-                                    検出中...
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles className="h-4 w-4" />
-                                    現在のLPから自動検出
-                                </>
-                            )}
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleAutoDetect}
+                        disabled={isDetecting || sections.length === 0}
+                        className="w-full py-3 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                    >
+                        {isDetecting ? (
+                            <>
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                検出中...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="h-4 w-4" />
+                                現在のLPから自動検出
+                            </>
+                        )}
+                    </button>
 
-                    {/* プリセットパレット */}
-                    <div className="mb-6">
-                        <h3 className="text-sm font-bold text-gray-900 mb-3">プリセット</h3>
+                    {/* プリセット */}
+                    <div>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">プリセット</h3>
                         <div className="grid grid-cols-2 gap-2">
                             {PRESET_PALETTES.map(preset => (
                                 <button
                                     key={preset.name}
                                     onClick={() => handlePresetSelect(preset)}
                                     className={clsx(
-                                        "p-3 rounded-xl border-2 transition-all text-left",
+                                        "p-3 rounded-xl border transition-all text-left",
                                         selectedPreset === preset.name
-                                            ? "border-violet-500 bg-violet-50"
-                                            : "border-gray-200 hover:border-gray-300"
+                                            ? "border-gray-900 bg-gray-50"
+                                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                                     )}
                                 >
-                                    <div className="flex gap-1 mb-2">
+                                    <div className="flex gap-1.5 mb-2">
                                         {Object.values(preset.colors).map((color, idx) => (
                                             <div
                                                 key={idx}
-                                                className="w-6 h-6 rounded-full shadow-sm"
+                                                className="w-5 h-5 rounded-full border border-white shadow-sm"
                                                 style={{ backgroundColor: color }}
                                             />
                                         ))}
@@ -218,82 +226,41 @@ export default function ColorPaletteModal({
                             ))}
                         </div>
                     </div>
-
-                    {/* カスタム色設定 */}
-                    <div>
-                        <h3 className="text-sm font-bold text-gray-900 mb-3">カスタム設定</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {Object.entries(palette).map(([key, color]) => (
-                                <div key={key}>
-                                    <label className="text-xs font-medium text-gray-600 mb-1 block capitalize">
-                                        {key === 'primary' && 'メインカラー'}
-                                        {key === 'secondary' && 'サブカラー'}
-                                        {key === 'accent' && 'アクセントカラー'}
-                                        {key === 'background' && '背景色'}
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="color"
-                                            value={color}
-                                            onChange={(e) => {
-                                                setPalette(prev => ({ ...prev, [key]: e.target.value }));
-                                                setSelectedPreset(null);
-                                            }}
-                                            className="w-12 h-10 rounded-lg cursor-pointer border border-gray-200"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={color}
-                                            onChange={(e) => {
-                                                setPalette(prev => ({ ...prev, [key]: e.target.value }));
-                                                setSelectedPreset(null);
-                                            }}
-                                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
-                    {/* コスト説明 */}
-                    <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="flex items-center gap-2">
-                            <DollarSign className="h-4 w-4 text-amber-600" />
-                            <span className="text-xs font-bold text-amber-800">
-                                「適用して再生成」のAPI課金費用: 約${(sections.filter(s => s.image?.filePath).length * GEMINI_PRICING['gemini-3-pro-image-preview'].perImage).toFixed(2)}
+                <div className="px-5 py-4 border-t border-gray-200 bg-gray-50 space-y-3">
+                    {/* コスト表示 */}
+                    {imageCount > 0 && (
+                        <div className="flex items-center gap-2 text-xs text-gray-500 bg-white px-3 py-2 rounded-lg border border-gray-200">
+                            <DollarSign className="h-3.5 w-3.5" />
+                            <span>
+                                「適用して再生成」の費用: 約${estimatedCost.toFixed(2)}
+                                <span className="text-gray-400 ml-1">({imageCount}枚)</span>
                             </span>
                         </div>
-                        <p className="text-[10px] text-amber-600 mt-1 ml-6">
-                            {sections.filter(s => s.image?.filePath).length}件 × ${GEMINI_PRICING['gemini-3-pro-image-preview'].perImage.toFixed(3)}（Gemini 3 Pro Image）
-                        </p>
-                    </div>
+                    )}
 
-                    <div className="flex justify-between items-center">
+                    <div className="flex items-center justify-between">
                         <button
                             onClick={onClose}
                             disabled={isRegenerating}
-                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
+                            className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
                         >
                             キャンセル
                         </button>
                         <div className="flex gap-2">
-                            {/* パレットのみ保存 */}
                             <button
                                 onClick={handleApply}
                                 disabled={isRegenerating}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 transition-all disabled:opacity-50"
+                                className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-white transition-all disabled:opacity-50"
                             >
                                 保存のみ
                             </button>
-                            {/* 適用して再生成 */}
                             <button
                                 onClick={() => onApplyAndRegenerate(palette)}
-                                disabled={isRegenerating || sections.filter(s => s.image?.filePath).length === 0}
-                                className="px-6 py-2 bg-gradient-to-r from-violet-500 to-purple-500 text-white text-sm font-bold rounded-lg hover:from-violet-600 hover:to-purple-600 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={isRegenerating || imageCount === 0}
+                                className="px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 {isRegenerating ? (
                                     <>

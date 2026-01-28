@@ -72,8 +72,9 @@ export function buildSystemPrompt(options: {
   layoutMode: 'desktop' | 'responsive';
   designContext?: DesignContext | null;
   formFields?: FormField[];
+  enableFormSubmission?: boolean;
 }): string {
-  const { templateId, layoutMode, designContext, formFields } = options;
+  const { templateId, layoutMode, designContext, formFields, enableFormSubmission } = options;
   const template = getTemplate(templateId);
   if (!template) return '';
 
@@ -231,6 +232,52 @@ export function buildSystemPrompt(options: {
 - ステップ: 「入力」→「確認」→「完了」
 - 現在のステップを視覚的に強調（primary色 + font-weight: bold）
 - ステップ間のライン: 完了したステップは primary色、未完了はborder色\n`;
+
+    // フォーム送信API連携の指示
+    if (enableFormSubmission) {
+      prompt += `
+■ フォーム送信API連携（必須実装）
+確認画面の「送信する」ボタン押下時に、以下のAPIにデータを送信すること:
+
+【API仕様】
+- URL: /api/form-submissions
+- Method: POST
+- Content-Type: application/json
+- Body形式:
+  {
+    "pageSlug": window.location.pathname.split('/').pop() || "unknown",
+    "formTitle": "お問い合わせ",
+    "formFields": [
+      { "fieldName": "フィールドのname属性", "fieldLabel": "表示ラベル", "value": "入力値" },
+      ...各フィールド分
+    ]
+  }
+
+【実装例】
+async function submitForm(formData) {
+  const response = await fetch('/api/form-submissions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      pageSlug: window.location.pathname.split('/').pop() || 'unknown',
+      formTitle: 'お問い合わせ',
+      formFields: Object.entries(formData).map(([key, value]) => ({
+        fieldName: key,
+        fieldLabel: document.querySelector(\`label[for="\${key}"]\`)?.textContent?.replace('*', '').trim() || key,
+        value: String(value)
+      }))
+    })
+  });
+  return response.json();
+}
+
+【送信処理フロー】
+1. 送信ボタンをdisabledにし、「送信中...」表示
+2. fetch APIでPOSTリクエスト
+3. 成功時（response.ok）: 完了画面へ遷移
+4. 失敗時: エラーメッセージを表示し、再送信可能に
+5. ネットワークエラー: try-catchで捕捉し、ユーザーにリトライを促す\n`;
+    }
   }
 
   return prompt;

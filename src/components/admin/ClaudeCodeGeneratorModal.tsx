@@ -112,14 +112,14 @@ function getTimestamp(): string {
 }
 
 const GENERATING_LOGS: { message: string; type: LogEntry['type']; delay: number }[] = [
-  { message: 'Initializing Claude Sonnet 4 engine...', type: 'system', delay: 200 },
-  { message: 'Loading model weights: claude-sonnet-4-20250514', type: 'info', delay: 600 },
+  { message: 'Initializing Gemini 2.0 Flash engine...', type: 'system', delay: 200 },
+  { message: 'Loading model: gemini-2.0-flash', type: 'info', delay: 600 },
   { message: 'Template context loaded successfully', type: 'success', delay: 400 },
   { message: 'Tokenizing user prompt...', type: 'info', delay: 300 },
   { message: 'Estimated input tokens: calculating...', type: 'info', delay: 500 },
-  { message: 'Establishing connection to Anthropic API', type: 'system', delay: 700 },
+  { message: 'Establishing connection to Google AI API', type: 'system', delay: 700 },
   { message: 'TLS handshake complete', type: 'info', delay: 300 },
-  { message: 'Sending request payload (max_tokens: 8192)', type: 'info', delay: 400 },
+  { message: 'Sending request payload...', type: 'info', delay: 400 },
   { message: 'Awaiting model response...', type: 'system', delay: 1200 },
   { message: 'Stream started: receiving chunks...', type: 'success', delay: 800 },
   { message: 'Generating HTML document structure', type: 'info', delay: 1000 },
@@ -148,6 +148,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
   const [editingFieldOptions, setEditingFieldOptions] = useState<string | null>(null);
   const [newOptionText, setNewOptionText] = useState('');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [enableFormSubmission, setEnableFormSubmission] = useState(true); // フォーム送信有効化
   const [deployServiceName, setDeployServiceName] = useState('');
   const [deploying, setDeploying] = useState(false);
   const [deployment, setDeployment] = useState<DeploymentInfo | null>(null);
@@ -246,6 +247,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
           layoutMode,
           designContext: designDefinition || null,
           formFields: template?.hasFormFields ? formFields : undefined,
+          enableFormSubmission: template?.hasFormFields ? enableFormSubmission : undefined,
         }),
       });
 
@@ -451,7 +453,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-gray-900 leading-none">AI Code Generator</h2>
-                <p className="text-[10px] text-gray-400 mt-0.5">Claude Sonnet 4</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Gemini 2.0 Flash</p>
               </div>
             </div>
           </div>
@@ -503,7 +505,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
                     <button
                       key={template.id}
                       onClick={() => handleSelectTemplate(template.id)}
-                      className="group relative p-5 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-md transition-all text-left"
+                      className="group relative p-5 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-md transition-all text-left overflow-hidden"
                     >
                       <div className="flex items-center gap-3 mb-3">
                         <div className={`h-9 w-9 rounded-lg ${colors.bg} flex items-center justify-center`}>
@@ -526,7 +528,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
               </div>
               <div className="mt-6 flex items-center justify-between text-xs text-gray-400">
                 <span>~$0.03-0.10 / 生成</span>
-                <span>model: claude-sonnet-4-20250514</span>
+                <span>model: gemini-2.0-flash</span>
               </div>
             </div>
           )}
@@ -703,6 +705,35 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
                 <span className="text-sm text-gray-400 group-hover:text-gray-600 font-medium">フィールドを追加</span>
               </button>
 
+              {/* フォーム送信有効化オプション */}
+              <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-800">フォーム送信を有効化</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      送信データをダッシュボードで確認＆メール通知を受け取る
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setEnableFormSubmission(!enableFormSubmission)}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${
+                      enableFormSubmission ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        enableFormSubmission ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {enableFormSubmission && (
+                  <p className="text-[11px] text-blue-600 mt-2 bg-blue-50 px-2 py-1 rounded">
+                    設定画面でResend APIキーと通知先メールを設定してください
+                  </p>
+                )}
+              </div>
+
               <div className="mt-5 flex items-center justify-between">
                 <div className="flex items-center gap-3 text-xs text-gray-400">
                   <span>{formFields.length} フィールド</span>
@@ -788,7 +819,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
               <div className="px-4 py-2.5 border-b border-gray-800 bg-gray-900 flex items-center gap-2.5">
                 <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-[11px] font-mono text-gray-400">
-                  Building | claude-sonnet-4 | {layoutMode}
+                  Building | gemini-2.0-flash | {layoutMode}
                 </span>
               </div>
               <div

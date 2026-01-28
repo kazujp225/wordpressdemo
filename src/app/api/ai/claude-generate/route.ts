@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@/lib/supabase/server';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
-import { getClaudeClient } from '@/lib/claude';
+import { getGoogleApiKey } from '@/lib/apiKeys';
 import { getTemplate, TEMPLATES, buildSystemPrompt } from '@/lib/claude-templates';
 import type { FormField, DesignContext } from '@/lib/claude-templates';
-import { estimateClaudeCost } from '@/lib/ai-costs';
+import { GEMINI_PRICING } from '@/lib/ai-costs';
+
+const MODEL_NAME = 'gemini-2.0-flash';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -16,12 +19,13 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { templateId, prompt, layoutMode, designContext, formFields } = body as {
+  const { templateId, prompt, layoutMode, designContext, formFields, enableFormSubmission } = body as {
     templateId: string;
     prompt: string;
     layoutMode?: 'desktop' | 'responsive';
     designContext?: DesignContext | null;
     formFields?: FormField[];
+    enableFormSubmission?: boolean;
   };
 
   if (!templateId || !prompt) {
@@ -45,6 +49,7 @@ export async function POST(request: NextRequest) {
     layoutMode: layoutMode || 'responsive',
     designContext: designContext || null,
     formFields: formFields,
+    enableFormSubmission: enableFormSubmission,
   });
 
   // Credit check
@@ -62,25 +67,20 @@ export async function POST(request: NextRequest) {
   const startTime = createTimer();
 
   try {
-    const client = getClaudeClient();
+    const apiKey = await getGoogleApiKey();
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Google API key is not configured' }, { status: 500 });
+    }
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-    });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-    // Extract text content
-    const textContent = response.content
-      .filter(block => block.type === 'text')
-      .map(block => block.type === 'text' ? block.text : '')
-      .join('');
+    // Combine system prompt and user prompt
+    const fullPrompt = `${systemPrompt}\n\n---\n\n【ユーザーからの指示】\n${prompt}`;
+
+    const result = await model.generateContent(fullPrompt);
+    const response = result.response;
+    const textContent = response.text();
 
     // Extract HTML from response (handle markdown code blocks)
     let html = textContent;
@@ -95,16 +95,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Log generation
-    const inputTokens = response.usage.input_tokens;
-    const outputTokens = response.usage.output_tokens;
-    const estimatedCost = estimateClaudeCost('claude-sonnet-4-20250514', inputTokens, outputTokens);
+    // Estimate cost (Gemini 2.0 Flash pricing)
+    const pricing = GEMINI_PRICING[MODEL_NAME] || { input: 0.075, output: 0.30 };
+    const inputTokens = fullPrompt.length / 4; // rough estimate
+    const outputTokens = textContent.length / 4;
+    const estimatedCost = (inputTokens / 1000000 * pricing.input) + (outputTokens / 1000000 * pricing.output);
 
+    // Log generation
     const logResult = await logGeneration({
       userId: user.id,
-      type: 'claude-generate',
+      type: 'gemini-generate',
       endpoint: '/api/ai/claude-generate',
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_NAME,
       inputPrompt: prompt,
       outputResult: html.slice(0, 5000),
       status: 'succeeded',
@@ -114,9 +116,9 @@ export async function POST(request: NextRequest) {
     // Record usage
     if (logResult && !limitCheck.skipCreditConsumption) {
       await recordApiUsage(user.id, logResult.id, estimatedCost, {
-        model: 'claude-sonnet-4-20250514',
-        inputTokens,
-        outputTokens,
+        model: MODEL_NAME,
+        inputTokens: Math.round(inputTokens),
+        outputTokens: Math.round(outputTokens),
       });
     }
 
@@ -126,16 +128,16 @@ export async function POST(request: NextRequest) {
       templateId,
       estimatedCost,
       usage: {
-        inputTokens,
-        outputTokens,
+        inputTokens: Math.round(inputTokens),
+        outputTokens: Math.round(outputTokens),
       },
     });
   } catch (error: any) {
     await logGeneration({
       userId: user.id,
-      type: 'claude-generate',
+      type: 'gemini-generate',
       endpoint: '/api/ai/claude-generate',
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_NAME,
       inputPrompt: prompt,
       status: 'failed',
       errorMessage: error.message,

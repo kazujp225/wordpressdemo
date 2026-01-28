@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@/lib/supabase/server';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
-import { getClaudeClient } from '@/lib/claude';
+import { getGoogleApiKey } from '@/lib/apiKeys';
 import type { DesignContext } from '@/lib/claude-templates';
-import { estimateClaudeCost } from '@/lib/ai-costs';
+import { GEMINI_PRICING } from '@/lib/ai-costs';
+
+const MODEL_NAME = 'gemini-2.0-flash';
 
 function buildEditSystemPrompt(options: {
   layoutMode: 'desktop' | 'responsive';
@@ -36,9 +39,12 @@ function buildEditSystemPrompt(options: {
 - 想定画面幅: 1024px〜1440px
 - モバイル用メディアクエリは追加しない\n\n`;
   } else {
-    prompt += `【レイアウト: レスポンシブ】
-- モバイルファーストの設計を維持
-- 既存のブレイクポイントを尊重\n\n`;
+    prompt += `【レイアウト: レスポンシブ対応必須】
+- 必ずモバイル（〜768px）とデスクトップ（769px〜）の両方に対応すること
+- モバイルファースト設計: 基本スタイルはモバイル用、@media (min-width: 769px) でデスクトップ用を追加
+- モバイルでは: 1カラムレイアウト、タップしやすいボタンサイズ（min-height: 44px）、適切なフォントサイズ（16px以上）
+- フレックスボックスやグリッドは flex-wrap: wrap や適切な grid-template-columns で対応
+- 画像は max-width: 100% で親要素に収まるように\n\n`;
   }
 
   // Design context
@@ -111,10 +117,20 @@ export async function POST(request: NextRequest) {
   const startTime = createTimer();
 
   try {
-    const client = getClaudeClient();
+    const apiKey = await getGoogleApiKey();
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Google API key is not configured' }, { status: 500 });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
     // メインの指示テキスト
-    const instructionText = `以下のHTMLコードを修正してください。
+    const fullPrompt = `${systemPrompt}
+
+---
+
+以下のHTMLコードを修正してください。
 
 【現在のHTMLコード】
 \`\`\`html
@@ -126,23 +142,9 @@ ${editPrompt}
 
 修正後の完全なHTMLコードを出力してください。`;
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: instructionText,
-        },
-      ],
-    });
-
-    // Extract text content
-    const textContent = response.content
-      .filter(block => block.type === 'text')
-      .map(block => block.type === 'text' ? block.text : '')
-      .join('');
+    const result = await model.generateContent(fullPrompt);
+    const response = result.response;
+    const textContent = response.text();
 
     // Extract HTML from response
     let html = textContent;
@@ -156,16 +158,17 @@ ${editPrompt}
       }
     }
 
-    // Log generation
-    const inputTokens = response.usage.input_tokens;
-    const outputTokens = response.usage.output_tokens;
-    const estimatedCost = estimateClaudeCost('claude-sonnet-4-20250514', inputTokens, outputTokens);
+    // Estimate cost (Gemini 2.0 Flash pricing)
+    const pricing = GEMINI_PRICING[MODEL_NAME] || { input: 0.075, output: 0.30 };
+    const inputTokens = fullPrompt.length / 4; // rough estimate
+    const outputTokens = textContent.length / 4;
+    const estimatedCost = (inputTokens / 1000000 * pricing.input) + (outputTokens / 1000000 * pricing.output);
 
     const logResult = await logGeneration({
       userId: user.id,
-      type: 'claude-edit-code',
+      type: 'gemini-edit-code',
       endpoint: '/api/ai/claude-edit-code',
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_NAME,
       inputPrompt: editPrompt,
       outputResult: html.slice(0, 5000),
       status: 'succeeded',
@@ -175,9 +178,9 @@ ${editPrompt}
     // Record usage
     if (logResult && !limitCheck.skipCreditConsumption) {
       await recordApiUsage(user.id, logResult.id, estimatedCost, {
-        model: 'claude-sonnet-4-20250514',
-        inputTokens,
-        outputTokens,
+        model: MODEL_NAME,
+        inputTokens: Math.round(inputTokens),
+        outputTokens: Math.round(outputTokens),
       });
     }
 
@@ -186,16 +189,16 @@ ${editPrompt}
       html,
       estimatedCost,
       usage: {
-        inputTokens,
-        outputTokens,
+        inputTokens: Math.round(inputTokens),
+        outputTokens: Math.round(outputTokens),
       },
     });
   } catch (error: any) {
     await logGeneration({
       userId: user.id,
-      type: 'claude-edit-code',
+      type: 'gemini-edit-code',
       endpoint: '/api/ai/claude-edit-code',
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_NAME,
       inputPrompt: editPrompt,
       status: 'failed',
       errorMessage: error.message,
