@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getGoogleApiKey } from '@/lib/apiKeys';
+import { getClaudeClient } from '@/lib/claude';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import {
   SEO_ANALYSIS_PROMPT,
   LLMO_ANALYSIS_PROMPT,
   SEO_LLMO_COMBINED_PROMPT
 } from '@/lib/gemini-prompts';
+
+const MODEL_NAME = 'claude-sonnet-4-20250514';
 
 // SEO分析結果の型定義
 export interface SEOAnalysisResult {
@@ -280,16 +281,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = await getGoogleApiKey();
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Google API Key not configured' },
-        { status: 500 }
-      );
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const client = getClaudeClient();
 
     // 画像をBase64に変換
     const base64Content = await getImageBase64(imageUrl);
@@ -314,18 +306,32 @@ export async function POST(request: NextRequest) {
 
     prompt += `\n\n【重要】必ずJSON形式のみで出力してください。説明文は不要です。`;
 
-    // Gemini APIで分析実行
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: base64Content,
-          mimeType: "image/jpeg"
-        }
-      }
-    ]);
+    // Claude APIで分析実行
+    const response = await client.messages.create({
+      model: MODEL_NAME,
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: base64Content,
+              },
+            },
+            {
+              type: 'text',
+              text: prompt,
+            },
+          ],
+        },
+      ],
+    });
 
-    const resText = result.response.text();
+    const resText = response.content[0].type === 'text' ? response.content[0].text : '';
 
     // JSONを抽出
     const jsonMatch = resText.match(/\{[\s\S]*\}/);
@@ -342,7 +348,7 @@ export async function POST(request: NextRequest) {
       userId: null,
       type: logType,
       endpoint: '/api/ai/seo-llmo-optimize',
-      model: 'gemini-2.0-flash',
+      model: MODEL_NAME,
       inputPrompt: `SEO/LLMO Analysis (${mode})`,
       outputResult: JSON.stringify(analysisResult),
       status: 'succeeded',
@@ -363,7 +369,7 @@ export async function POST(request: NextRequest) {
       userId: null,
       type: 'seo-llmo-combined',
       endpoint: '/api/ai/seo-llmo-optimize',
-      model: 'gemini-2.0-flash',
+      model: MODEL_NAME,
       inputPrompt: prompt || 'Error pre-prompt',
       status: 'failed',
       errorMessage,
