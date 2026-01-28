@@ -4091,7 +4091,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         <EditorMenuItem
                             icon={<Code2 className="h-3.5 w-3.5" />}
                             title="gemini-codegen"
-                            description="gemini-2.0-flash | html/css/js"
+                            description="html/css/js"
                             tooltip="HTML/CSS/JSコードを自動生成します"
                             iconVariant="dark"
                             badge={<EditorBadge variant="new">NEW</EditorBadge>}
