@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const checkoutUrl = await createSubscriptionCheckout(
       user.id,
       user.email,
-      planId
+      planId as any
     );
 
     return NextResponse.json({ url: checkoutUrl });
