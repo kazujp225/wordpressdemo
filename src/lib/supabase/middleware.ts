@@ -5,6 +5,8 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 // ユーザーステータスをチェックする関数
 interface UserStatus {
     isBanned: boolean;
+    hasActiveSubscription: boolean;
+    plan: string | null;
 }
 
 async function checkUserStatus(userId: string): Promise<UserStatus> {
@@ -14,19 +16,34 @@ async function checkUserStatus(userId: string): Promise<UserStatus> {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data, error } = await supabaseAdmin
+    // UserSettingsを取得
+    const { data: settings } = await supabaseAdmin
         .from('UserSettings')
-        .select('isBanned')
+        .select('isBanned, plan')
         .eq('userId', userId)
         .single();
 
-    if (error || !data) {
-        // UserSettingsが存在しない場合は未BAN
-        return { isBanned: false };
-    }
+    // Subscriptionを取得
+    const { data: subscription } = await supabaseAdmin
+        .from('Subscription')
+        .select('status, plan')
+        .eq('userId', userId)
+        .single();
+
+    const isBanned = settings?.isBanned === true;
+
+    // 有効なサブスクリプションがあるかチェック
+    // active または past_due（支払い遅延中だがまだアクセス可能）の場合は有効
+    const hasActiveSubscription =
+        subscription?.status === 'active' ||
+        subscription?.status === 'past_due';
+
+    const plan = subscription?.plan || settings?.plan || null;
 
     return {
-        isBanned: data.isBanned === true,
+        isBanned,
+        hasActiveSubscription,
+        plan,
     };
 }
 
@@ -92,13 +109,17 @@ export async function updateSession(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
     // 認証不要のパブリックルート
-    const publicRoutes = ['/', '/auth/callback', '/terms', '/privacy'];
+    const publicRoutes = ['/', '/auth/callback', '/terms', '/privacy', '/welcome'];
     const isPublicRoute = publicRoutes.includes(pathname)
         || pathname.startsWith('/p/')
-        || pathname.startsWith('/api/auth/');
+        || pathname.startsWith('/api/auth/')
+        || pathname.startsWith('/api/billing/checkout')
+        || pathname.startsWith('/api/webhooks/');
 
     // 特殊ページ
     const isBannedPage = pathname === '/banned';
+    const isSubscriptionRequiredPage = pathname === '/subscribe';
+    const isAdminRoute = pathname.startsWith('/admin');
 
     // 未認証ユーザーがプライベートルートにアクセスした場合、ログインページへリダイレクト
     if (!user && !isPublicRoute) {
@@ -120,10 +141,24 @@ export async function updateSession(request: NextRequest) {
             return NextResponse.redirect(new URL('/admin', request.url));
         }
 
-        // ログインページにアクセスしている場合は管理画面へ
+        // 有効なサブスクリプションがない場合（adminルートへのアクセス時のみ）
+        if (isAdminRoute && !status.hasActiveSubscription) {
+            // サブスク必要ページへリダイレクト
+            return NextResponse.redirect(new URL('/subscribe', request.url));
+        }
+
+        // サブスク必要ページにいるが、すでにサブスクがある場合
+        if (isSubscriptionRequiredPage && status.hasActiveSubscription) {
+            return NextResponse.redirect(new URL('/admin', request.url));
+        }
+
+        // ログインページにアクセスしている場合
         if (pathname === '/') {
             if (status.isBanned) {
                 return NextResponse.redirect(new URL('/banned', request.url));
+            }
+            if (!status.hasActiveSubscription) {
+                return NextResponse.redirect(new URL('/subscribe', request.url));
             }
             return NextResponse.redirect(new URL('/admin', request.url));
         }

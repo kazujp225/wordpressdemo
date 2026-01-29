@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 import { constructWebhookEvent, getPlanIdFromPriceId } from '@/lib/stripe';
 import {
   grantPlanCredit,
@@ -9,12 +10,40 @@ import {
 } from '@/lib/credits';
 import { PLANS } from '@/lib/plans';
 import { prisma } from '@/lib/db';
+import crypto from 'crypto';
+
+// Supabase Admin Client（ユーザー作成用）
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
+/**
+ * ランダムパスワード生成（12文字）
+ */
+function generatePassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let password = '';
+  const randomBytes = crypto.randomBytes(12);
+  for (let i = 0; i < 12; i++) {
+    password += chars[randomBytes[i] % chars.length];
+  }
+  return password;
+}
 
 /**
  * Stripe Webhook処理
  *
  * 処理するイベント:
- * - checkout.session.completed: サブスク開始 / クレジット購入完了
+ * - checkout.session.completed: サブスク開始 / クレジット購入完了 / 新規ユーザー作成
  * - invoice.paid: 月次サブスク更新（クレジット付与）
  * - customer.subscription.updated: サブスク更新
  * - customer.subscription.deleted: サブスクキャンセル完了
@@ -77,15 +106,11 @@ export async function POST(request: NextRequest) {
 
 /**
  * Checkout Session完了時の処理
+ * 新規ユーザー登録フローと既存ユーザーのサブスク開始を両方処理
  */
 async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const metadata = session.metadata || {};
-  const userId = metadata.userId;
-
-  if (!userId) {
-    console.error('No userId in checkout session metadata');
-    return;
-  }
+  const supabaseAdmin = getSupabaseAdmin();
 
   // サブスクリプションの場合
   if (session.mode === 'subscription' && session.subscription) {
@@ -101,6 +126,56 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
     const planId = metadata.planId || 'pro';
     const plan = PLANS[planId as keyof typeof PLANS];
+    const email = metadata.email || session.customer_email;
+    const tempPassword = metadata.tempPassword;
+
+    if (!email) {
+      console.error('No email in checkout session');
+      return;
+    }
+
+    let userId: string;
+
+    // メールアドレスでSupabaseユーザーを検索
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    if (existingUser) {
+      // 既存ユーザー
+      userId = existingUser.id;
+      console.log(`Existing user found: ${userId}`);
+    } else {
+      // 新規ユーザー作成
+      const password = tempPassword || generatePassword();
+
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // メール確認をスキップ
+      });
+
+      if (createError || !newUser.user) {
+        console.error('Failed to create user:', createError);
+        return;
+      }
+
+      userId = newUser.user.id;
+      console.log(`New user created: ${userId}, email: ${email}`);
+
+      // パスワードをStripe Customerのメタデータに保存（決済完了画面で表示するため）
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: '2025-12-15.clover',
+      });
+      await stripe.customers.update(customerId, {
+        metadata: {
+          userId,
+          tempPassword: password,
+          passwordSet: 'true',
+        },
+      });
+    }
 
     // サブスクリプション情報を保存
     await updateSubscription(userId, {
@@ -110,16 +185,20 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       plan: planId,
       status: 'active',
       currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 仮の30日後
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
-    // UserSettingsのプランも更新
+    // UserSettingsを作成/更新
     await prisma.userSettings.upsert({
       where: { userId },
-      update: { plan: planId },
+      update: {
+        plan: planId,
+        email,
+      },
       create: {
         userId,
         plan: planId,
+        email,
       },
     });
 
@@ -133,6 +212,13 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   // 単発購入（クレジット購入）の場合
   if (session.mode === 'payment') {
+    // 既存ユーザーのuserIdが必要
+    const userId = metadata.userId;
+    if (!userId) {
+      console.error('No userId in payment session metadata');
+      return;
+    }
+
     const packageId = metadata.packageId;
     const creditUsd = parseFloat(metadata.creditUsd || '0');
     const packageName = metadata.packageName || 'クレジットパッケージ';
@@ -152,7 +238,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
 /**
  * Invoice支払い完了時の処理（月次更新）
- * TODO: Stripe本番実装時に型を確認
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // 初回請求（サブスク開始時）はcheckout.session.completedで処理済みなのでスキップ
@@ -165,7 +250,6 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     return;
   }
 
-  // TODO: Stripe本番実装時に型を確認
   const invoiceData = invoice as any;
   const subscriptionId =
     typeof invoiceData.subscription === 'string'
@@ -209,7 +293,6 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
 /**
  * サブスクリプション更新時の処理
- * TODO: Stripe本番実装時に型を確認
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const subscriptionRecord = await prisma.subscription.findFirst({
@@ -220,7 +303,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return;
   }
 
-  // TODO: Stripe本番実装時に型を確認
   const subData = subscription as any;
 
   // プラン変更の検出
