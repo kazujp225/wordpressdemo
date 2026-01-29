@@ -39,96 +39,50 @@ export async function GET() {
         const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
         if (error) throw error;
 
-        // UserSettingsと結合
+        // UserSettingsとSubscriptionを取得
         const userSettings = await prisma.userSettings.findMany();
+        const subscriptions = await prisma.subscription.findMany();
+
         const settingsMap = new Map(userSettings.map(s => [s.userId, s]));
+        const subscriptionMap = new Map(subscriptions.map(s => [s.userId, s]));
 
         // 使用量情報を取得
         const usagePromises = users.map(u => getUserUsage(u.id).catch(() => null));
         const usageResults = await Promise.all(usagePromises);
         const usageMap = new Map(users.map((u, i) => [u.id, usageResults[i]]));
 
-        const usersWithApproval = users.map(u => {
+        const usersWithInfo = users.map(u => {
             const settings = settingsMap.get(u.id);
+            const subscription = subscriptionMap.get(u.id);
             const usage = usageMap.get(u.id);
+
             return {
                 id: u.id,
                 email: u.email,
                 createdAt: u.created_at,
                 lastSignInAt: u.last_sign_in_at,
-                isApproved: settings?.isApproved || false,
-                approvedAt: settings?.approvedAt || null,
                 isBanned: settings?.isBanned || false,
                 bannedAt: settings?.bannedAt || null,
                 banReason: settings?.banReason || null,
                 plan: settings?.plan || 'free',
+                subscriptionStatus: subscription?.status || null,
+                subscriptionId: subscription?.stripeSubscriptionId || null,
                 usage: usage || { monthlyGenerations: 0, monthlyUploads: 0, totalPages: 0, totalStorageMB: 0 },
             };
         });
 
-        // BANユーザーを最後に、未承認を先に、その後作成日時で降順ソート
-        usersWithApproval.sort((a, b) => {
+        // BANユーザーを最後に、作成日時で降順ソート
+        usersWithInfo.sort((a, b) => {
             // BANされているユーザーは最後
             if (a.isBanned !== b.isBanned) {
                 return a.isBanned ? 1 : -1;
             }
-            // 未承認を先に
-            if (a.isApproved !== b.isApproved) {
-                return a.isApproved ? 1 : -1;
-            }
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
 
-        return NextResponse.json(usersWithApproval);
+        return NextResponse.json(usersWithInfo);
     } catch (error: any) {
         console.error('Failed to fetch users:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-}
-
-// POST: ユーザーを承認/却下
-export async function POST(request: NextRequest) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // 管理者チェック
-    const admin = await isAdmin(user.id);
-    if (!admin) {
-        return NextResponse.json({ error: 'Forbidden: Admin only' }, { status: 403 });
-    }
-
-    try {
-        const { userId, action } = await request.json();
-
-        if (!userId || !['approve', 'revoke'].includes(action)) {
-            return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
-        }
-
-        const isApproved = action === 'approve';
-
-        // UserSettingsをupsert
-        await prisma.userSettings.upsert({
-            where: { userId },
-            update: {
-                isApproved,
-                approvedAt: isApproved ? new Date() : null,
-                approvedBy: isApproved ? user.id : null,
-            },
-            create: {
-                userId,
-                isApproved,
-                approvedAt: isApproved ? new Date() : null,
-                approvedBy: isApproved ? user.id : null,
-            },
-        });
-
-        return NextResponse.json({ success: true, userId, isApproved });
-    } catch (error: any) {
-        console.error('Failed to update user approval:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
@@ -151,19 +105,15 @@ export async function PATCH(request: NextRequest) {
     try {
         const { userId, plan } = await request.json();
 
-        // プランの検証
         if (!userId || !plan || !(plan in PLANS)) {
-            return NextResponse.json({
-                error: 'Invalid request',
-                validPlans: Object.keys(PLANS)
-            }, { status: 400 });
+            return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
         }
 
-        // UserSettingsを更新
+        // UserSettingsをupsert
         await prisma.userSettings.upsert({
             where: { userId },
             update: { plan },
-            create: { userId, plan, isApproved: false },
+            create: { userId, plan },
         });
 
         return NextResponse.json({ success: true, userId, plan });
@@ -173,8 +123,8 @@ export async function PATCH(request: NextRequest) {
     }
 }
 
-// PUT: ユーザーをBAN/BAN解除
-export async function PUT(request: NextRequest) {
+// DELETE: ユーザーをBANまたはBAN解除
+export async function DELETE(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -197,22 +147,20 @@ export async function PUT(request: NextRequest) {
 
         const isBanned = action === 'ban';
 
-        // UserSettingsをupsert
         await prisma.userSettings.upsert({
             where: { userId },
             update: {
                 isBanned,
                 bannedAt: isBanned ? new Date() : null,
                 bannedBy: isBanned ? user.id : null,
-                banReason: isBanned ? (reason || ' 利用規約違反') : null,
+                banReason: isBanned ? reason || null : null,
             },
             create: {
                 userId,
                 isBanned,
                 bannedAt: isBanned ? new Date() : null,
                 bannedBy: isBanned ? user.id : null,
-                banReason: isBanned ? (reason || '利用規約違反') : null,
-                isApproved: false,
+                banReason: isBanned ? reason || null : null,
             },
         });
 

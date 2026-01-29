@@ -4,7 +4,6 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 // ユーザーステータスをチェックする関数
 interface UserStatus {
-    isApproved: boolean;
     isBanned: boolean;
 }
 
@@ -17,17 +16,16 @@ async function checkUserStatus(userId: string): Promise<UserStatus> {
 
     const { data, error } = await supabaseAdmin
         .from('UserSettings')
-        .select('isApproved, isBanned')
+        .select('isBanned')
         .eq('userId', userId)
         .single();
 
     if (error || !data) {
-        // UserSettingsが存在しない場合は未承認・未BAN
-        return { isApproved: false, isBanned: false };
+        // UserSettingsが存在しない場合は未BAN
+        return { isBanned: false };
     }
 
     return {
-        isApproved: data.isApproved === true,
         isBanned: data.isBanned === true,
     };
 }
@@ -97,12 +95,9 @@ export async function updateSession(request: NextRequest) {
     const publicRoutes = ['/', '/auth/callback', '/terms', '/privacy'];
     const isPublicRoute = publicRoutes.includes(pathname)
         || pathname.startsWith('/p/')
-        || pathname.startsWith('/api/auth/')
-        || pathname.startsWith('/api/waitingroom')
-        || pathname.startsWith('/waitingroom');
+        || pathname.startsWith('/api/auth/');
 
     // 特殊ページ
-    const isPendingApproval = pathname === '/pending-approval';
     const isBannedPage = pathname === '/banned';
 
     // 未認証ユーザーがプライベートルートにアクセスした場合、ログインページへリダイレクト
@@ -125,28 +120,11 @@ export async function updateSession(request: NextRequest) {
             return NextResponse.redirect(new URL('/admin', request.url));
         }
 
-        // ログインページにアクセスしている場合
+        // ログインページにアクセスしている場合は管理画面へ
         if (pathname === '/') {
             if (status.isBanned) {
                 return NextResponse.redirect(new URL('/banned', request.url));
             }
-            if (status.isApproved) {
-                return NextResponse.redirect(new URL('/admin', request.url));
-            } else {
-                return NextResponse.redirect(new URL('/pending-approval', request.url));
-            }
-        }
-
-        // 承認待ちページ・BANページ以外にアクセスしようとしている場合
-        if (!isPendingApproval && !isBannedPage && !isPublicRoute) {
-            if (!status.isApproved) {
-                // 未承認ユーザーは承認待ちページへリダイレクト
-                return NextResponse.redirect(new URL('/pending-approval', request.url));
-            }
-        }
-
-        // 承認済みユーザーが承認待ちページにアクセスしようとした場合
-        if (isPendingApproval && status.isApproved) {
             return NextResponse.redirect(new URL('/admin', request.url));
         }
     }
