@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     const stripe = getStripe();
 
-    // Checkout Session作成（Customerは作成しない、Stripeが自動で作成）
+    // Checkout Session作成（subscriptionモードではStripeが自動でCustomerを作成）
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [
@@ -80,8 +80,6 @@ export async function POST(request: NextRequest) {
       billing_address_collection: 'required',
       payment_method_types: ['card'],
       locale: 'ja',
-      // メール入力を必須に（Stripeが自動でCustomerを作成）
-      customer_creation: 'always',
     });
 
     return NextResponse.json({ url: session.url });
