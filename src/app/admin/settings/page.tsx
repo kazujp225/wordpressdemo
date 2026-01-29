@@ -94,14 +94,37 @@ function SettingsPage() {
         }
 
         const githubStatus = searchParams.get('github');
+        const subscriptionStatus = searchParams.get('subscription');
+        const creditStatus = searchParams.get('credit');
         const error = searchParams.get('error');
+
+        // Subscription success/cancel
+        if (subscriptionStatus === 'success') {
+            toast.success('🎉 プランへの登録が完了しました！');
+            router.replace('/admin/settings?tab=plan', { scroll: false });
+        } else if (subscriptionStatus === 'canceled') {
+            toast.error('プランへの登録がキャンセルされました');
+            router.replace('/admin/settings?tab=plan', { scroll: false });
+        }
+
+        // Credit purchase success/cancel
+        if (creditStatus === 'success') {
+            toast.success('💰 クレジット購入が完了しました！');
+            router.replace('/admin/settings?tab=plan', { scroll: false });
+        } else if (creditStatus === 'canceled') {
+            toast.error('クレジット購入がキャンセルされました');
+            router.replace('/admin/settings?tab=plan', { scroll: false });
+        }
+
+        // GitHub OAuth
         if (githubStatus === 'connected') {
             toast.success('GitHub連携が完了しました');
             setHasGithubToken(true);
             setActiveTab('deploy');
-            // Clean URL
             router.replace('/admin/settings', { scroll: false });
         }
+
+        // Error handling
         if (error) {
             const errorMessages: Record<string, string> = {
                 unauthorized: 'ログインが必要です',
