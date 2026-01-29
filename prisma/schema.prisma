@@ -108,9 +108,6 @@ model UserSettings {
   renderApiKey      String?
   githubToken       String?
   githubDeployOwner String?
-  isApproved        Boolean   @default(false)
-  approvedAt        DateTime?
-  approvedBy        String?
   isBanned          Boolean   @default(false)
   bannedAt          DateTime?
   bannedBy          String?
