@@ -164,7 +164,6 @@ export interface CreditPackage {
 }
 
 export const CREDIT_PACKAGES: CreditPackage[] = [
-  { id: 0, name: '1円', priceJpy: 1, creditUsd: 0.01 },
   { id: 1, name: '500円分', priceJpy: 500, creditUsd: 3.33 },
   { id: 2, name: '1,000円分', priceJpy: 1000, creditUsd: 6.67 },
   { id: 3, name: '3,000円分', priceJpy: 3000, creditUsd: 20.0 },
