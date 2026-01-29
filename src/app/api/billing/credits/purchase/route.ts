@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createCreditPurchaseCheckout } from '@/lib/stripe';
 import { getSubscription } from '@/lib/credits';
 import { CREDIT_PACKAGES, getCreditPackageForPlan } from '@/lib/plans';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 
 /**
  * GET: 購入可能なクレジットパッケージ一覧
