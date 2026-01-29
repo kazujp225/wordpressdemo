@@ -1,11 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Save, Eye, Plus, X, FolderOpen, FileText, ChevronDown, Sparkles, Layout, Settings, Type, ExternalLink, Box, Trash2, Clock, MonitorPlay, MousePointer, Search, Bot, Image, PenTool } from 'lucide-react';
+import { Save, Eye, Plus, FileText, ChevronDown, Sparkles, Layout, Settings, Type, ExternalLink, Box, Trash2, MonitorPlay, MousePointer, Search, Bot, Image, PenTool } from 'lucide-react';
 import { GeminiGeneratorModal } from '@/components/lp-builder/GeminiGeneratorModal';
 import { TextBasedLPGenerator } from '@/components/lp-builder/TextBasedLPGenerator';
 import { SEOLLMOOptimizer } from '@/components/lp-builder/SEOLLMOOptimizer';

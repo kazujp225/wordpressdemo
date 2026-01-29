@@ -4161,7 +4161,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             action={
                                 <EditorActionButton
                                     onClick={() => setShowSeoLlmoModal(true)}
-                                    variant="default"
+                                    variant="primary"
                                 >
                                     最適化する
                                 </EditorActionButton>

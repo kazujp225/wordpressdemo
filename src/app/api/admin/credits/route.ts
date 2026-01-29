@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
-import { adjustCredit, getCreditSummary, grantPlanCredit } from '@/lib/credits';
+import { adjustCredit, getCreditSummary } from '@/lib/credits';
 
 // 管理者かどうかをチェック（DBのroleフィールドで判定）
 async function isAdmin(userId: string): Promise<boolean> {
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { userId, amount, description, type } = await request.json();
+        const { userId, amount, description } = await request.json();
 
         if (!userId || amount === undefined) {
             return NextResponse.json({ error: 'userId and amount are required' }, { status: 400 });

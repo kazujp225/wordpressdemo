@@ -49,7 +49,7 @@ const ASPECT_RATIOS: Record<string, { width: number; height: number; prompt: str
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
     let imagePrompt = '';
-    let modelUsed = 'gemini-3-pro-image-preview';
+    const modelUsed = 'gemini-3-pro-image-preview';
 
     // ユーザー認証を確認してAPIキーを取得
     const supabase = await createClient();

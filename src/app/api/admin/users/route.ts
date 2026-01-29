@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
-import { PLANS, PlanType } from '@/lib/plans';
+import { PLANS } from '@/lib/plans';
 import { getUserUsage } from '@/lib/usage';
 
 // 管理者かどうかをチェック（DBのroleフィールドで判定）

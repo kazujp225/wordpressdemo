@@ -231,7 +231,7 @@ export function EditorMenuSearch({
 // ============================================================================
 interface EditorMenuSectionProps {
   title: string
-  color?: "indigo" | "emerald" | "amber" | "rose" | "purple"
+  color?: "indigo" | "emerald" | "amber" | "rose" | "purple" | "violet"
   children: React.ReactNode
   className?: string
   collapsible?: boolean
@@ -244,6 +244,7 @@ const colorMap = {
   amber: "bg-amber-500",
   rose: "bg-rose-500",
   purple: "bg-purple-500",
+  violet: "bg-violet-500",
 }
 
 export function EditorMenuSection({

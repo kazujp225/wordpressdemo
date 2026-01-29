@@ -987,7 +987,7 @@ ${designDefinition.colorPreference}を基調とした配色で生成してくだ
             requestParts.push({ text: fullPrompt });
 
             // Primary Model: Gemini 3 Pro Image (Nano Banana Pro)
-            let usedModel: string = MODELS.IMAGE;
+            const usedModel: string = MODELS.IMAGE;
             const response = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.IMAGE}:generateContent?key=${apiKey}`,
                 {

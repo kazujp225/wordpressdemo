@@ -8,7 +8,7 @@ import { logGeneration, createTimer } from '@/lib/generation-logger';
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
     let editPrompt = '';
-    let modelUsed = 'gemini-3-pro-image-preview';
+    const modelUsed = 'gemini-3-pro-image-preview';
 
     // ユーザー認証を確認してAPIキーを取得
     const supabase = await createClient();
