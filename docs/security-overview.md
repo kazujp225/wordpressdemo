@@ -2,6 +2,8 @@
 
 このドキュメントは、セキュリティチェック用にアプリケーションの全体像をまとめたものです。
 
+**最終更新**: 2025年1月
+
 ---
 
 ## 1. 技術スタック
@@ -29,7 +31,7 @@ Supabase Auth (anon key)
     ↓
 Cookie-based Session
     ↓
-Server-side Session Validation
+Server-side Session Validation (getUser())
 ```
 
 ### 2.2 クライアント側
@@ -53,25 +55,23 @@ createServerClient(
 );
 ```
 
-### 2.4 ミドルウェア認可
+### 2.4 ミドルウェア（Edge Runtime）
 
 ```typescript
 // src/lib/supabase/middleware.ts
-// 各リクエストでユーザーステータスをチェック
-async function checkUserStatus(userId: string): Promise<UserStatus> {
-    const { data: settings } = await supabaseAdmin
-        .from('UserSettings')
-        .select('isBanned, plan')
-        .eq('userId', userId)
-        .single();
+// 認証のみ処理（service_role不使用）
+export async function updateSession(request: NextRequest) {
+    const supabase = createServerClient(url, anonKey, { cookies });
+    const { data: { user } } = await supabase.auth.getUser();
 
-    return {
-        isBanned: settings?.isBanned === true,
-        hasActiveSubscription: !!plan && plan !== 'free',
-        plan
-    };
+    // 未認証ユーザーはログインページへリダイレクト
+    if (!user && !isPublicRoute) {
+        return NextResponse.redirect('/');
+    }
 }
 ```
+
+**重要**: Edge Runtimeではservice_roleキーを使用しない（漏洩リスク回避）
 
 ### 2.5 ルートベース認可
 
@@ -79,14 +79,26 @@ async function checkUserStatus(userId: string): Promise<UserStatus> {
 |-----------|--------|------|
 | パブリック | `/`, `/auth/callback`, `/terms`, `/privacy`, `/p/[slug]` | 不要 |
 | API (Webhook) | `/api/webhooks/*` | Stripe署名検証 |
-| プライベート | `/dashboard`, `/editor/*` | 必須 |
-| 管理者専用 | `/admin/*` | 必須 + role='admin' |
+| プライベート | `/admin/*`, `/editor/*` | 必須 |
+| 管理者専用 | `/api/admin/*` | 必須 + role='admin' |
 
-### 2.6 BAN機能
+### 2.6 BAN/planチェック
 
-- DBの `isBanned` フラグでチェック
-- ミドルウェアで全リクエストを検証
-- BAN中は `/banned` へ強制リダイレクト
+BAN状態とサブスクリプション状態のチェックはNode.js RuntimeのAPIで実施:
+
+```
+/admin アクセス
+    ↓
+UserStatusGuard (クライアントコンポーネント)
+    ↓
+/api/user/status を呼び出し（Node.js Runtime）
+    ↓
+Prisma経由でDB確認
+    ↓
+結果に応じてリダイレクト
+    - BAN → /banned
+    - サブスクなし → /subscribe
+```
 
 ---
 
@@ -127,27 +139,27 @@ export function usdToTokens(usd: number): number {
     ↓
 5. Webhook受信 (/api/webhooks/stripe)
     ↓
-6. checkout.session.completed イベント処理
+6. 冪等性チェック（WebhookEventテーブル）
     ↓
-7. ユーザー作成 or プラン更新
+7. checkout.session.completed イベント処理
     ↓
-8. クレジット付与
+8. ユーザー作成 or プラン更新
+    ↓
+9. クレジット付与
 ```
 
-### 3.4 Webhook処理
+### 3.4 Webhook処理（冪等性対応）
 
 ```typescript
 // src/app/api/webhooks/stripe/route.ts
 export async function POST(request: NextRequest) {
-    const body = await request.text();
-    const signature = headersList.get('stripe-signature');
+    // 署名検証
+    const event = constructWebhookEvent(body, signature);
 
-    // 署名検証（必須）
-    let event: Stripe.Event;
-    try {
-        event = constructWebhookEvent(body, signature);
-    } catch (error) {
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    // 冪等性チェック（重複処理防止）
+    const { shouldProcess } = await checkAndLockEvent(event.id, event.type);
+    if (!shouldProcess) {
+        return NextResponse.json({ received: true, skipped: true });
     }
 
     // イベント処理
@@ -155,35 +167,26 @@ export async function POST(request: NextRequest) {
         case 'checkout.session.completed':
             await handleCheckoutComplete(event.data.object);
             break;
-        case 'invoice.paid':
-            await handleInvoicePaid(event.data.object);
-            break;
-        case 'customer.subscription.updated':
-            await handleSubscriptionUpdated(event.data.object);
-            break;
-        case 'customer.subscription.deleted':
-            await handleSubscriptionDeleted(event.data.object);
-            break;
+        // ...
     }
+
+    // 完了マーク
+    await markEventCompleted(event.id);
 }
 ```
 
-### 3.5 クレジット管理
+### 3.5 クレジット管理（レースコンディション対策）
 
 ```typescript
 // API呼び出し前のチェック
 const limitCheck = await checkTextGenerationLimit(userId, model, inputTokens, outputTokens);
 if (!limitCheck.allowed) {
-    return NextResponse.json({
-        error: 'INSUFFICIENT_CREDIT',
-        message: limitCheck.reason
-    }, { status: 402 });
+    return NextResponse.json({ error: 'INSUFFICIENT_CREDIT' }, { status: 402 });
 }
 
-// API呼び出し成功後の消費
-if (!skipCreditConsumption) {
-    await recordApiUsage(userId, logResult.id, logResult.estimatedCost, { model });
-}
+// API呼び出し成功後の消費（トランザクション内で残高再チェック）
+await consumeCredit(userId, costUsd, generationRunId, details);
+// → トランザクション内で残高を再確認し、不足ならInsufficientCreditErrorをthrow
 ```
 
 ---
@@ -209,7 +212,21 @@ model UserSettings {
 }
 ```
 
-### 4.2 CreditBalance
+### 4.2 WebhookEvent（冪等性確保）
+
+```prisma
+model WebhookEvent {
+  id          Int       @id @default(autoincrement())
+  eventId     String    @unique  // Stripe event.id
+  eventType   String
+  status      String    @default("pending")  // pending | processing | completed | failed
+  error       String?
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+```
+
+### 4.3 CreditBalance / CreditTransaction
 
 ```prisma
 model CreditBalance {
@@ -218,34 +235,14 @@ model CreditBalance {
   balanceUsd      Decimal   @default(0) @db.Decimal(10, 6)
   lastRefreshedAt DateTime?
 }
-```
 
-### 4.3 CreditTransaction
-
-```prisma
 model CreditTransaction {
   id              Int      @id @default(autoincrement())
   userId          String
   type            String   // 'plan_grant' | 'api_usage' | 'purchase' | 'refund' | 'adjustment'
   amountUsd       Decimal  @db.Decimal(10, 6)
   balanceAfter    Decimal  @db.Decimal(10, 6)
-  generationRunId Int?
-  model           String?
-  stripePaymentId String?  @unique
-}
-```
-
-### 4.4 Subscription
-
-```prisma
-model Subscription {
-  id                   Int       @id @default(autoincrement())
-  userId               String    @unique
-  stripeCustomerId     String    @unique
-  stripeSubscriptionId String?   @unique
-  plan                 String    @default("pro")
-  status               String    @default("active") // active | canceled | past_due | unpaid
-  cancelAtPeriodEnd    Boolean   @default(false)
+  stripePaymentId String?  @unique  // 重複購入防止
 }
 ```
 
@@ -265,14 +262,7 @@ export function encrypt(text: string): string {
     const key = getEncryptionKey();  // SHA256ハッシュ化
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-
-    const tag = cipher.getAuthTag();
-
     // Format: iv:tag:encrypted
-    return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted}`;
 }
 ```
 
@@ -289,15 +279,15 @@ export function encrypt(text: string): string {
 
 ### 6.1 シークレット（サーバーのみ）
 
-| 変数名 | 用途 |
-|--------|------|
-| `DATABASE_URL` | PostgreSQL接続 |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase管理者アクセス |
-| `STRIPE_SECRET_KEY` | Stripe API（シークレット） |
-| `STRIPE_WEBHOOK_SECRET` | Webhook署名検証 |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | Gemini API |
-| `ANTHROPIC_API_KEY` | Claude API |
-| `ENCRYPTION_KEY` | APIキー暗号化 |
+| 変数名 | 用途 | Runtime制限 |
+|--------|------|-------------|
+| `DATABASE_URL` | PostgreSQL接続 | Node.js only |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase管理者アクセス | **Node.js only** |
+| `STRIPE_SECRET_KEY` | Stripe API | Node.js only |
+| `STRIPE_WEBHOOK_SECRET` | Webhook署名検証 | Node.js only |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Gemini API | Node.js only |
+| `ANTHROPIC_API_KEY` | Claude API | Node.js only |
+| `ENCRYPTION_KEY` | APIキー暗号化 | Node.js only |
 
 ### 6.2 パブリック（クライアント可）
 
@@ -344,14 +334,13 @@ export async function POST(request: NextRequest) {
     if (!await isAdmin(user.id)) {
         return NextResponse.json({ error: 'Forbidden: Admin only' }, { status: 403 });
     }
-
-    // 管理者処理
 }
 ```
 
-### 7.3 所有権チェック
+### 7.3 所有権チェック（IDOR対策）
 
 ```typescript
+const page = await prisma.page.findUnique({ where: { id: pageId } });
 if (page?.userId !== user?.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
@@ -397,7 +386,7 @@ export async function getGoogleApiKeyWithInfo(userId: string): Promise<ApiKeyRes
 
 - Supabaseで有効化
 - Prisma + service_role keyはRLSをバイパス
-- API層で認可チェックを実装
+- **API層で認可チェックを実装（二重防御）**
 
 ### 9.2 ポリシー例
 
@@ -415,26 +404,26 @@ USING ("status" = 'published');
 
 ---
 
-## 10. セキュリティ上の考慮事項
+## 10. セキュリティ実装チェックリスト
 
 ### 10.1 実装済み
 
 - [x] Supabase Auth による認証
 - [x] Stripe Webhook署名検証
+- [x] Webhook冪等性（WebhookEventテーブルで重複処理防止）
 - [x] APIキーのAES-256-GCM暗号化
 - [x] 管理者ロールベースアクセス制御
-- [x] ページ所有権チェック
+- [x] ページ所有権チェック（IDOR対策）
+- [x] 全APIルートの認可チェック
 - [x] BAN機能（即時ブロック）
 - [x] クレジット消費のトランザクション処理
-- [x] RLSによるデータベースレベル保護
-- [x] Webhook冪等性（WebhookEventテーブルで重複処理防止）
-- [x] 全APIルートの認可チェック（IDOR対策完了）
-- [x] 管理者専用エンドポイントのロールチェック
 - [x] クレジット消費のレースコンディション対策（トランザクション内チェック）
+- [x] RLSによるデータベースレベル保護
 - [x] APIエンドポイント別のレート制限（ミドルウェアで実装）
 - [x] CSRF対策（Origin/Refererヘッダー検証）
 - [x] Content Security Policy (CSP) ヘッダー
 - [x] セキュリティヘッダー（X-Frame-Options, X-Content-Type-Options, HSTS等）
+- [x] **Edge Runtimeからservice_role撤去**
 
 ### 10.2 潜在的な改善点
 
@@ -469,7 +458,7 @@ frame-ancestors 'self';
 
 | ディレクティブ | 設定 | 理由 |
 |--------------|------|------|
-| `script-src 'unsafe-inline' 'unsafe-eval'` | 許可 | Next.js App Routerのhydration/HMRに必須 |
+| `script-src 'unsafe-inline' 'unsafe-eval'` | 許可 | Next.js App Routerのhydration必須（本番含む） |
 | `connect-src` | 限定的 | Supabase, Stripe, AI APIのみ許可 |
 | `frame-src` | Stripeのみ | 決済フォーム埋め込み用 |
 | `object-src 'none'` | 禁止 | Flash/Plugin無効化 |
@@ -477,7 +466,7 @@ frame-ancestors 'self';
 
 ### 11.3 注意事項
 
-- `unsafe-inline`/`unsafe-eval`はNext.jsの制約上必須
+- `unsafe-inline`/`unsafe-eval`はNext.jsの制約上、本番環境でも必須
 - nonceベースCSPは設定複雑度が高く現状未実装
 - XSS対策は入力サニタイズとReactのエスケープに依存
 
@@ -516,32 +505,29 @@ createServerClient(url, anonKey, {
 
 ## 13. service_role利用箇所
 
-### 13.1 利用一覧
+### 13.1 利用一覧（Node.js Runtimeのみ）
 
-| ファイル | 目的 | 入力 | ログ方針 | Runtime |
-|---------|------|------|----------|---------|
-| `src/lib/supabase.ts` | Storage操作（画像アップロード） | ファイルデータ | アップロードログあり | Node.js |
-| `src/app/api/webhooks/stripe/route.ts` | ユーザー作成 | Stripe metadata | Webhook処理ログあり | Node.js |
-| `src/app/api/admin/users/route.ts` | ユーザー一覧取得 | なし | 管理者操作 | Node.js |
+| ファイル | 目的 | 入力 | ログ方針 |
+|---------|------|------|----------|
+| `src/lib/supabase.ts` | Storage操作（画像アップロード） | ファイルデータ | アップロードログあり |
+| `src/app/api/webhooks/stripe/route.ts` | ユーザー作成 | Stripe metadata | Webhook処理ログあり |
+| `src/app/api/admin/users/route.ts` | ユーザー一覧取得 | なし | 管理者操作 |
 
 ### 13.2 設計方針
 
 - **Edge Runtimeでは使用禁止**: service_roleはNode.js Runtimeのみで使用
 - **最小権限**: service_roleは必要な操作のみに使用
-- **フォールバック禁止**: anon keyへのフォールバックは廃止
+- **フォールバック禁止**: anon keyへのフォールバックは廃止（明示的にエラー）
 - **入力検証**: 外部入力（Stripe metadata等）は署名検証後に使用
 - **ログ**: 重要操作はGenerationRun/WebhookEventテーブルに記録
 
 ### 13.3 BAN/planチェックの設計
 
-以前はEdge Middleware（`src/lib/supabase/middleware.ts`）でservice_roleを使用してBAN/planチェックを行っていたが、
-セキュリティリスク（service_role漏洩時に全データ流出）を考慮し、以下の設計に変更:
-
 ```
-【旧設計（危険）】
+【旧設計（危険）- 廃止済み】
 Edge Middleware + service_role → DB直接アクセス → BAN/planチェック
 
-【新設計（安全）】
+【新設計（安全）- 現在の実装】
 Edge Middleware（認証のみ、anon key使用）
     ↓
 クライアント: /api/user/status を呼び出し
@@ -559,7 +545,29 @@ Node.js API（Prisma使用）→ BAN/planチェック
 
 ---
 
-## 14. 依存関係（セキュリティ関連）
+## 14. レート制限
+
+### 14.1 実装箇所
+
+`src/middleware.ts` でIP別にレート制限を実施
+
+### 14.2 設定値
+
+| エンドポイント | 制限 | 超過時 |
+|--------------|------|--------|
+| `/api/ai/*` | 20リクエスト/分 | 429 Too Many Requests |
+| `/api/auth/*` | 10リクエスト/分 | 429 Too Many Requests |
+| `/api/form-submissions` | 5リクエスト/分 | 429 Too Many Requests |
+| その他API | 60リクエスト/分 | 429 Too Many Requests |
+
+### 14.3 注意事項
+
+- 現在はインメモリ実装（サーバーレス環境ではインスタンス間で共有されない）
+- スケール時はRedis等の共有ストアへの移行を推奨
+
+---
+
+## 15. 依存関係（セキュリティ関連）
 
 ```json
 {
@@ -575,9 +583,9 @@ Node.js API（Prisma使用）→ BAN/planチェック
 
 ---
 
-## 15. 緊急時対応
+## 16. 緊急時対応
 
-### 12.1 ユーザーBAN
+### 16.1 ユーザーBAN
 
 ```sql
 UPDATE "UserSettings"
@@ -585,11 +593,29 @@ SET "isBanned" = true, "bannedAt" = NOW(), "banReason" = '理由'
 WHERE "userId" = 'xxx';
 ```
 
-### 12.2 Stripe Webhook無効化
+### 16.2 Stripe Webhook無効化
 
 Stripeダッシュボード → Webhooks → エンドポイント無効化
 
-### 12.3 APIキー無効化
+### 16.3 APIキー無効化
 
 - Google Cloud Console → 認証情報 → APIキー削除
 - Stripe Dashboard → APIキー → ローテーション
+
+### 16.4 service_role漏洩時
+
+1. Supabaseダッシュボード → Settings → API → service_role keyをローテーション
+2. 環境変数を更新してデプロイ
+3. 監査ログを確認して不正アクセスを調査
+
+---
+
+## 17. リリースOKチェックリスト
+
+| 項目 | 状態 | 確認方法 |
+|------|------|----------|
+| Edgeにservice_roleが存在しない | ✅ | middleware.tsでSUPABASE_SERVICE_ROLE_KEY未使用 |
+| CSP/HSTSヘッダーが付く | ✅ | レスポンスヘッダー確認 |
+| 401/403が期待通り | ✅ | 未ログイン→401、他人ID→403、admin以外→403 |
+| Webhook重複でクレジット増えない | ✅ | WebhookEventテーブルで重複排除 |
+| レート制限が機能する | ✅ | 429レスポンス確認 |
