@@ -903,8 +903,8 @@ function SettingsPage() {
                     )}
                 </div>
 
-                {/* 保存ボタン（フローティング） - プランタブ以外で表示 */}
-                {activeTab !== 'plan' && (
+                {/* 保存ボタン（フローティング） - 一般設定、デプロイ、GitHub連携タブで表示 */}
+                {(activeTab === 'general' || activeTab === 'deploy' || activeTab === 'github') && (
                     <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-gray-200 p-3 sm:p-4 z-50">
                         <div className="max-w-5xl mx-auto flex justify-between items-center gap-3">
                             <p className="text-xs sm:text-sm text-gray-500 font-medium hidden sm:block">
