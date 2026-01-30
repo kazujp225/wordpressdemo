@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseStorage } from '@/lib/supabase';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration } from '@/lib/generation-logger';
+import { checkFeatureAccess } from '@/lib/usage';
 
 // Veo 2 API (Gemini API経由)
 // https://ai.google.dev/gemini-api/docs/video
@@ -25,6 +26,15 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+        // 動画生成機能のアクセスチェック（Enterpriseプランのみ）
+        const featureCheck = await checkFeatureAccess(user.id, 'generateVideo');
+        if (!featureCheck.allowed) {
+            return NextResponse.json(
+                { error: featureCheck.reason || '動画生成機能はEnterpriseプランでのみ利用可能です' },
+                { status: 403 }
+            );
+        }
+
         const body = await request.json();
         const { prompt, sourceImageUrl, duration = 5 } = body;
 
@@ -194,7 +204,7 @@ export async function POST(request: NextRequest) {
                 const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
                 const filename = `veo-generated-${uniqueSuffix}.mp4`;
 
-                const { error: uploadError } = await supabase
+                const { error: uploadError } = await supabaseStorage
                     .storage
                     .from('videos')
                     .upload(filename, videoBuffer, {
@@ -207,7 +217,7 @@ export async function POST(request: NextRequest) {
                     throw new Error('生成された動画のアップロードに失敗しました');
                 }
 
-                const { data: { publicUrl } } = supabase
+                const { data: { publicUrl } } = supabaseStorage
                     .storage
                     .from('videos')
                     .getPublicUrl(filename);

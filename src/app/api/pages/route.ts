@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
+import { checkPageLimit } from '@/lib/usage';
 
 // GET /api/pages (List)
 export async function GET() {
@@ -46,6 +47,15 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+        // ページ数制限チェック
+        const limitCheck = await checkPageLimit(user.id);
+        if (!limitCheck.allowed) {
+            return NextResponse.json(
+                { error: limitCheck.reason || 'ページ数の上限に達しました' },
+                { status: 403 }
+            );
+        }
+
         const body = await request.json();
         const { sections, headerConfig, ...rest } = body;
 
