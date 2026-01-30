@@ -3,7 +3,8 @@
 import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Check, Loader2, ArrowRight, AlertCircle, Mail } from 'lucide-react';
+import { Check, Loader2, ArrowRight, AlertCircle, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
 
 interface WelcomeData {
   email: string;
@@ -15,12 +16,52 @@ function WelcomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = searchParams.get('session_id');
+  const isPasswordSetup = searchParams.get('setup') === 'true';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState<WelcomeData | null>(null);
 
+  // パスワード設定用の状態
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [passwordSet, setPasswordSet] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
+  // Supabaseクライアント
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
   useEffect(() => {
+    // パスワード設定モードの場合
+    if (isPasswordSetup) {
+      // Supabaseがリカバリーリンクを処理してセッションを設定するのを待つ
+      const checkSession = async () => {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          setError('セッションの取得に失敗しました');
+        } else if (!session) {
+          // リカバリーリンクがまだ処理中の可能性があるので少し待つ
+          setTimeout(async () => {
+            const { data: { session: retrySession } } = await supabase.auth.getSession();
+            if (!retrySession) {
+              setError('パスワード設定リンクが無効か、有効期限が切れています。ログイン画面から「パスワードを忘れた方」をお試しください。');
+            }
+            setLoading(false);
+          }, 1000);
+          return;
+        }
+        setLoading(false);
+      };
+      checkSession();
+      return;
+    }
+
+    // 通常のウェルカムページ（決済完了後）
     if (!sessionId) {
       setError('セッションIDが見つかりません');
       setLoading(false);
@@ -43,20 +84,186 @@ function WelcomeContent() {
       .finally(() => {
         setLoading(false);
       });
-  }, [sessionId]);
+  }, [sessionId, isPasswordSetup, supabase.auth]);
+
+  // パスワード設定処理
+  const handleSetPassword = async () => {
+    setPasswordError('');
+
+    if (password.length < 8) {
+      setPasswordError('パスワードは8文字以上で設定してください');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setPasswordError('パスワードが一致しません');
+      return;
+    }
+
+    setSettingPassword(true);
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password,
+      });
+
+      if (updateError) {
+        setPasswordError(updateError.message);
+        return;
+      }
+
+      setPasswordSet(true);
+    } catch (err: any) {
+      setPasswordError(err.message || 'パスワードの設定に失敗しました');
+    } finally {
+      setSettingPassword(false);
+    }
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">アカウント情報を取得中...</p>
+          <p className="text-muted-foreground">読み込み中...</p>
         </div>
       </div>
     );
   }
 
-  if (error || !data) {
+  // パスワード設定完了後
+  if (passwordSet) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm">
+          <div className="max-w-6xl mx-auto px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 bg-primary rounded-sm" />
+              <span className="text-xl font-bold tracking-tight">LP Builder</span>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-xl mx-auto px-4 py-12">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center h-16 w-16 bg-green-100 rounded-full mb-6">
+              <Check className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight mb-2">
+              パスワードを設定しました
+            </h1>
+            <p className="text-muted-foreground">
+              これでログインできるようになりました
+            </p>
+          </div>
+
+          <button
+            onClick={() => router.push('/admin')}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 px-6 rounded-lg font-bold text-lg hover:bg-primary/90 transition-colors"
+          >
+            ダッシュボードへ進む
+            <ArrowRight className="h-5 w-5" />
+          </button>
+        </main>
+      </div>
+    );
+  }
+
+  // パスワード設定モード
+  if (isPasswordSetup && !error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm">
+          <div className="max-w-6xl mx-auto px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 bg-primary rounded-sm" />
+              <span className="text-xl font-bold tracking-tight">LP Builder</span>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-md mx-auto px-4 py-12">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center h-14 w-14 bg-blue-100 rounded-full mb-4">
+              <Lock className="h-7 w-7 text-blue-600" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight mb-2">
+              パスワードを設定
+            </h1>
+            <p className="text-muted-foreground">
+              ログイン用のパスワードを設定してください
+            </p>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  パスワード
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-12"
+                    placeholder="8文字以上"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  パスワード（確認）
+                </label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  placeholder="もう一度入力"
+                />
+              </div>
+
+              {passwordError && (
+                <div className="flex items-center gap-2 text-red-600 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  {passwordError}
+                </div>
+              )}
+
+              <button
+                onClick={handleSetPassword}
+                disabled={settingPassword || !password || !confirmPassword}
+                className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 px-6 rounded-lg font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {settingPassword ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    設定中...
+                  </>
+                ) : (
+                  <>
+                    パスワードを設定
+                    <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || (!data && !isPasswordSetup)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white px-4">
         <div className="max-w-md w-full text-center">
@@ -76,6 +283,7 @@ function WelcomeContent() {
     );
   }
 
+  // 決済完了後のウェルカム画面
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Header */}
@@ -98,7 +306,7 @@ function WelcomeContent() {
             ご登録ありがとうございます！
           </h1>
           <p className="text-muted-foreground">
-            {data.planName}プランのお申し込みが完了しました
+            {data?.planName}プランのお申し込みが完了しました
           </p>
         </div>
 
@@ -107,17 +315,17 @@ function WelcomeContent() {
           <div className="bg-blue-50 px-6 py-6 text-center">
             <Mail className="h-12 w-12 text-blue-500 mx-auto mb-4" />
             <h2 className="font-bold text-xl text-blue-800 mb-2">
-              ログイン情報をメールで送信しました
+              パスワード設定メールを送信しました
             </h2>
             <p className="text-blue-700">
-              <span className="font-mono font-bold">{data.email}</span>
+              <span className="font-mono font-bold">{data?.email}</span>
             </p>
           </div>
 
           <div className="px-6 py-5">
             <p className="text-gray-600 leading-relaxed">
-              上記のメールアドレス宛に、ログインに必要なパスワードを送信しました。
-              メールをご確認の上、ログインしてください。
+              上記のメールアドレス宛に、パスワード設定用のリンクを送信しました。
+              メールをご確認の上、パスワードを設定してください。
             </p>
           </div>
         </div>
@@ -146,7 +354,7 @@ function WelcomeContent() {
         </button>
 
         <p className="text-center text-sm text-muted-foreground mt-4">
-          メールに記載されたパスワードでログインできます
+          メールのリンクからパスワードを設定後、ログインできます
         </p>
       </main>
     </div>

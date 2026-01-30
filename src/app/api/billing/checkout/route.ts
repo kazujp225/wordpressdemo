@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { PLANS, type PlanType } from '@/lib/plans';
-import crypto from 'crypto';
 
 // Stripeクライアント
 function getStripe(): Stripe {
@@ -17,19 +16,6 @@ function getStripe(): Stripe {
 
 const getBaseUrl = () =>
   process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-
-/**
- * ランダムパスワード生成（12文字）
- */
-function generatePassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  let password = '';
-  const randomBytes = crypto.randomBytes(12);
-  for (let i = 0; i < 12; i++) {
-    password += chars[randomBytes[i] % chars.length];
-  }
-  return password;
-}
 
 /**
  * POST: 未認証ユーザー向けCheckout Session作成
@@ -51,12 +37,10 @@ export async function POST(request: NextRequest) {
 
     const plan = PLANS[planId as PlanType];
 
-    // 自動生成パスワード
-    const tempPassword = generatePassword();
-
     const stripe = getStripe();
 
     // Checkout Session作成（subscriptionモードではStripeが自動でCustomerを作成）
+    // パスワードはWebhook処理後にユーザー自身が設定（セキュリティ向上）
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [
@@ -69,7 +53,6 @@ export async function POST(request: NextRequest) {
       cancel_url: `${getBaseUrl()}/?canceled=true`,
       metadata: {
         planId,
-        tempPassword, // Webhook側でパスワードを取得するため
       },
       subscription_data: {
         metadata: {

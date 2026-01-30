@@ -10,7 +10,6 @@ import {
 } from '@/lib/credits';
 import { PLANS } from '@/lib/plans';
 import { prisma } from '@/lib/db';
-import crypto from 'crypto';
 import { sendWelcomeEmail } from '@/lib/email';
 
 /**
@@ -103,18 +102,6 @@ function getSupabaseAdmin() {
   );
 }
 
-/**
- * ランダムパスワード生成（12文字）
- */
-function generatePassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  let password = '';
-  const randomBytes = crypto.randomBytes(12);
-  for (let i = 0; i < 12; i++) {
-    password += chars[randomBytes[i] % chars.length];
-  }
-  return password;
-}
 
 /**
  * Stripe Webhook処理
@@ -217,7 +204,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     const planId = metadata.planId || 'pro';
     const plan = PLANS[planId as keyof typeof PLANS];
     const email = metadata.email || session.customer_email;
-    const tempPassword = metadata.tempPassword;
 
     if (!email) {
       console.error('No email in checkout session');
@@ -259,12 +245,10 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       userId = existingUser.id;
       console.log(`Existing user found: ${userId}`);
     } else {
-      // 新規ユーザー作成
-      const password = tempPassword || generatePassword();
-
+      // 新規ユーザー作成（パスワードなし = 初期状態）
+      // ユーザーは後でパスワード設定リンクからパスワードを設定する
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
-        password,
         email_confirm: true, // メール確認をスキップ
       });
 
@@ -276,30 +260,43 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       userId = newUser.user.id;
       console.log(`New user created: ${userId}, email: ${email}`);
 
-      // パスワードをStripe Customerのメタデータに保存
+      // Stripe CustomerメタデータにuserIdのみ保存（パスワードは保存しない）
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
         apiVersion: '2025-12-15.clover',
       });
       await stripe.customers.update(customerId, {
         metadata: {
           userId,
-          tempPassword: password,
-          passwordSet: 'true',
         },
       });
 
-      // ウェルカムメールでパスワードを送信
-      const planName = plan?.name || planId;
-      const emailResult = await sendWelcomeEmail({
-        to: email,
-        password,
-        planName,
+      // パスワード設定リンクを生成（recovery = パスワードリセット機能を流用）
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://xn--lp-xv5crjy08r.com';
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email,
+        options: {
+          redirectTo: `${baseUrl}/welcome?setup=true`,
+        },
       });
 
-      if (emailResult.success) {
-        console.log(`Welcome email sent to ${email}`);
+      if (linkError || !linkData?.properties?.action_link) {
+        console.error('Failed to generate password setup link:', linkError);
+        // リンク生成失敗してもユーザー作成は完了しているので続行
       } else {
-        console.error(`Failed to send welcome email: ${emailResult.error}`);
+        // ウェルカムメールでパスワード設定リンクを送信
+        const planName = plan?.name || planId;
+        const emailResult = await sendWelcomeEmail({
+          to: email,
+          planName,
+          passwordSetupUrl: linkData.properties.action_link,
+        });
+
+        if (emailResult.success) {
+          console.log(`Welcome email with password setup link sent to ${email}`);
+        } else {
+          console.error(`Failed to send welcome email: ${emailResult.error}`);
+        }
       }
     }
 

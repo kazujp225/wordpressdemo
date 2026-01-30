@@ -24,15 +24,16 @@ interface SendFormNotificationParams {
 
 /**
  * ウェルカムメール送信（新規登録完了時）
+ * パスワード設定リンクを送信（平文パスワードは送信しない）
  */
 export async function sendWelcomeEmail({
   to,
-  password,
   planName,
+  passwordSetupUrl,
 }: {
   to: string;
-  password: string;
   planName: string;
+  passwordSetupUrl: string;
 }): Promise<{ success: boolean; error?: string }> {
   if (!SYSTEM_RESEND_API_KEY) {
     console.error('RESEND_API_KEY is not configured');
@@ -56,7 +57,7 @@ export async function sendWelcomeEmail({
 
         <p style="color:#6b7280;margin-bottom:24px;text-align:center;">
           ${escapeHtml(planName)}プランへのご登録が完了しました。<br>
-          以下のログイン情報でサービスをご利用いただけます。
+          下のボタンをクリックしてパスワードを設定してください。
         </p>
 
         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:24px;">
@@ -65,23 +66,22 @@ export async function sendWelcomeEmail({
               <td style="padding:8px 0;color:#6b7280;font-size:14px;">ログインID（メールアドレス）</td>
             </tr>
             <tr>
-              <td style="padding:0 0 16px;font-size:18px;font-weight:600;color:#111827;">${escapeHtml(to)}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 0;color:#6b7280;font-size:14px;">パスワード</td>
-            </tr>
-            <tr>
-              <td style="padding:0;font-size:18px;font-weight:600;color:#111827;font-family:monospace;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:12px;letter-spacing:1px;">${escapeHtml(password)}</td>
+              <td style="padding:0;font-size:18px;font-weight:600;color:#111827;">${escapeHtml(to)}</td>
             </tr>
           </table>
         </div>
 
         <div style="text-align:center;margin-bottom:24px;">
-          <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'https://xn--lp-xv5crjy08r.com'}"
+          <a href="${escapeHtml(passwordSetupUrl)}"
              style="display:inline-block;background:#000;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;">
-            ログインする
+            パスワードを設定する
           </a>
         </div>
+
+        <p style="color:#9ca3af;font-size:12px;text-align:center;margin-bottom:24px;">
+          このリンクは24時間有効です。<br>
+          有効期限が切れた場合は、ログイン画面から「パスワードを忘れた方」をご利用ください。
+        </p>
 
         <div style="border-top:1px solid #e5e7eb;padding-top:24px;margin-top:24px;">
           <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
@@ -95,7 +95,7 @@ export async function sendWelcomeEmail({
     await resend.emails.send({
       from: SYSTEM_FROM_EMAIL,
       to,
-      subject: '【LP Builder】ご登録完了 - ログイン情報のお知らせ',
+      subject: '【LP Builder】ご登録完了 - パスワード設定のお願い',
       html,
     });
 
