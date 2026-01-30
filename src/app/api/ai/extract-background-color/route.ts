@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
+import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
 
 const log = {
     info: (msg: string) => console.log(`\x1b[36m[EXTRACT-BG]\x1b[0m ${msg}`),
@@ -13,6 +15,8 @@ interface ExtractBackgroundColorRequest {
 }
 
 export async function POST(request: NextRequest) {
+    const startTime = createTimer();
+
     // ユーザー認証
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -20,6 +24,19 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // クレジット残高チェック
+    const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 500, 500);
+    if (!limitCheck.allowed) {
+        if (limitCheck.needApiKey) {
+            return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        if (limitCheck.needSubscription) {
+            return NextResponse.json({ error: 'SUBSCRIPTION_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        return NextResponse.json({ error: 'INSUFFICIENT_CREDIT', message: limitCheck.reason, needPurchase: true }, { status: 402 });
+    }
+    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
 
     try {
         const body: ExtractBackgroundColorRequest = await request.json();
@@ -133,6 +150,23 @@ JSONのみを返してください。説明文は不要です。`;
 
         log.success(`Extracted background color: ${result.primaryColor} (${result.colorName})`);
 
+        // ログ記録（成功）
+        const logResult = await logGeneration({
+            userId: user.id,
+            type: 'extract-background-color',
+            endpoint: '/api/ai/extract-background-color',
+            model: 'gemini-2.0-flash',
+            inputPrompt: prompt,
+            outputResult: JSON.stringify(result),
+            status: 'succeeded',
+            startTime
+        });
+
+        // クレジット消費
+        if (logResult && !skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, { model: 'gemini-2.0-flash' });
+        }
+
         return NextResponse.json({
             success: true,
             color: result.primaryColor.toUpperCase(),
@@ -143,6 +177,19 @@ JSONのみを返してください。説明文は不要です。`;
 
     } catch (error: any) {
         log.error(`Error: ${error.message}`);
+
+        // ログ記録（エラー）
+        await logGeneration({
+            userId: user.id,
+            type: 'extract-background-color',
+            endpoint: '/api/ai/extract-background-color',
+            model: 'gemini-2.0-flash',
+            inputPrompt: 'Error before prompt',
+            status: 'failed',
+            errorMessage: error.message,
+            startTime
+        });
+
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

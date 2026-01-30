@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { checkImageGenerationLimit, recordApiUsage } from '@/lib/usage';
 
 interface UpscaleRequest {
     imageUrl?: string;
@@ -37,6 +38,23 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // クレジット残高チェック (Real-ESRGANモデル用)
+    const limitCheck = await checkImageGenerationLimit(user.id, 'real-esrgan', 1);
+    if (!limitCheck.allowed) {
+        if (limitCheck.needApiKey) {
+            return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        if (limitCheck.needSubscription) {
+            return NextResponse.json({ error: 'SUBSCRIPTION_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        return NextResponse.json({
+            error: 'INSUFFICIENT_CREDIT',
+            message: limitCheck.reason,
+            needPurchase: true,
+        }, { status: 402 });
+    }
+    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
 
     try {
         const {
@@ -169,7 +187,7 @@ export async function POST(request: NextRequest) {
         const durationMs = Date.now() - startTime;
 
         // ログ記録
-        await logGeneration({
+        const logResult = await logGeneration({
             userId: user.id,
             type: 'upscale',
             endpoint: '/api/ai/upscale',
@@ -178,6 +196,14 @@ export async function POST(request: NextRequest) {
             status: 'succeeded',
             startTime
         });
+
+        // クレジット消費（自分のAPIキー使用時はスキップ、Sharpのみ使用時もスキップ）
+        if (logResult && !skipCreditConsumption && modelName.includes('esrgan')) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
+                model: modelName,
+                imageCount: 1,
+            });
+        }
 
         return NextResponse.json({
             success: true,

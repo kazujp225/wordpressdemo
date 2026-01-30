@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { getGoogleApiKey } from '@/lib/apiKeys';
 import { createClient } from '@/lib/supabase/server';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
 
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
@@ -17,6 +18,19 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // クレジット残高チェック
+    const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 2000, 4000);
+    if (!limitCheck.allowed) {
+        if (limitCheck.needApiKey) {
+            return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        if (limitCheck.needSubscription) {
+            return NextResponse.json({ error: 'SUBSCRIPTION_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        return NextResponse.json({ error: 'INSUFFICIENT_CREDIT', message: limitCheck.reason, needPurchase: true }, { status: 402 });
+    }
+    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
 
     try {
         const { productInfo, taste, sections, designDefinition } = await request.json();
@@ -183,7 +197,7 @@ export async function POST(request: NextRequest) {
         const resultData = JSON.parse(jsonMatch[0]);
 
         // 成功ログの記録
-        await logGeneration({
+        const logResult = await logGeneration({
             userId: user.id,
             type: 'copy',
             endpoint: '/api/ai/generate-copy',
@@ -193,6 +207,11 @@ export async function POST(request: NextRequest) {
             status: 'succeeded',
             startTime
         });
+
+        // クレジット消費
+        if (logResult && !skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, { model: 'gemini-2.0-flash' });
+        }
 
         return NextResponse.json(resultData);
     } catch (error: any) {

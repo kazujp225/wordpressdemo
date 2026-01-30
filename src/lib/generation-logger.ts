@@ -31,7 +31,9 @@ export type GenerationType =
   | 'gemini-edit-code'
   | 'seo-analysis'
   | 'llmo-analysis'
-  | 'seo-llmo-combined';
+  | 'seo-llmo-combined'
+  | 'suggest-benefits'
+  | 'extract-background-color';
 
 export interface LogGenerationParams {
   userId?: string | null;

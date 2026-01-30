@@ -3,8 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
 import { supabase as supabaseStorage } from '@/lib/supabase';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
-import { logGeneration } from '@/lib/generation-logger';
-import { checkFeatureAccess } from '@/lib/usage';
+import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { checkFeatureAccess, recordApiUsage } from '@/lib/usage';
 
 // Veo 2 API (Gemini API経由)
 // https://ai.google.dev/gemini-api/docs/video
@@ -15,7 +15,7 @@ const VEO_MODEL = 'veo-2.0-generate-001';
 const COST_PER_SECOND = 0.35;
 
 export async function POST(request: NextRequest) {
-    const startTime = Date.now();
+    const startTime = createTimer();
 
     // ユーザー認証
     const supabase = await createClient();
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
 
         // 成功ログを記録
         const estimatedCost = videoDuration * COST_PER_SECOND;
-        await logGeneration({
+        const logResult = await logGeneration({
             userId: user.id,
             type: 'video-generate',
             endpoint: '/api/ai/generate-video',
@@ -255,6 +255,13 @@ export async function POST(request: NextRequest) {
             status: 'succeeded',
             startTime,
         });
+
+        // クレジット消費
+        if (logResult) {
+            await recordApiUsage(user.id, logResult.id, estimatedCost, {
+                model: VEO_MODEL,
+            });
+        }
 
         return NextResponse.json({
             success: true,

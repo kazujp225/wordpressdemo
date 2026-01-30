@@ -3,16 +3,32 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { suggestBenefitsSchema, validateRequest } from '@/lib/validations';
+import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
 
 const MODEL = 'gemini-2.0-flash';
 
 export async function POST(req: NextRequest) {
+    const startTime = createTimer();
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // クレジット残高チェック
+    const limitCheck = await checkTextGenerationLimit(user.id, MODEL, 1000, 3000);
+    if (!limitCheck.allowed) {
+        if (limitCheck.needApiKey) {
+            return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        if (limitCheck.needSubscription) {
+            return NextResponse.json({ error: 'SUBSCRIPTION_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        return NextResponse.json({ error: 'INSUFFICIENT_CREDIT', message: limitCheck.reason, needPurchase: true }, { status: 402 });
+    }
+    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
 
     try {
         const body = await req.json();
@@ -179,6 +195,23 @@ ${prompt}
         const response = await result.response;
         const text = response.text();
 
+        // ログ記録（成功）
+        const logResult = await logGeneration({
+            userId: user.id,
+            type: 'suggest-benefits',
+            endpoint: '/api/ai/suggest-benefits',
+            model: MODEL,
+            inputPrompt: fullPrompt,
+            outputResult: text,
+            status: 'succeeded',
+            startTime
+        });
+
+        // クレジット消費
+        if (logResult && !skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, { model: MODEL });
+        }
+
         // テキストをパースして各セクションを抽出
         const sections: Record<string, string[]> = {
             benefits: [],
@@ -221,6 +254,18 @@ ${prompt}
 
     } catch (error: any) {
         console.error('AI suggest error:', error);
+
+        // ログ記録（エラー）
+        await logGeneration({
+            userId: user.id,
+            type: 'suggest-benefits',
+            endpoint: '/api/ai/suggest-benefits',
+            model: MODEL,
+            inputPrompt: 'Error before prompt',
+            status: 'failed',
+            errorMessage: error.message,
+            startTime
+        });
 
         // ユーザーフレンドリーなエラーメッセージを生成
         let userMessage = 'AI提案の生成中にエラーが発生しました。';

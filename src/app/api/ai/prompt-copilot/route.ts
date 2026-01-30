@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { createClient } from '@/lib/supabase/server';
+import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
+import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
 
-// 管理者負担のAPIキー（環境変数から取得）
+// 管理者負担のAPIキー（フォールバック用）
 const ADMIN_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
 const SYSTEM_PROMPT = `あなたはLP（ランディングページ）画像生成のプロンプト作成を支援するコパイロットです。
@@ -29,20 +32,45 @@ export async function POST(request: NextRequest) {
     const startTime = createTimer();
     let inputPrompt = '';
 
+    // ユーザー認証
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // クレジット残高チェック
+    const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 500, 1024);
+    if (!limitCheck.allowed) {
+        if (limitCheck.needApiKey) {
+            return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        if (limitCheck.needSubscription) {
+            return NextResponse.json({ error: 'SUBSCRIPTION_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        return NextResponse.json({ error: 'INSUFFICIENT_CREDIT', message: limitCheck.reason, needPurchase: true }, { status: 402 });
+    }
+    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
+
     try {
         const { messages } = await request.json();
         inputPrompt = messages.map((m: any) => `${m.role}: ${m.content}`).join('\n');
 
-        // 管理者負担のAPIキーを使用（ユーザー認証不要）
-        if (!ADMIN_API_KEY) {
+        // ユーザーのAPIキーを優先、なければ管理者キーを使用
+        let apiKey = await getGoogleApiKeyForUser(user.id);
+        if (!apiKey) {
+            apiKey = ADMIN_API_KEY || null;
+        }
+        if (!apiKey) {
             return NextResponse.json({
-                error: 'システムAPIキーが設定されていません。管理者に連絡してください。'
+                error: 'APIキーが設定されていません。設定画面でAPIキーを設定してください。'
             }, { status: 500 });
         }
 
         // Gemini 2.0 Flash（高速・低コストモデル）でAPI呼び出し
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${ADMIN_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -72,8 +100,8 @@ export async function POST(request: NextRequest) {
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'すみません、応答を生成できませんでした。';
 
         // ログ記録（成功）
-        await logGeneration({
-            userId: null, // 管理者負担のため userId なし
+        const logResult = await logGeneration({
+            userId: user.id,
             type: 'prompt-copilot',
             endpoint: '/api/ai/prompt-copilot',
             model: 'gemini-2.0-flash',
@@ -83,6 +111,11 @@ export async function POST(request: NextRequest) {
             startTime
         });
 
+        // クレジット消費
+        if (logResult && !skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, { model: 'gemini-2.0-flash' });
+        }
+
         return NextResponse.json({ message: text });
 
     } catch (error: any) {
@@ -90,7 +123,7 @@ export async function POST(request: NextRequest) {
 
         // ログ記録（エラー）
         await logGeneration({
-            userId: null,
+            userId: user.id,
             type: 'prompt-copilot',
             endpoint: '/api/ai/prompt-copilot',
             model: 'gemini-2.0-flash',

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getGoogleApiKey } from '@/lib/apiKeys';
+import { createClient } from '@/lib/supabase/server';
+import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
 
 // Type definitions for the design structure
 export interface DesignDefinition {
@@ -27,6 +29,27 @@ export async function POST(request: NextRequest) {
     const startTime = createTimer();
     let prompt = '';
 
+    // ユーザー認証
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // クレジット残高チェック
+    const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 1000, 2000);
+    if (!limitCheck.allowed) {
+        if (limitCheck.needApiKey) {
+            return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        if (limitCheck.needSubscription) {
+            return NextResponse.json({ error: 'SUBSCRIPTION_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        return NextResponse.json({ error: 'INSUFFICIENT_CREDIT', message: limitCheck.reason, needPurchase: true }, { status: 402 });
+    }
+    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
+
     try {
         const { imageUrl } = await request.json();
 
@@ -34,9 +57,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Image URL is required' }, { status: 400 });
         }
 
-        const apiKey = await getGoogleApiKey();
+        const apiKey = await getGoogleApiKeyForUser(user.id);
         if (!apiKey) {
-            return NextResponse.json({ error: 'GitHub Model API Key Config Error' }, { status: 500 });
+            return NextResponse.json({ error: 'Google API key is not configured. 設定画面でAPIキーを設定してください。' }, { status: 500 });
         }
         const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -114,8 +137,8 @@ export async function POST(request: NextRequest) {
         const designDefinition = JSON.parse(jsonMatch[0]);
 
         // Log success
-        await logGeneration({
-            userId: null,
+        const logResult = await logGeneration({
+            userId: user.id,
             type: 'design-analysis',
             endpoint: '/api/ai/analyze-design',
             model: 'gemini-2.0-flash',
@@ -125,13 +148,18 @@ export async function POST(request: NextRequest) {
             startTime
         });
 
+        // クレジット消費
+        if (logResult && !skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, { model: 'gemini-2.0-flash' });
+        }
+
         return NextResponse.json(designDefinition);
 
     } catch (error: any) {
         console.error('Design Analysis Error:', error);
 
         await logGeneration({
-            userId: null,
+            userId: user.id,
             type: 'design-analysis',
             endpoint: '/api/ai/analyze-design',
             model: 'gemini-2.0-flash',

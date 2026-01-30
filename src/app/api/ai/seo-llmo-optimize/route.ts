@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClaudeClient } from '@/lib/claude';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
+import { createClient } from '@/lib/supabase/server';
+import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
 import {
   SEO_ANALYSIS_PROMPT,
   LLMO_ANALYSIS_PROMPT,
@@ -260,6 +262,27 @@ export async function POST(request: NextRequest) {
   const startTime = createTimer();
   let prompt = '';
 
+  // ユーザー認証
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // クレジット残高チェック (Claude Sonnetは高コストなので余裕を持たせる)
+  const limitCheck = await checkTextGenerationLimit(user.id, MODEL_NAME, 2000, 4096);
+  if (!limitCheck.allowed) {
+    if (limitCheck.needApiKey) {
+      return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
+    }
+    if (limitCheck.needSubscription) {
+      return NextResponse.json({ error: 'SUBSCRIPTION_REQUIRED', message: limitCheck.reason }, { status: 402 });
+    }
+    return NextResponse.json({ error: 'INSUFFICIENT_CREDIT', message: limitCheck.reason, needPurchase: true }, { status: 402 });
+  }
+  const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
+
   try {
     const body = await request.json();
     const {
@@ -344,8 +367,8 @@ export async function POST(request: NextRequest) {
 
     // 成功ログ
     const logType = mode === 'seo' ? 'seo-analysis' : mode === 'llmo' ? 'llmo-analysis' : 'seo-llmo-combined';
-    await logGeneration({
-      userId: null,
+    const logResult = await logGeneration({
+      userId: user.id,
       type: logType,
       endpoint: '/api/ai/seo-llmo-optimize',
       model: MODEL_NAME,
@@ -354,6 +377,11 @@ export async function POST(request: NextRequest) {
       status: 'succeeded',
       startTime
     });
+
+    // クレジット消費
+    if (logResult && !skipCreditConsumption) {
+      await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, { model: MODEL_NAME });
+    }
 
     return NextResponse.json({
       success: true,
@@ -366,7 +394,7 @@ export async function POST(request: NextRequest) {
     console.error('SEO/LLMO Analysis Error:', error);
 
     await logGeneration({
-      userId: null,
+      userId: user.id,
       type: 'seo-llmo-combined',
       endpoint: '/api/ai/seo-llmo-optimize',
       model: MODEL_NAME,

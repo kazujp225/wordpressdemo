@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import sharp from 'sharp';
+import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
 
 interface CropArea {
     x: number;
@@ -30,6 +31,23 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // クレジット残高チェック（テキスト生成）
+    const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 1000, 2000);
+    if (!limitCheck.allowed) {
+        if (limitCheck.needApiKey) {
+            return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        if (limitCheck.needSubscription) {
+            return NextResponse.json({ error: 'SUBSCRIPTION_REQUIRED', message: limitCheck.reason }, { status: 402 });
+        }
+        return NextResponse.json({
+            error: 'INSUFFICIENT_CREDIT',
+            message: limitCheck.reason,
+            needPurchase: true,
+        }, { status: 402 });
+    }
+    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
 
     try {
         const { imageUrl, imageBase64, cropArea, cropAreas }: OCRRequest = await request.json();
@@ -185,7 +203,7 @@ export async function POST(request: NextRequest) {
         const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         // ログ記録
-        await logGeneration({
+        const logResult = await logGeneration({
             userId: user.id,
             type: 'ocr',
             endpoint: '/api/ai/ocr',
@@ -194,6 +212,13 @@ export async function POST(request: NextRequest) {
             status: 'succeeded',
             startTime
         });
+
+        // クレジット消費
+        if (logResult && !skipCreditConsumption) {
+            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
+                model: 'gemini-2.0-flash',
+            });
+        }
 
         return NextResponse.json({
             success: true,
