@@ -6,17 +6,17 @@ import { Check, X, RefreshCw, Shield, Clock, Mail, Zap, Database, FileText, Crow
 // プラン定義（src/lib/plans.ts と同期）
 const PLANS = {
     free: { name: 'Free', color: 'bg-gray-100 text-gray-700', description: '自分のAPIキー使用', monthlyTokens: 0 },
-    pro: { name: 'Pro', color: 'bg-purple-100 text-purple-700', description: '月50,000トークン', monthlyTokens: 50000 },
-    business: { name: 'Business', color: 'bg-blue-100 text-blue-700', description: '月100,000トークン', monthlyTokens: 100000 },
-    enterprise: { name: 'Enterprise', color: 'bg-amber-100 text-amber-700', description: '月250,000トークン', monthlyTokens: 250000 },
+    pro: { name: 'Pro', color: 'bg-purple-100 text-purple-700', description: '月50,000クレジット', monthlyTokens: 50000 },
+    business: { name: 'Business', color: 'bg-blue-100 text-blue-700', description: '月100,000クレジット', monthlyTokens: 100000 },
+    enterprise: { name: 'Enterprise', color: 'bg-amber-100 text-amber-700', description: '月250,000クレジット', monthlyTokens: 250000 },
 };
 
-// USD → トークン変換（1 USD = 150円、1円 = 10トークン → 1 USD = 1,500トークン）
+// USD → クレジット変換（1 USD = 150円、1円 = 10クレジット → 1 USD = 1,500クレジット）
 const USD_TO_TOKENS = 1500;
 const usdToTokens = (usd: number) => Math.round(usd * USD_TO_TOKENS);
 const tokensToUsd = (tokens: number) => tokens / USD_TO_TOKENS;
 
-// トークン表示用フォーマット
+// クレジット表示用フォーマット
 const formatTokens = (tokens: number) => tokens.toLocaleString();
 
 interface UserUsage {
@@ -169,10 +169,10 @@ export default function UsersPage() {
         }
     };
 
-    // トークン付与（内部でUSDに変換してAPI呼び出し）
+    // クレジット付与（内部でUSDに変換してAPI呼び出し）
     const handleTokenGrant = async (userId: string, tokens: number) => {
         if (tokens <= 0) {
-            alert('トークン数は0より大きい値を入力してください');
+            alert('クレジット数は0より大きい値を入力してください');
             return;
         }
 
@@ -186,13 +186,13 @@ export default function UsersPage() {
                 body: JSON.stringify({
                     userId,
                     amount: amountUsd,
-                    description: `管理者によるトークン付与 ${formatTokens(tokens)}トークン`,
+                    description: `サービスクレジット付与 ${formatTokens(tokens)}クレジット`,
                 }),
             });
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || 'Failed to grant tokens');
+                throw new Error(data.error || 'Failed to grant credits');
             }
 
             const data = await res.json();
@@ -213,7 +213,7 @@ export default function UsersPage() {
             // 履歴を最新に更新
             fetchCreditInfo(userId);
 
-            alert(`${formatTokens(tokens)} トークンを付与しました。新残高: ${formatTokens(newBalanceTokens)} トークン`);
+            alert(`${formatTokens(tokens)} クレジットを付与しました。新残高: ${formatTokens(newBalanceTokens)} クレジット`);
         } catch (err: any) {
             alert(err.message);
         } finally {
@@ -525,11 +525,11 @@ export default function UsersPage() {
                                             </div>
                                         </div>
 
-                                        {/* Token Management */}
+                                        {/* Credit Management */}
                                         <div className="mt-6 pt-4 border-t">
                                             <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
                                                 <Coins className="w-4 h-4 text-amber-500" />
-                                                トークン管理
+                                                クレジット管理
                                             </h4>
                                             <div className="bg-white rounded-lg border p-4">
                                                 {/* 現在の残高 */}
@@ -540,7 +540,7 @@ export default function UsersPage() {
                                                             <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
                                                         ) : (
                                                             <span className="text-xl font-bold text-amber-600">
-                                                                {formatTokens(creditInfoMap.get(user.id)?.currentBalanceTokens || 0)} トークン
+                                                                {formatTokens(creditInfoMap.get(user.id)?.currentBalanceTokens || 0)} クレジット
                                                             </span>
                                                         )}
                                                         <button
@@ -553,10 +553,10 @@ export default function UsersPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* トークン付与 */}
+                                                {/* クレジット付与 */}
                                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                                                     <div className="flex-1">
-                                                        <label className="text-xs text-gray-500 mb-1 block">付与数 (トークン)</label>
+                                                        <label className="text-xs text-gray-500 mb-1 block">付与数 (クレジット)</label>
                                                         <div className="relative">
                                                             <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                                             <input
@@ -593,7 +593,7 @@ export default function UsersPage() {
 
                                                 {/* 注意書き */}
                                                 <p className="text-xs text-gray-400 mt-3">
-                                                    ※ Freeプランのユーザーはトークンを使用しません（自分のAPIキーを使用）
+                                                    ※ Freeプランのユーザーはクレジットを使用しません（自分のAPIキーを使用）
                                                 </p>
                                             </div>
 
@@ -602,7 +602,7 @@ export default function UsersPage() {
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-sm text-gray-600">今月の使用量</span>
                                                     <span className="font-medium text-gray-900">
-                                                        {formatTokens(creditInfoMap.get(user.id)?.monthlyUsageTokens || 0)} トークン
+                                                        {formatTokens(creditInfoMap.get(user.id)?.monthlyUsageTokens || 0)} クレジット
                                                     </span>
                                                 </div>
                                             </div>
@@ -625,13 +625,13 @@ export default function UsersPage() {
                                                                         <span className={`inline-flex items-center px-1.5 py-0.5 text-xs rounded ${
                                                                             tx.type === 'api_usage' ? 'bg-red-100 text-red-700' :
                                                                             tx.type === 'plan_grant' ? 'bg-green-100 text-green-700' :
-                                                                            tx.type === 'admin_grant' ? 'bg-blue-100 text-blue-700' :
+                                                                            tx.type === 'adjustment' ? 'bg-blue-100 text-blue-700' :
                                                                             tx.type === 'purchase' ? 'bg-purple-100 text-purple-700' :
                                                                             'bg-gray-100 text-gray-700'
                                                                         }`}>
                                                                             {tx.type === 'api_usage' ? '使用' :
                                                                              tx.type === 'plan_grant' ? 'プラン' :
-                                                                             tx.type === 'admin_grant' ? '付与' :
+                                                                             tx.type === 'adjustment' ? 'サービス' :
                                                                              tx.type === 'purchase' ? '購入' :
                                                                              tx.type}
                                                                         </span>

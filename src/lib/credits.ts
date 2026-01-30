@@ -66,7 +66,7 @@ export async function checkCreditBalance(
       currentBalanceUsd: currentBalance,
       estimatedCostUsd,
       remainingAfterUsd: remaining,
-      reason: `トークン残高が不足しています`,
+      reason: `クレジット残高が不足しています`,
       needPurchase: true,
     };
   }
@@ -276,7 +276,7 @@ export async function getCreditSummary(userId: string): Promise<CreditSummary> {
 }
 
 /**
- * 管理者用: クレジット調整
+ * 管理者用: クレジット調整（サービスクレジット付与）
  */
 export async function adjustCredit(
   userId: string,
@@ -302,7 +302,7 @@ export async function adjustCredit(
         type: 'adjustment',
         amountUsd: new Decimal(amountUsd),
         balanceAfter: balance.balanceUsd,
-        description: `管理者調整 (${adminId}): ${description}`,
+        description: `サービスクレジット付与 (${adminId}): ${description}`,
       },
     });
   });

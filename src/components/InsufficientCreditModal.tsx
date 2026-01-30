@@ -137,16 +137,16 @@ export function InsufficientCreditProvider({ children }: ProviderProps) {
                         </motion.div>
                         <div>
                           <Dialog.Title className="text-xl font-bold">
-                            トークン残高不足
+                            クレジット残高不足
                           </Dialog.Title>
                           <Dialog.Description className="text-sm text-white/80 mt-1">
-                            この操作を実行するにはトークンが不足しています
+                            この操作を実行するにはクレジットが不足しています
                           </Dialog.Description>
                         </div>
                       </div>
                     </div>
 
-                    {/* トークン情報 */}
+                    {/* クレジット情報 */}
                     <div className="p-6 border-b">
                       <div className="grid grid-cols-3 gap-4">
                         <div className="text-center p-3 bg-gray-50 rounded-xl">
@@ -156,7 +156,7 @@ export function InsufficientCreditProvider({ children }: ProviderProps) {
                           </p>
                         </div>
                         <div className="text-center p-3 bg-red-50 rounded-xl">
-                          <p className="text-xs text-red-600 mb-1">必要トークン</p>
+                          <p className="text-xs text-red-600 mb-1">必要クレジット</p>
                           <p className="text-lg font-bold text-red-600">
                             {formatTokens(usdToTokens(creditData?.requiredAmount || 0))}
                           </p>
@@ -174,7 +174,7 @@ export function InsufficientCreditProvider({ children }: ProviderProps) {
                     <div className="p-6 space-y-4">
                       <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                         <Sparkles className="w-4 h-4 text-amber-500" />
-                        おすすめのトークンパッケージ
+                        おすすめのクレジットパッケージ
                       </div>
 
                       {recommendedPackage && (
@@ -195,7 +195,7 @@ export function InsufficientCreditProvider({ children }: ProviderProps) {
                               <div className="text-left">
                                 <p className="font-bold">{recommendedPackage.name}</p>
                                 <p className="text-sm text-white/80">
-                                  {formatTokens(usdToTokens(recommendedPackage.creditUsd))} トークン
+                                  {formatTokens(usdToTokens(recommendedPackage.creditUsd))} クレジット
                                 </p>
                               </div>
                             </div>
@@ -233,7 +233,7 @@ export function InsufficientCreditProvider({ children }: ProviderProps) {
                                 <div className="flex items-center justify-between">
                                   <div>
                                     <p className="text-sm font-medium text-gray-900">{pkg.name}</p>
-                                    <p className="text-xs text-gray-500">{formatTokens(usdToTokens(pkg.creditUsd))} トークン</p>
+                                    <p className="text-xs text-gray-500">{formatTokens(usdToTokens(pkg.creditUsd))} クレジット</p>
                                   </div>
                                   {purchaseLoading === pkg.id ? (
                                     <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
@@ -286,7 +286,7 @@ export function showInsufficientCreditModal(data: { currentBalance: number; requ
   } else {
     // フォールバック: トーストで通知
     toast.error(
-      `トークン残高が不足しています。残高: ${formatTokens(usdToTokens(data.currentBalance))}, 必要: ${formatTokens(usdToTokens(data.requiredAmount))}`,
+      `クレジット残高が不足しています。残高: ${formatTokens(usdToTokens(data.currentBalance))}, 必要: ${formatTokens(usdToTokens(data.requiredAmount))}`,
       { duration: 5000 }
     );
   }

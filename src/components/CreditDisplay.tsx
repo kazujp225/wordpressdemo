@@ -94,7 +94,7 @@ const PLAN_STYLES: Record<string, { bg: string; text: string; border: string; gr
   },
 };
 
-// 残高レベルの色とスタイル（トークン数ベース）
+// 残高レベルの色とスタイル（クレジット数ベース）
 function getBalanceStyle(tokens: number) {
   if (tokens <= 150) return { color: 'text-red-600', bg: 'bg-red-50', status: 'critical' };
   if (tokens <= 750) return { color: 'text-amber-600', bg: 'bg-amber-50', status: 'warning' };
@@ -149,7 +149,7 @@ export function CreditDisplay() {
         setPackages(packagesData.packages || []);
       }
     } catch {
-      toast.error('トークン情報の取得に失敗しました');
+      toast.error('クレジット情報の取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -205,7 +205,7 @@ export function CreditDisplay() {
           >
             <Coins className="w-10 h-10 text-amber-500" />
           </motion.div>
-          <p className="text-gray-500">トークン情報を読み込み中...</p>
+          <p className="text-gray-500">クレジット情報を読み込み中...</p>
         </div>
       </div>
     );
@@ -229,7 +229,7 @@ export function CreditDisplay() {
   }
 
   const { credits, plan, subscription, recentTransactions } = report;
-  // USDからトークンへ変換（1 USD = 150円 = 1500トークン）
+  // USDからクレジットへ変換（1 USD = 150円 = 1500クレジット）
   const balanceTokens = usdToTokens(credits.currentBalanceUsd);
   const monthlyUsageTokens = usdToTokens(credits.monthlyUsageUsd);
   const planInfo = PLANS[plan.id as PlanType];
@@ -287,7 +287,7 @@ export function CreditDisplay() {
                 <div>
                   <h2 className="text-xl font-bold">{plan.name}プラン</h2>
                   <p className="text-sm text-white/80">
-                    月間トークン {formatTokens(planIncludedTokens)}
+                    月間クレジット {formatTokens(planIncludedTokens)}
                   </p>
                 </div>
               </div>
@@ -314,19 +314,19 @@ export function CreditDisplay() {
               )}
             </div>
 
-            {/* トークン残高カード */}
+            {/* クレジット残高カード */}
             <motion.div
               whileHover={{ scale: 1.02 }}
               className="bg-white/10 backdrop-blur-sm rounded-xl p-4"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-white/70 mb-1">トークン残高</p>
+                  <p className="text-sm text-white/70 mb-1">クレジット残高</p>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold">
                       {formatTokens(balanceTokens)}
                     </span>
-                    <span className="text-sm text-white/60">トークン</span>
+                    <span className="text-sm text-white/60">クレジット</span>
                   </div>
                 </div>
                 <motion.button
@@ -336,7 +336,7 @@ export function CreditDisplay() {
                   className="flex items-center gap-2 px-4 py-2 bg-white text-gray-900 font-medium rounded-xl hover:shadow-lg transition-shadow"
                 >
                   <Sparkles className="w-4 h-4" />
-                  トークン追加
+                  クレジット追加
                 </motion.button>
               </div>
             </motion.div>
@@ -373,7 +373,7 @@ export function CreditDisplay() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-gray-700">今月の使用状況</h3>
                 <span className="text-xs text-gray-500">
-                  {formatTokens(monthlyUsageTokens)} / {formatTokens(planIncludedTokens)} トークン
+                  {formatTokens(monthlyUsageTokens)} / {formatTokens(planIncludedTokens)} クレジット
                 </span>
               </div>
               <Progress.Root
@@ -423,7 +423,7 @@ export function CreditDisplay() {
                           color: '#fff',
                           fontSize: '12px',
                         }}
-                        formatter={(value) => [`${formatTokens(usdToTokens(Number(value ?? 0)))} トークン`, '使用量']}
+                        formatter={(value) => [`${formatTokens(usdToTokens(Number(value ?? 0)))} クレジット`, '使用量']}
                       />
                       <Area
                         type="monotone"
@@ -554,10 +554,10 @@ export function CreditDisplay() {
               >
                 <div className="relative p-6 border-b">
                   <Dialog.Title className="text-xl font-bold text-gray-900">
-                    トークン購入
+                    クレジット購入
                   </Dialog.Title>
                   <Dialog.Description className="text-sm text-gray-500 mt-1">
-                    追加トークンを購入して、API機能を継続してご利用ください
+                    追加クレジットを購入して、API機能を継続してご利用ください
                   </Dialog.Description>
                   <Dialog.Close asChild>
                     <button className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg">
@@ -590,7 +590,7 @@ export function CreditDisplay() {
                           <div>
                             <p className="font-semibold text-gray-900">{pkg.name}</p>
                             <p className="text-sm text-gray-500">
-                              {formatTokens(usdToTokens(pkg.creditUsd))} トークン
+                              {formatTokens(usdToTokens(pkg.creditUsd))} クレジット
                             </p>
                           </div>
                         </div>
@@ -630,9 +630,9 @@ export function CreditDisplay() {
 function getTransactionLabel(type: string): string {
   const labels: Record<string, string> = {
     plan_grant: 'プラン付与',
-    purchase: 'トークン購入',
+    purchase: 'クレジット購入',
     api_usage: 'API使用',
-    adjustment: '調整',
+    adjustment: 'サービスクレジット',
     refund: '返金',
   };
   return labels[type] || type;
@@ -761,7 +761,7 @@ export function SubscriptionRequired() {
 
             <div className="mt-2 flex items-center gap-1 text-sm text-blue-600">
               <Coins className="w-4 h-4" />
-              <span>{formatTokens(usdToTokens(plan.credit))} トークン/月</span>
+              <span>{formatTokens(usdToTokens(plan.credit))} クレジット/月</span>
             </div>
 
             <ul className="mt-6 space-y-3">
@@ -799,7 +799,7 @@ export function SubscriptionRequired() {
   );
 }
 
-// コンパクトなトークン表示（ヘッダー用）- 強化版
+// コンパクトなクレジット表示（ヘッダー用）- 強化版
 export function CreditBadge() {
   const [balanceUsd, setBalanceUsd] = useState<number | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -847,7 +847,7 @@ export function CreditBadge() {
             className="bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg"
             sideOffset={5}
           >
-            <p className="font-medium">トークン残高</p>
+            <p className="font-medium">クレジット残高</p>
             <p className="text-gray-400 mt-1">
               {style.status === 'critical'
                 ? '残高が非常に少なくなっています'
