@@ -49,10 +49,19 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
         const page = auth.page!;
 
+        // Parse headerConfig if exists
+        let headerConfig = null;
+        try {
+            if (page.headerConfig) {
+                headerConfig = JSON.parse(page.headerConfig);
+            }
+        } catch { }
+
         return NextResponse.json({
             id: page.id,
             title: page.title,
             slug: page.slug,
+            headerConfig,
             sections: page.sections.map(s => {
                 let config = null;
                 try { if (s.config) config = JSON.parse(s.config); } catch { }

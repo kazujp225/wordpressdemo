@@ -13,8 +13,18 @@ interface Section {
     config?: string | Record<string, unknown>;
 }
 
+interface HeaderConfig {
+    logoText?: string;
+    navItems?: { label: string; href: string }[];
+    ctaText?: string;
+    ctaLink?: string;
+    sticky?: boolean;
+}
+
 interface PageData {
+    title?: string;
     sections: Section[];
+    headerConfig?: HeaderConfig;
 }
 
 export default function PagePreviewPage() {
@@ -126,6 +136,43 @@ export default function PagePreviewPage() {
                     className={viewMode === 'mobile' ? 'w-[390px] bg-white shadow-2xl rounded-3xl overflow-hidden overflow-y-auto' : 'w-full'}
                     style={viewMode === 'mobile' ? { maxHeight: 'calc(100vh - 100px)' } : {}}
                 >
+                    {/* Header */}
+                    {pageData.headerConfig && (
+                        <header
+                            className={`${pageData.headerConfig.sticky !== false ? 'sticky top-0' : 'relative'} z-40 flex h-14 items-center justify-between bg-white/95 px-4 shadow-sm backdrop-blur-md ${viewMode === 'mobile' ? 'px-3' : 'md:px-8'}`}
+                        >
+                            <div className={`font-bold text-gray-900 ${viewMode === 'mobile' ? 'text-base' : 'text-xl'}`}>
+                                {pageData.headerConfig.logoText || pageData.title || 'My Brand'}
+                            </div>
+                            {viewMode !== 'mobile' && (
+                                <nav className="hidden md:flex gap-6">
+                                    {pageData.headerConfig.navItems && pageData.headerConfig.navItems.length > 0 ? (
+                                        pageData.headerConfig.navItems.map((item, idx) => (
+                                            <a
+                                                key={idx}
+                                                href={item.href}
+                                                className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                                            >
+                                                {item.label}
+                                            </a>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <a href="#hero" className="text-sm font-medium text-gray-700 hover:text-blue-600">トップ</a>
+                                            <a href="#contact" className="text-sm font-medium text-gray-700 hover:text-blue-600">お問い合わせ</a>
+                                        </>
+                                    )}
+                                </nav>
+                            )}
+                            <a
+                                href={pageData.headerConfig.ctaLink || '#contact'}
+                                className={`rounded-full bg-blue-600 text-white font-bold shadow-lg transition-transform hover:scale-105 active:scale-95 ${viewMode === 'mobile' ? 'px-4 py-1.5 text-xs' : 'px-6 py-2 text-sm'}`}
+                            >
+                                {pageData.headerConfig.ctaText || 'お問い合わせ'}
+                            </a>
+                        </header>
+                    )}
+
                     {pageData.sections.map((section) => {
                         // Get the appropriate image based on view mode
                         // モバイルビューでモバイル画像がある場合はそれを使用、なければデスクトップ画像
