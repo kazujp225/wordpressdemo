@@ -4,21 +4,24 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
     try {
-        // ユーザー認証
+        // ユーザー認証（必須）
         const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        // 認証必須: 未ログインユーザーはアクセス不可
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
         const searchParams = request.nextUrl.searchParams;
         const limit = parseInt(searchParams.get('limit') || '20');
         const offset = parseInt(searchParams.get('offset') || '0');
         const originalImage = searchParams.get('originalImage'); // 特定画像の履歴を取得
 
-        const where: any = {};
-
-        // ユーザーがログインしている場合はそのユーザーの履歴のみ
-        if (user?.id) {
-            where.userId = user.id;
-        }
+        // 必ずログインユーザーのデータのみを取得
+        const where: { userId: string; originalImage?: string } = {
+            userId: user.id,
+        };
 
         // 特定の元画像の履歴を取得する場合
         if (originalImage) {

@@ -442,10 +442,105 @@ USING ("status" = 'published');
 - [ ] 監査ログの詳細化（管理者操作）
 - [ ] データベースのEncryption at Rest確認
 - [ ] Redisベースのレート制限（スケール時）
+- [ ] 暗号化キーのローテーション設計
 
 ---
 
-## 11. 依存関係（セキュリティ関連）
+## 11. CSP詳細設定
+
+### 11.1 Content-Security-Policy
+
+```
+default-src 'self';
+script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://challenges.cloudflare.com;
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+font-src 'self' https://fonts.gstatic.com data:;
+img-src 'self' data: blob: https://*.supabase.co https://*.supabase.com https://replicate.delivery https://pbxt.replicate.delivery;
+connect-src 'self' https://*.supabase.co https://*.supabase.com https://api.stripe.com https://generativelanguage.googleapis.com https://api.anthropic.com https://api.replicate.com wss://*.supabase.co;
+frame-src 'self' https://js.stripe.com https://challenges.cloudflare.com;
+media-src 'self' blob: https://*.supabase.co https://*.supabase.com;
+object-src 'none';
+base-uri 'self';
+form-action 'self';
+frame-ancestors 'self';
+```
+
+### 11.2 CSP設計方針
+
+| ディレクティブ | 設定 | 理由 |
+|--------------|------|------|
+| `script-src 'unsafe-inline' 'unsafe-eval'` | 許可 | Next.js App Routerのhydration/HMRに必須 |
+| `connect-src` | 限定的 | Supabase, Stripe, AI APIのみ許可 |
+| `frame-src` | Stripeのみ | 決済フォーム埋め込み用 |
+| `object-src 'none'` | 禁止 | Flash/Plugin無効化 |
+| `frame-ancestors 'self'` | 自サイトのみ | クリックジャッキング対策 |
+
+### 11.3 注意事項
+
+- `unsafe-inline`/`unsafe-eval`はNext.jsの制約上必須
+- nonceベースCSPは設定複雑度が高く現状未実装
+- XSS対策は入力サニタイズとReactのエスケープに依存
+
+---
+
+## 12. Cookie/Session設定
+
+### 12.1 Supabase Auth Cookie属性
+
+| 属性 | 値 | 説明 |
+|------|-----|------|
+| `HttpOnly` | true | JavaScriptからアクセス不可 |
+| `Secure` | true (本番) | HTTPS時のみ送信 |
+| `SameSite` | Lax | CSRF対策（クロスサイトPOSTでは送信されない） |
+| `Path` | / | 全パスで有効 |
+| `Domain` | 未設定 | 現在のホストのみ |
+
+### 12.2 セッション管理
+
+- Supabase SSRライブラリがCookie管理を担当
+- アクセストークンは自動リフレッシュ
+- サーバーサイドで`getUser()`によるJWT検証
+
+```typescript
+// src/lib/supabase/server.ts
+createServerClient(url, anonKey, {
+    cookies: {
+        get(name) { return cookieStore.get(name)?.value; },
+        set(name, value, options) { cookieStore.set({ name, value, ...options }); },
+        remove(name, options) { cookieStore.set({ name, value: '', ...options }); },
+    },
+});
+```
+
+---
+
+## 13. service_role利用箇所
+
+### 13.1 利用一覧
+
+| ファイル | 目的 | 入力 | ログ方針 |
+|---------|------|------|----------|
+| `src/lib/supabase/middleware.ts` | UserSettings取得（BAN/plan確認） | userId (JWT由来) | なし |
+| `src/lib/supabase.ts` | Storage操作（画像アップロード） | ファイルデータ | アップロードログあり |
+| `src/app/api/webhooks/stripe/route.ts` | ユーザー作成 | Stripe metadata | Webhook処理ログあり |
+| `src/app/api/admin/users/route.ts` | ユーザー一覧取得 | なし | 管理者操作 |
+
+### 13.2 設計方針
+
+- **最小権限**: service_roleは必要な操作のみに使用
+- **フォールバック禁止**: anon keyへのフォールバックは廃止
+- **入力検証**: 外部入力（Stripe metadata等）は署名検証後に使用
+- **ログ**: 重要操作はGenerationRun/WebhookEventテーブルに記録
+
+### 13.3 Edge Runtime注意事項
+
+- `src/lib/supabase/middleware.ts`はEdge Runtimeで動作
+- service_roleキーがEdge環境に露出するリスクあり
+- 対策: 環境変数はVercel Edge Configで保護
+
+---
+
+## 14. 依存関係（セキュリティ関連）
 
 ```json
 {
@@ -461,7 +556,7 @@ USING ("status" = 'published');
 
 ---
 
-## 12. 緊急時対応
+## 15. 緊急時対応
 
 ### 12.1 ユーザーBAN
 

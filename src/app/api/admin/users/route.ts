@@ -66,7 +66,8 @@ export async function GET() {
                 banReason: settings?.banReason || null,
                 plan: settings?.plan || 'free',
                 subscriptionStatus: subscription?.status || null,
-                subscriptionId: subscription?.stripeSubscriptionId || null,
+                // stripeSubscriptionId は管理画面に不要（課金情報はStripeダッシュボードで確認）
+                hasSubscription: !!subscription?.stripeSubscriptionId,
                 usage: usage || { monthlyGenerations: 0, monthlyUploads: 0, totalPages: 0, totalStorageMB: 0 },
             };
         });
