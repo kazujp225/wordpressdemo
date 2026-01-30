@@ -431,15 +431,17 @@ USING ("status" = 'published');
 - [x] 全APIルートの認可チェック（IDOR対策完了）
 - [x] 管理者専用エンドポイントのロールチェック
 - [x] クレジット消費のレースコンディション対策（トランザクション内チェック）
+- [x] APIエンドポイント別のレート制限（ミドルウェアで実装）
+- [x] CSRF対策（Origin/Refererヘッダー検証）
+- [x] Content Security Policy (CSP) ヘッダー
+- [x] セキュリティヘッダー（X-Frame-Options, X-Content-Type-Options, HSTS等）
 
 ### 10.2 潜在的な改善点
 
-- [ ] APIエンドポイント別のレート制限
 - [ ] BAN チェックのキャッシュ化（パフォーマンス）
 - [ ] 監査ログの詳細化（管理者操作）
 - [ ] データベースのEncryption at Rest確認
-- [ ] CSRF対策の明示的実装
-- [ ] Content Security Policy (CSP) ヘッダー
+- [ ] Redisベースのレート制限（スケール時）
 
 ---
 
