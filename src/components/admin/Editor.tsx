@@ -160,6 +160,26 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // メニュー検索
     const [menuSearch, setMenuSearch] = useState('');
 
+    // プラン情報（機能制限用）
+    const [planLimits, setPlanLimits] = useState<{
+        canUpscale4K: boolean;
+        canRestyle: boolean;
+        canGenerateVideo: boolean;
+        maxPages: number;
+    } | null>(null);
+
+    // プラン情報を取得
+    useEffect(() => {
+        fetch('/api/user/usage')
+            .then(res => res.json())
+            .then(data => {
+                if (data.limits) {
+                    setPlanLimits(data.limits);
+                }
+            })
+            .catch(err => console.error('Failed to fetch plan limits:', err));
+    }, []);
+
     // メニュー検索フィルタリング用のヘルパー
     const menuItems = {
         crop: { title: '画像を切り取る', keywords: ['切り取り', 'カット', 'トリミング', 'crop'] },
@@ -4017,8 +4037,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         </EditorMenuSection>
                     )}
 
-                    {/* もっと魅力的にする */}
-                    {isSectionVisible(['video']) && (
+                    {/* もっと魅力的にする（Enterpriseプランのみ） */}
+                    {planLimits?.canGenerateVideo && isSectionVisible(['video']) && (
                         <EditorMenuSection title="もっと魅力的にする" color="amber">
                             {/* 動画を埋め込む */}
                             {isMenuItemVisible('video') && (
@@ -4026,7 +4046,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     icon={<Video className="h-3.5 w-3.5" />}
                                     title="動画を埋め込む"
                                     description="YouTube等の動画を追加"
-                                    badge={<EditorBadge variant="dark">Max</EditorBadge>}
+                                    badge={<EditorBadge variant="dark">Enterprise</EditorBadge>}
                                     tooltip="YouTubeやVimeoの動画を埋め込めます"
                                     open={expandedTools.has('video')}
                                     onOpenChange={(open) => {
