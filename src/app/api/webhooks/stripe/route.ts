@@ -225,12 +225,34 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     }
 
     let userId: string;
+    let existingUser = null;
 
     // メールアドレスでSupabaseユーザーを検索
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    );
+    // Supabase Admin APIにはgetUserByEmailがないため、
+    // まず作成を試み、既存ユーザーエラーの場合はlistUsersでページング検索
+    // 注意: listUsersは大量ユーザー時に遅いが、Supabase側の制限
+    try {
+      // ページングで効率的に検索（最大1000件ずつ）
+      let page = 1;
+      const perPage = 1000;
+      while (!existingUser) {
+        const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+        if (error || !data?.users?.length) break;
+
+        existingUser = data.users.find(
+          (u) => u.email?.toLowerCase() === email.toLowerCase()
+        );
+
+        if (data.users.length < perPage) break; // 最後のページ
+        page++;
+        if (page > 10) break; // 安全のため10ページ（1万件）で打ち切り
+      }
+    } catch (err) {
+      console.log('User lookup failed, will create new user:', err);
+    }
 
     if (existingUser) {
       // 既存ユーザー
