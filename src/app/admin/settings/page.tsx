@@ -860,51 +860,65 @@ function SettingsPage() {
                                 </div>
                                 <div>
                                     <h3 className="text-base font-bold text-gray-900">GitHub連携</h3>
-                                    <p className="text-sm text-gray-500 mt-1">リポジトリへの自動デプロイ設定</p>
+                                    <p className="text-sm text-gray-500 mt-1">GitHubアカウントを連携してリポジトリにデプロイ</p>
                                 </div>
                             </div>
 
                             <div className="space-y-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">パーソナルアクセストークン</label>
-                                    <input
-                                        type="password"
-                                        value={config.github?.token || ''}
-                                        placeholder="ghp_..."
-                                        onChange={e => setConfig({ ...config, github: { ...config.github, token: e.target.value } })}
-                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all font-mono text-gray-900"
-                                    />
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        Repoスコープ権限が必要です
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">オーナー / 組織</label>
-                                        <input
-                                            type="text"
-                                            value={config.github?.owner || ''}
-                                            onChange={e => setConfig({ ...config, github: { ...config.github, owner: e.target.value } })}
-                                            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all text-gray-900"
-                                        />
+                                {hasGithubToken ? (
+                                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <CheckCircle className="h-5 w-5 text-green-600" />
+                                            <div>
+                                                <p className="font-medium text-green-800">GitHub連携済み</p>
+                                                {githubDeployOwner && (
+                                                    <p className="text-sm text-green-600">@{githubDeployOwner}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                if (confirm('GitHub連携を解除しますか？')) {
+                                                    try {
+                                                        const response = await fetch('/api/auth/github/disconnect', { method: 'POST' });
+                                                        if (response.ok) {
+                                                            setHasGithubToken(false);
+                                                            setGithubDeployOwner('');
+                                                            toast.success('GitHub連携を解除しました');
+                                                        }
+                                                    } catch {
+                                                        toast.error('連携解除に失敗しました');
+                                                    }
+                                                }
+                                            }}
+                                            className="mt-3 text-sm text-red-600 hover:text-red-700 underline"
+                                        >
+                                            連携を解除
+                                        </button>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">リポジトリ</label>
-                                        <input
-                                            type="text"
-                                            value={config.github?.repo || ''}
-                                            onChange={e => setConfig({ ...config, github: { ...config.github, repo: e.target.value } })}
-                                            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all text-gray-900"
-                                        />
+                                ) : (
+                                    <div className="space-y-4">
+                                        <p className="text-sm text-gray-600">
+                                            GitHubアカウントを連携すると、作成したLPをリポジトリに自動デプロイできます。
+                                        </p>
+                                        <button
+                                            onClick={() => {
+                                                window.location.href = '/api/auth/github';
+                                            }}
+                                            className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
+                                        >
+                                            <Github className="h-4 w-4" />
+                                            GitHubアカウントを連携
+                                        </button>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* 保存ボタン（フローティング） - 一般設定、デプロイ、GitHub連携タブで表示 */}
-                {(activeTab === 'general' || activeTab === 'deploy' || activeTab === 'github') && (
+                {/* 保存ボタン（フローティング） - 一般設定、デプロイタブで表示 */}
+                {(activeTab === 'general' || activeTab === 'deploy') && (
                     <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-gray-200 p-3 sm:p-4 z-50">
                         <div className="max-w-5xl mx-auto flex justify-between items-center gap-3">
                             <p className="text-xs sm:text-sm text-gray-500 font-medium hidden sm:block">
