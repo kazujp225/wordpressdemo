@@ -97,6 +97,20 @@ export default function LPBuilderPage() {
     const [showGeneratorSelector, setShowGeneratorSelector] = useState(false);
     const [isSEOModalOpen, setIsSEOModalOpen] = useState(false);
     const [buttonEditorSectionId, setButtonEditorSectionId] = useState<string | null>(null);
+    const [headerConfig, setHeaderConfig] = useState<{
+        logoText: string;
+        navItems: { label: string; href: string }[];
+        ctaText: string;
+        ctaLink: string;
+        sticky: boolean;
+    }>({
+        logoText: 'My Brand',
+        navItems: [],
+        ctaText: 'お問い合わせ',
+        ctaLink: '#contact',
+        sticky: true,
+    });
+    const [isGeneratingNav, setIsGeneratingNav] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -186,6 +200,51 @@ export default function LPBuilderPage() {
 
     const handleDragCancel = () => {
         setActiveId(null);
+    };
+
+    // Generate navigation/header from sections using AI
+    const generateNavigation = async () => {
+        if (sections.length === 0) {
+            toast.error('セクションがありません');
+            return;
+        }
+
+        setIsGeneratingNav(true);
+        try {
+            // Prepare sections data with images
+            const sectionsData = sections.map(s => ({
+                role: s.type,
+                base64: s.properties.image,
+                image: s.properties.image ? { filePath: s.properties.image } : null,
+            }));
+
+            const res = await fetch('/api/ai/generate-nav', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sections: sectionsData }),
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.message || 'ナビゲーション生成に失敗しました');
+            }
+
+            const navData = await res.json();
+            if (navData && !navData.error) {
+                setHeaderConfig(prev => ({
+                    ...prev,
+                    logoText: navData.logoText || prev.logoText,
+                    navItems: navData.navItems || prev.navItems,
+                    ctaText: navData.ctaText || prev.ctaText,
+                }));
+                toast.success('ヘッダーを生成しました');
+            }
+        } catch (error: any) {
+            console.error('Navigation generation error:', error);
+            toast.error(error.message || 'ヘッダー生成に失敗しました');
+        } finally {
+            setIsGeneratingNav(false);
+        }
     };
 
     const addSection = (type: string) => {
@@ -495,9 +554,22 @@ export default function LPBuilderPage() {
                             <span className="hidden lg:inline">SEO/LLMO</span>
                         </button>
                         <button
+                            onClick={generateNavigation}
+                            disabled={isGeneratingNav || sections.length === 0}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50"
+                            title="AIでヘッダーを自動生成"
+                        >
+                            {isGeneratingNav ? (
+                                <div className="h-3 w-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                            ) : (
+                                <Layout className="h-3 w-3" />
+                            )}
+                            Header
+                        </button>
+                        <button
                             onClick={() => {
-                                // Save sections to localStorage and open preview in new tab
-                                localStorage.setItem('lp-builder-preview', JSON.stringify({ sections }));
+                                // Save sections and header to localStorage and open preview in new tab
+                                localStorage.setItem('lp-builder-preview', JSON.stringify({ sections, headerConfig }));
                                 window.open('/preview/lp-builder', '_blank');
                             }}
                             className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all"

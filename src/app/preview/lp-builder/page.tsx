@@ -3,8 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import type { LPSection, ClickableArea } from '@/types';
 
+interface HeaderConfig {
+    logoText: string;
+    navItems: { label: string; href: string }[];
+    ctaText: string;
+    ctaLink: string;
+    sticky: boolean;
+}
+
 export default function LPPreviewPage() {
     const [sections, setSections] = useState<LPSection[]>([]);
+    const [headerConfig, setHeaderConfig] = useState<HeaderConfig | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -14,6 +23,7 @@ export default function LPPreviewPage() {
             try {
                 const parsed = JSON.parse(previewData);
                 setSections(parsed.sections || []);
+                setHeaderConfig(parsed.headerConfig || null);
             } catch (e) {
                 console.error('Failed to parse preview data:', e);
             }
@@ -61,6 +71,39 @@ export default function LPPreviewPage() {
                 }
             `}</style>
             <div style={{ margin: 0, padding: 0, width: '100%' }}>
+                {/* Header */}
+                {headerConfig && (
+                    <header
+                        className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex h-16 items-center justify-between bg-white/90 px-4 shadow-sm backdrop-blur-md md:px-8`}
+                    >
+                        <div className="text-xl font-bold text-gray-900">{headerConfig.logoText}</div>
+                        <nav className="hidden md:flex gap-6">
+                            {headerConfig.navItems && headerConfig.navItems.length > 0 ? (
+                                headerConfig.navItems.map((item, idx) => (
+                                    <a
+                                        key={idx}
+                                        href={item.href}
+                                        className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                                    >
+                                        {item.label}
+                                    </a>
+                                ))
+                            ) : (
+                                <>
+                                    <a href="#hero" className="text-sm font-medium text-gray-700 hover:text-blue-600">トップ</a>
+                                    <a href="#contact" className="text-sm font-medium text-gray-700 hover:text-blue-600">お問い合わせ</a>
+                                </>
+                            )}
+                        </nav>
+                        <a
+                            href={headerConfig.ctaLink || '#contact'}
+                            className="rounded-full bg-blue-600 px-6 py-2 text-sm font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+                        >
+                            {headerConfig.ctaText || 'お問い合わせ'}
+                        </a>
+                    </header>
+                )}
+
                 {sections.map((section) => {
                     const clickableAreas = (section.properties.clickableAreas as ClickableArea[] | undefined) || [];
                     return (
