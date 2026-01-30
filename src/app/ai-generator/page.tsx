@@ -276,8 +276,8 @@ export default function AiGeneratorPage() {
                         <span className="font-semibold text-slate-900">Claude 3.5 Sonnet</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-600">Est. Cost</span>
-                        <span className="font-medium text-slate-900">~$0.03 - $0.10</span>
+                        <span className="text-slate-600">消費クレジット</span>
+                        <span className="font-medium text-slate-900">約300〜1,000</span>
                       </div>
                     </div>
                   </div>

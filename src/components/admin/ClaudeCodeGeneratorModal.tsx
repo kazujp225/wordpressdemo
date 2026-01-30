@@ -528,7 +528,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
                 })}
               </div>
               <div className="mt-6 flex items-center justify-between text-xs text-gray-400">
-                <span>~$0.03-0.10 / 生成</span>
+                <span>約300〜1,000クレジット / 生成</span>
                 <span>model: gemini-2.0-flash</span>
               </div>
             </div>
