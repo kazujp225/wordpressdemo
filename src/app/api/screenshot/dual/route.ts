@@ -386,73 +386,62 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-            // ========== 並列スクリーンショット取得 ==========
-            send({ type: 'progress', step: 'capture', message: 'デスクトップ・モバイル版を同時取得中...' });
-            log.info('Creating two pages for parallel capture...');
-
-            // 2つのページを同時作成
-            const [desktopPage, mobilePage] = await Promise.all([
-                browser.newPage(),
-                browser.newPage()
-            ]);
-
+            // ========== 順次スクリーンショット取得（メモリ負荷軽減） ==========
             const desktopConfig = DEVICE_PRESETS.desktop;
             const mobileConfig = DEVICE_PRESETS.mobile;
 
-            // デスクトップページの設定
-            const setupDesktop = async () => {
-                await desktopPage.setViewport({
-                    width: desktopConfig.width,
-                    height: desktopConfig.height,
-                    deviceScaleFactor: desktopConfig.deviceScaleFactor,
-                    isMobile: desktopConfig.isMobile,
-                    hasTouch: desktopConfig.isMobile
-                });
-                log.info('Desktop: navigating to URL...');
-                await desktopPage.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-                log.info('Desktop: capturing full page...');
-                const screenshot = await captureFullPage(desktopPage, desktopConfig);
-                log.success('Desktop screenshot captured!');
-                return screenshot;
-            };
+            // 1. デスクトップ版を取得
+            send({ type: 'progress', step: 'capture-desktop', message: 'デスクトップ版を取得中...' });
+            log.info('Creating desktop page...');
 
-            // モバイルページの設定
-            const setupMobile = async () => {
-                await mobilePage.setViewport({
-                    width: mobileConfig.width,
-                    height: mobileConfig.height,
-                    deviceScaleFactor: mobileConfig.deviceScaleFactor,
-                    isMobile: mobileConfig.isMobile,
-                    hasTouch: mobileConfig.isMobile
-                });
-                if (mobileConfig.userAgent) {
-                    await mobilePage.setUserAgent(mobileConfig.userAgent);
-                }
-                log.info('Mobile: navigating to URL...');
-                await mobilePage.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-                log.info('Mobile: capturing full page...');
-                const screenshot = await captureFullPage(mobilePage, mobileConfig);
-                log.success('Mobile screenshot captured!');
-                return screenshot;
-            };
+            const desktopPage = await browser.newPage();
+            await desktopPage.setViewport({
+                width: desktopConfig.width,
+                height: desktopConfig.height,
+                deviceScaleFactor: desktopConfig.deviceScaleFactor,
+                isMobile: desktopConfig.isMobile,
+                hasTouch: desktopConfig.isMobile
+            });
+            log.info('Desktop: navigating to URL...');
+            await desktopPage.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+            log.info('Desktop: capturing full page...');
+            const desktopScreenshot = await captureFullPage(desktopPage, desktopConfig);
+            log.success('Desktop screenshot captured!');
+            await desktopPage.close();
 
-            // 並列実行
-            const [desktopScreenshot, mobileScreenshot] = await Promise.all([
-                setupDesktop(),
-                setupMobile()
-            ]);
+            // デスクトップのアップロード
+            send({ type: 'progress', step: 'upload-desktop', message: 'デスクトップ版をアップロード中...' });
+            log.info('Uploading desktop segments...');
+            const desktopMedia = await segmentAndUpload(desktopScreenshot, 'desktop', url, user.id);
+            log.success(`Desktop: ${desktopMedia.length} segments created`);
 
-            // ページを閉じる
-            await Promise.all([desktopPage.close(), mobilePage.close()]);
+            // 2. モバイル版を取得
+            send({ type: 'progress', step: 'capture-mobile', message: 'モバイル版を取得中...' });
+            log.info('Creating mobile page...');
 
-            // ========== セグメント分割とアップロード（並列） ==========
-            send({ type: 'progress', step: 'upload', message: 'セグメント分割とアップロード中...' });
-            log.info('Segmenting and uploading in parallel...');
+            const mobilePage = await browser.newPage();
+            await mobilePage.setViewport({
+                width: mobileConfig.width,
+                height: mobileConfig.height,
+                deviceScaleFactor: mobileConfig.deviceScaleFactor,
+                isMobile: mobileConfig.isMobile,
+                hasTouch: mobileConfig.isMobile
+            });
+            if (mobileConfig.userAgent) {
+                await mobilePage.setUserAgent(mobileConfig.userAgent);
+            }
+            log.info('Mobile: navigating to URL...');
+            await mobilePage.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+            log.info('Mobile: capturing full page...');
+            const mobileScreenshot = await captureFullPage(mobilePage, mobileConfig);
+            log.success('Mobile screenshot captured!');
+            await mobilePage.close();
 
-            const [desktopMedia, mobileMedia] = await Promise.all([
-                segmentAndUpload(desktopScreenshot, 'desktop', url, user.id),
-                segmentAndUpload(mobileScreenshot, 'mobile', url, user.id)
-            ]);
+            // モバイルのアップロード
+            send({ type: 'progress', step: 'upload-mobile', message: 'モバイル版をアップロード中...' });
+            log.info('Uploading mobile segments...');
+            const mobileMedia = await segmentAndUpload(mobileScreenshot, 'mobile', url, user.id);
+            log.success(`Mobile: ${mobileMedia.length} segments created`);
 
             log.success(`Desktop: ${desktopMedia.length} segments created`);
             log.success(`Mobile: ${mobileMedia.length} segments created`);
