@@ -545,7 +545,7 @@ export async function POST(request: NextRequest) {
 
             await page.evaluate(async () => {
                 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-                const scrollStep = 500; // Faster scrolling
+                const scrollStep = 800; // Even faster scrolling
 
                 let maxScroll = Math.max(
                     document.body.scrollHeight,
@@ -554,7 +554,7 @@ export async function POST(request: NextRequest) {
 
                 for (let y = 0; y < maxScroll; y += scrollStep) {
                     window.scrollTo(0, y);
-                    await delay(50); // Faster in production
+                    await delay(30); // Minimal delay
 
                     const newHeight = Math.max(
                         document.body.scrollHeight,
@@ -564,14 +564,14 @@ export async function POST(request: NextRequest) {
                 }
 
                 window.scrollTo(0, maxScroll);
-                await delay(300);
+                await delay(100);
             });
 
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
 
         await page.evaluate(() => window.scrollTo(0, 0));
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         // Force load ALL images (including lazy-loaded ones)
         log.info('Force loading all images...');
@@ -740,9 +740,14 @@ export async function POST(request: NextRequest) {
 
         viewportHeight = deviceConfig.height * deviceConfig.deviceScaleFactor;
         viewportWidth = deviceConfig.width * deviceConfig.deviceScaleFactor;
-        numCaptures = Math.ceil(documentHeight / deviceConfig.height);
+        const totalCaptures = Math.ceil(documentHeight / deviceConfig.height);
 
-        log.info(`Document height: ${documentHeight}px, Viewport: ${deviceConfig.width}x${deviceConfig.height}, Captures needed: ${numCaptures}`);
+        // 本番環境では1回あたりの撮影枚数を制限（タイムアウト対策）
+        const maxCapturesPerRequest = isDev ? 100 : 8;
+        numCaptures = Math.min(totalCaptures, maxCapturesPerRequest);
+
+        log.info(`Document height: ${documentHeight}px, Viewport: ${deviceConfig.width}x${deviceConfig.height}`);
+        log.info(`Total captures needed: ${totalCaptures}, Limited to: ${numCaptures} (max per request: ${maxCapturesPerRequest})`);
 
         viewportBuffers = [];
 
