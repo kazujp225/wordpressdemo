@@ -540,104 +540,104 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Scroll to trigger lazy loading (本番環境では高速化のため1パスのみ)
+        // Scroll to trigger lazy loading (本番環境では高速化のため軽量化)
         send({ type: 'progress', step: 'scroll', message: 'コンテンツを読み込み中...' });
-        const scrollPasses = isDev ? 3 : 1;
-        for (let pass = 0; pass < scrollPasses; pass++) {
-            log.info(`Scroll pass ${pass + 1}/${scrollPasses} starting...`);
 
-            await page.evaluate(async () => {
-                const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-                const scrollStep = 800; // Even faster scrolling
+        if (isDev) {
+            // 開発環境：しっかりスクロール
+            for (let pass = 0; pass < 3; pass++) {
+                log.info(`Scroll pass ${pass + 1}/3 starting...`);
 
-                let maxScroll = Math.max(
-                    document.body.scrollHeight,
-                    document.documentElement.scrollHeight
-                );
+                await page.evaluate(async () => {
+                    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+                    const scrollStep = 800;
 
-                for (let y = 0; y < maxScroll; y += scrollStep) {
-                    window.scrollTo(0, y);
-                    await delay(30); // Minimal delay
-
-                    const newHeight = Math.max(
+                    let maxScroll = Math.max(
                         document.body.scrollHeight,
                         document.documentElement.scrollHeight
                     );
-                    if (newHeight > maxScroll) maxScroll = newHeight;
-                }
 
-                window.scrollTo(0, maxScroll);
-                await delay(100);
-            });
+                    for (let y = 0; y < maxScroll; y += scrollStep) {
+                        window.scrollTo(0, y);
+                        await delay(30);
 
-            await new Promise(resolve => setTimeout(resolve, 200));
+                        const newHeight = Math.max(
+                            document.body.scrollHeight,
+                            document.documentElement.scrollHeight
+                        );
+                        if (newHeight > maxScroll) maxScroll = newHeight;
+                    }
+
+                    window.scrollTo(0, maxScroll);
+                    await delay(100);
+                });
+
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        } else {
+            // 本番環境：高速スクロール（タイムアウト対策）
+            log.info('Quick scroll for production...');
+            try {
+                await page.evaluate(async () => {
+                    const scrollStep = 2000; // 大きなステップで高速スクロール
+                    const maxScroll = Math.max(
+                        document.body.scrollHeight,
+                        document.documentElement.scrollHeight
+                    );
+
+                    // 3回だけジャンプしてlazy loadをトリガー
+                    const positions = [0, maxScroll * 0.33, maxScroll * 0.66, maxScroll];
+                    for (const y of positions) {
+                        window.scrollTo(0, y);
+                        await new Promise(r => setTimeout(r, 50));
+                    }
+                    window.scrollTo(0, 0);
+                });
+            } catch (scrollError: any) {
+                log.info(`Scroll skipped due to timeout: ${scrollError.message}`);
+            }
         }
 
         await page.evaluate(() => window.scrollTo(0, 0));
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         // Force load ALL images (including lazy-loaded ones)
         log.info('Force loading all images...');
-        await page.evaluate(async () => {
-            // 1. Force lazy images to load by removing lazy attributes
-            const lazyImages = document.querySelectorAll('img[loading="lazy"], img[data-src], img[data-lazy]');
-            lazyImages.forEach(img => {
-                const imgEl = img as HTMLImageElement;
-                // Move data-src to src if present
-                if (imgEl.dataset.src) {
-                    imgEl.src = imgEl.dataset.src;
-                }
-                if (imgEl.dataset.lazy) {
-                    imgEl.src = imgEl.dataset.lazy;
-                }
-                // Remove lazy loading
-                imgEl.removeAttribute('loading');
-                imgEl.loading = 'eager';
-            });
-
-            // 2. Force all images to load
-            const allImages = Array.from(document.querySelectorAll('img'));
-            console.log(`[IMPORT] Found ${allImages.length} images to load`);
-
-            await Promise.all(allImages.map(img => {
-                if (img.complete && img.naturalHeight > 0) return Promise.resolve();
-                return new Promise((resolve) => {
-                    img.onload = () => { console.log(`[IMPORT] Loaded: ${img.src?.substring(0, 50)}`); resolve(undefined); };
-                    img.onerror = resolve;
-                    setTimeout(resolve, 5000); // 5 seconds timeout
-                });
-            }));
-
-            // 3. Force CSS background images to load
-            const allElements = document.querySelectorAll('*');
-            const bgUrls: string[] = [];
-            allElements.forEach(el => {
-                const style = window.getComputedStyle(el);
-                const bgImage = style.backgroundImage;
-                if (bgImage && bgImage !== 'none') {
-                    const match = bgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
-                    if (match && match[1]) {
-                        bgUrls.push(match[1]);
+        try {
+            await page.evaluate(async () => {
+                // 1. Force lazy images to load by removing lazy attributes
+                const lazyImages = document.querySelectorAll('img[loading="lazy"], img[data-src], img[data-lazy]');
+                lazyImages.forEach(img => {
+                    const imgEl = img as HTMLImageElement;
+                    if (imgEl.dataset.src) {
+                        imgEl.src = imgEl.dataset.src;
                     }
-                }
-            });
-
-            console.log(`[IMPORT] Found ${bgUrls.length} background images`);
-
-            // Preload background images
-            await Promise.all(bgUrls.slice(0, 50).map(url => { // Limit to 50 to avoid timeout
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = resolve;
-                    img.onerror = resolve;
-                    img.src = url;
-                    setTimeout(resolve, 3000);
+                    if (imgEl.dataset.lazy) {
+                        imgEl.src = imgEl.dataset.lazy;
+                    }
+                    imgEl.removeAttribute('loading');
+                    imgEl.loading = 'eager';
                 });
-            }));
-        });
+
+                // 2. Force all images to load (with shorter timeout for production)
+                const allImages = Array.from(document.querySelectorAll('img'));
+                const imageTimeout = 2000; // 2秒タイムアウト
+
+                await Promise.all(allImages.slice(0, 30).map(img => { // 最大30枚に制限
+                    if (img.complete && img.naturalHeight > 0) return Promise.resolve();
+                    return new Promise((resolve) => {
+                        img.onload = () => resolve(undefined);
+                        img.onerror = resolve;
+                        setTimeout(resolve, imageTimeout);
+                    });
+                }));
+            });
+        } catch (imgError: any) {
+            log.info(`Image loading skipped due to timeout: ${imgError.message}`);
+        }
 
         log.info('Images loaded, waiting for render...');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Extra wait for rendering
+        await new Promise(resolve => setTimeout(resolve, isDev ? 2000 : 500)); // 本番は短く
 
         // Remove popups - LESS AGGRESSIVE to avoid removing legitimate content
         log.info('Removing popups...');
