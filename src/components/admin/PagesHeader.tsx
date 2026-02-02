@@ -535,8 +535,11 @@ export function PagesHeader() {
                                             <p className="text-xs text-gray-500 mt-2 ml-8">
                                                 取り込み後、エディタで両方のビューポートを並べて編集できます
                                             </p>
+                                            <p className="text-xs text-red-600 mt-2 ml-8 bg-red-50 p-2 rounded border border-red-200 font-medium">
+                                                ※ ページ上部から最大8セクションまでの取得となります
+                                            </p>
                                             <p className="text-xs text-amber-600 mt-2 ml-8 bg-amber-50 p-2 rounded border border-amber-200">
-                                                ※ ページの長さによっては処理に1〜3分程度かかる場合があります
+                                                ※ 処理に1〜3分程度かかる場合があります
                                             </p>
                                         </div>
                                     ) : (
