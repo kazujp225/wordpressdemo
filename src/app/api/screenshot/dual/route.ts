@@ -456,10 +456,16 @@ export async function POST(request: NextRequest) {
                 mobile: mobileMedia,
             };
             log.success(`Sending complete event with ${desktopMedia.length} desktop and ${mobileMedia.length} mobile segments`);
+
+            // completeイベントを複数回送信（確実に届くように）
+            send(completePayload);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            send(completePayload);
+            await new Promise(resolve => setTimeout(resolve, 200));
             send(completePayload);
 
             // ストリーム終了前に待機（クライアントがデータを受け取る時間を確保）
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
         } finally {
             await browser.close();
