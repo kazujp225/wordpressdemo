@@ -523,7 +523,19 @@ export async function POST(request: NextRequest) {
         // Navigate to URL
         send({ type: 'progress', step: 'navigate', message: 'ページを読み込み中...' });
         log.info('Navigating to URL...');
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+        // 本番環境では短いタイムアウト＆早めの完了条件を使用（Renderの30秒制限対策）
+        const navigationTimeout = isDev ? 60000 : 25000;
+        const waitUntilOption = isDev ? 'networkidle2' : 'domcontentloaded';
+        try {
+            await page.goto(url, { waitUntil: waitUntilOption as any, timeout: navigationTimeout });
+        } catch (navError: any) {
+            // タイムアウトでも続行を試みる（一部コンテンツは読み込まれている可能性）
+            if (navError.message?.includes('timeout')) {
+                log.info('Navigation timeout, but continuing with partial content...');
+            } else {
+                throw navError;
+            }
+        }
 
         // Scroll to trigger lazy loading (本番環境では高速化のため1パスのみ)
         send({ type: 'progress', step: 'scroll', message: 'コンテンツを読み込み中...' });
