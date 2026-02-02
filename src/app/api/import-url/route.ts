@@ -575,8 +575,9 @@ export async function POST(request: NextRequest) {
         // Navigate to URL
         send({ type: 'progress', step: 'navigate', message: 'ページを読み込み中...' });
         log.info('Navigating to URL...');
-        // 本番環境では短いタイムアウト＆早めの完了条件を使用（Renderの30秒制限対策）
-        const navigationTimeout = isDev ? 60000 : 25000;
+        // 本番環境では短いタイムアウト＆早めの完了条件を使用（Renderの制限対策）
+        // モバイルはさらに短く
+        const navigationTimeout = isDev ? 60000 : (device === 'mobile' ? 15000 : 20000);
         const waitUntilOption = isDev ? 'networkidle2' : 'domcontentloaded';
         try {
             await page.goto(url, { waitUntil: waitUntilOption as any, timeout: navigationTimeout });
@@ -648,18 +649,16 @@ export async function POST(request: NextRequest) {
             log.info('Quick scroll for production...');
             try {
                 await page.evaluate(async () => {
-                    const scrollStep = 2000; // 大きなステップで高速スクロール
                     const maxScroll = Math.max(
                         document.body.scrollHeight,
                         document.documentElement.scrollHeight
                     );
 
-                    // 3回だけジャンプしてlazy loadをトリガー
-                    const positions = [0, maxScroll * 0.33, maxScroll * 0.66, maxScroll];
-                    for (const y of positions) {
-                        window.scrollTo(0, y);
-                        await new Promise(r => setTimeout(r, 50));
-                    }
+                    // 2回だけジャンプしてlazy loadをトリガー（高速化）
+                    window.scrollTo(0, maxScroll * 0.5);
+                    await new Promise(r => setTimeout(r, 30));
+                    window.scrollTo(0, maxScroll);
+                    await new Promise(r => setTimeout(r, 30));
                     window.scrollTo(0, 0);
                 });
             } catch (scrollError: any) {
@@ -668,45 +667,49 @@ export async function POST(request: NextRequest) {
         }
 
         await page.evaluate(() => window.scrollTo(0, 0));
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // Force load ALL images (including lazy-loaded ones)
-        log.info('Force loading all images...');
-        try {
-            await page.evaluate(async () => {
-                // 1. Force lazy images to load by removing lazy attributes
-                const lazyImages = document.querySelectorAll('img[loading="lazy"], img[data-src], img[data-lazy]');
-                lazyImages.forEach(img => {
-                    const imgEl = img as HTMLImageElement;
-                    if (imgEl.dataset.src) {
-                        imgEl.src = imgEl.dataset.src;
-                    }
-                    if (imgEl.dataset.lazy) {
-                        imgEl.src = imgEl.dataset.lazy;
-                    }
-                    imgEl.removeAttribute('loading');
-                    imgEl.loading = 'eager';
-                });
-
-                // 2. Force all images to load (with shorter timeout for production)
-                const allImages = Array.from(document.querySelectorAll('img'));
-                const imageTimeout = 2000; // 2秒タイムアウト
-
-                await Promise.all(allImages.slice(0, 30).map(img => { // 最大30枚に制限
-                    if (img.complete && img.naturalHeight > 0) return Promise.resolve();
-                    return new Promise((resolve) => {
-                        img.onload = () => resolve(undefined);
-                        img.onerror = resolve;
-                        setTimeout(resolve, imageTimeout);
+        // モバイルはスキップして高速化
+        if (device !== 'mobile' || isDev) {
+            log.info('Force loading all images...');
+            try {
+                await page.evaluate(async () => {
+                    // 1. Force lazy images to load by removing lazy attributes
+                    const lazyImages = document.querySelectorAll('img[loading="lazy"], img[data-src], img[data-lazy]');
+                    lazyImages.forEach(img => {
+                        const imgEl = img as HTMLImageElement;
+                        if (imgEl.dataset.src) {
+                            imgEl.src = imgEl.dataset.src;
+                        }
+                        if (imgEl.dataset.lazy) {
+                            imgEl.src = imgEl.dataset.lazy;
+                        }
+                        imgEl.removeAttribute('loading');
+                        imgEl.loading = 'eager';
                     });
-                }));
-            });
-        } catch (imgError: any) {
-            log.info(`Image loading skipped due to timeout: ${imgError.message}`);
-        }
 
-        log.info('Images loaded, waiting for render...');
-        await new Promise(resolve => setTimeout(resolve, isDev ? 2000 : 500)); // 本番は短く
+                    // 2. Force all images to load (with shorter timeout for production)
+                    const allImages = Array.from(document.querySelectorAll('img'));
+                    const imageTimeout = 1500; // 1.5秒タイムアウト
+
+                    await Promise.all(allImages.slice(0, 20).map(img => { // 最大20枚に制限
+                        if (img.complete && img.naturalHeight > 0) return Promise.resolve();
+                        return new Promise((resolve) => {
+                            img.onload = () => resolve(undefined);
+                            img.onerror = resolve;
+                            setTimeout(resolve, imageTimeout);
+                        });
+                    }));
+                });
+            } catch (imgError: any) {
+                log.info(`Image loading skipped due to timeout: ${imgError.message}`);
+            }
+            log.info('Images loaded, waiting for render...');
+        } else {
+            log.info('Skipping image force-load for mobile (speed optimization)...');
+        }
+        await new Promise(resolve => setTimeout(resolve, isDev ? 2000 : 200)); // 本番は短く
 
         // Remove popups - LESS AGGRESSIVE to avoid removing legitimate content
         log.info('Removing popups...');
@@ -739,7 +742,7 @@ export async function POST(request: NextRequest) {
             document.documentElement.style.overflow = 'auto';
         });
 
-        await new Promise(resolve => setTimeout(resolve, isDev ? 500 : 100));
+        await new Promise(resolve => setTimeout(resolve, isDev ? 500 : 50));
 
         // Fix fixed/sticky elements for proper fullPage screenshot
         // These elements repeat at every viewport position, corrupting the final image
@@ -793,7 +796,7 @@ export async function POST(request: NextRequest) {
             document.documentElement.style.position = 'static';
         });
 
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, isDev ? 300 : 100));
 
         // Take screenshots manually by scrolling viewport-by-viewport
         // This avoids Puppeteer's buggy fullPage implementation that repeats fixed elements
@@ -844,17 +847,19 @@ export async function POST(request: NextRequest) {
             await new Promise(resolve => setTimeout(resolve, scrollWait));
 
             // Remove fixed elements AGAIN before each capture (in case JS re-added them)
-            // 毎回実行してヘッダーの繰り返しを防ぐ
-            await page.evaluate(() => {
-                const allElements = document.querySelectorAll('*');
-                allElements.forEach(el => {
-                    const element = el as HTMLElement;
-                    const computedStyle = window.getComputedStyle(element);
-                    if (computedStyle.position === 'fixed' || computedStyle.position === 'sticky') {
-                        element.remove(); // display:none ではなく完全に削除
-                    }
+            // 最初の2回だけ完全チェック、以降は軽量チェック
+            if (i < 2) {
+                await page.evaluate(() => {
+                    const allElements = document.querySelectorAll('*');
+                    allElements.forEach(el => {
+                        const element = el as HTMLElement;
+                        const computedStyle = window.getComputedStyle(element);
+                        if (computedStyle.position === 'fixed' || computedStyle.position === 'sticky') {
+                            element.remove();
+                        }
+                    });
                 });
-            });
+            }
             await new Promise(resolve => setTimeout(resolve, captureWait));
 
             // Take viewport screenshot
