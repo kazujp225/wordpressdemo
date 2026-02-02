@@ -325,17 +325,53 @@ export async function POST(request: NextRequest) {
 
         let browser;
         try {
-            const executablePath = await chromium.executablePath();
-            log.info(`Chromium path: ${executablePath}`);
+            const isDev = process.env.NODE_ENV === 'development';
 
-            browser = await puppeteer.launch({
-                args: chromium.args,
-                executablePath,
-                headless: true,
-            });
+            if (isDev) {
+                // ローカル開発環境: システムのChromeを使用
+                const possiblePaths = [
+                    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // macOS
+                    '/usr/bin/google-chrome', // Linux
+                    '/usr/bin/chromium-browser', // Linux Chromium
+                    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', // Windows
+                    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe', // Windows x86
+                ];
+
+                let localChromePath: string | undefined;
+                for (const p of possiblePaths) {
+                    try {
+                        const fs = await import('fs');
+                        if (fs.existsSync(p)) {
+                            localChromePath = p;
+                            break;
+                        }
+                    } catch {}
+                }
+
+                if (!localChromePath) {
+                    throw new Error('ローカルにChromeが見つかりません。Google Chromeをインストールしてください。');
+                }
+
+                log.info(`Local Chrome path: ${localChromePath}`);
+                browser = await puppeteer.launch({
+                    executablePath: localChromePath,
+                    headless: true,
+                    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                });
+            } else {
+                // 本番環境: @sparticuz/chromiumを使用
+                const executablePath = await chromium.executablePath();
+                log.info(`Chromium path: ${executablePath}`);
+
+                browser = await puppeteer.launch({
+                    args: chromium.args,
+                    executablePath,
+                    headless: true,
+                });
+            }
         } catch (launchError: any) {
             log.error(`Browser launch failed: ${launchError.message}`);
-            send({ type: 'error', error: 'ブラウザの起動に失敗しました' });
+            send({ type: 'error', error: `ブラウザの起動に失敗しました: ${launchError.message}` });
             return;
         }
 
