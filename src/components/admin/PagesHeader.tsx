@@ -554,7 +554,7 @@ export function PagesHeader() {
                                                         <p>2. 次にモバイル版を取得</p>
                                                     </div>
                                                     <p className="text-xs text-red-600 ml-8 bg-red-50 p-2 rounded border border-red-200 font-medium">
-                                                        ※ 各デバイス上部から最大12セクションまでの取得となります
+                                                        ※ 各デバイス上部から最大10セクションまでの取得となります
                                                     </p>
                                                 </>
                                             ) : dualStep === 'desktop-done' ? (

@@ -743,7 +743,7 @@ export async function POST(request: NextRequest) {
         const totalCaptures = Math.ceil(documentHeight / deviceConfig.height);
 
         // 本番環境では1回あたりの撮影枚数を制限（タイムアウト対策）
-        const maxCapturesPerRequest = isDev ? 100 : 12;
+        const maxCapturesPerRequest = isDev ? 100 : 10;
         numCaptures = Math.min(totalCaptures, maxCapturesPerRequest);
 
         log.info(`Document height: ${documentHeight}px, Viewport: ${deviceConfig.width}x${deviceConfig.height}`);
