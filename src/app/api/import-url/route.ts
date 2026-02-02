@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { prisma } from '@/lib/db';
+
+// Vercel/Render用のタイムアウト設定（60秒）
+export const maxDuration = 60;
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import sharp from 'sharp';
 import fs from 'fs';
