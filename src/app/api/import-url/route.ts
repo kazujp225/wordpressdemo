@@ -511,6 +511,52 @@ export async function POST(request: NextRequest) {
         try {
         const page = await browser.newPage();
 
+        // 本番環境でモバイル時：リクエストインターセプションで不要リソースをブロック
+        if (!isDev && device === 'mobile') {
+            await page.setRequestInterception(true);
+            page.on('request', (req) => {
+                const resourceType = req.resourceType();
+                const url = req.url();
+
+                // ブロック対象：media, font, analytics, third-party scripts
+                const blockedTypes = ['media', 'font'];
+                const blockedPatterns = [
+                    /google-analytics\.com/i,
+                    /googletagmanager\.com/i,
+                    /facebook\.net/i,
+                    /twitter\.com\/i\/jot/i,
+                    /analytics/i,
+                    /tracking/i,
+                    /ads\./i,
+                    /doubleclick/i,
+                    /adservice/i,
+                    /hotjar/i,
+                    /clarity\.ms/i,
+                    /mixpanel/i,
+                    /segment\.io/i,
+                    /intercom/i,
+                    /crisp\.chat/i,
+                    /zendesk/i,
+                    /tawk\.to/i,
+                    /livechat/i,
+                    /chat.*widget/i,
+                ];
+
+                if (blockedTypes.includes(resourceType)) {
+                    req.abort();
+                    return;
+                }
+
+                if (blockedPatterns.some(pattern => pattern.test(url))) {
+                    req.abort();
+                    return;
+                }
+
+                req.continue();
+            });
+            log.info('Request interception enabled for mobile (blocking media/font/analytics)');
+        }
+
         await page.setViewport({
             width: deviceConfig.width,
             height: deviceConfig.height,
@@ -538,6 +584,26 @@ export async function POST(request: NextRequest) {
             } else {
                 throw navError;
             }
+        }
+
+        // 本番環境でモバイル時：CSS注入でアニメーション停止（処理高速化）
+        if (!isDev && device === 'mobile') {
+            await page.addStyleTag({
+                content: `
+                    *, *::before, *::after {
+                        animation: none !important;
+                        animation-duration: 0s !important;
+                        animation-delay: 0s !important;
+                        transition: none !important;
+                        transition-duration: 0s !important;
+                        transition-delay: 0s !important;
+                    }
+                    video, iframe[src*="youtube"], iframe[src*="vimeo"] {
+                        display: none !important;
+                    }
+                `
+            });
+            log.info('Animations disabled via CSS injection for mobile');
         }
 
         // Scroll to trigger lazy loading (本番環境では高速化のため軽量化)
