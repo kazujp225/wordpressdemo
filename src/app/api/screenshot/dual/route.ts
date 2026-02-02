@@ -462,6 +462,9 @@ export async function POST(request: NextRequest) {
             log.success(`Sending complete event with ${desktopMedia.length} desktop and ${mobileMedia.length} mobile segments`);
             send(completePayload);
 
+            // ストリーム終了前に待機（クライアントがデータを受け取る時間を確保）
+            await new Promise(resolve => setTimeout(resolve, 500));
+
         } finally {
             await browser.close();
         }

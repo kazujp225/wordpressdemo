@@ -268,28 +268,71 @@ export function PagesHeader() {
                 }
             }
 
-            // 残りのバッファもチェック
+            // 残りのバッファもチェック（改行で分割して全行を処理）
             if (buffer.trim()) {
-                const lines = buffer.split('\n').filter(line => line.startsWith('data: '));
-                for (const line of lines) {
+                console.log('[DualImport] Processing final buffer, length:', buffer.length);
+                // バッファ内の全ての data: 行を抽出
+                const allLines = buffer.split('\n');
+                for (const rawLine of allLines) {
+                    const line = rawLine.trim();
+                    if (!line.startsWith('data: ')) continue;
+
                     try {
                         const jsonStr = line.substring(6);
                         const data = JSON.parse(jsonStr);
-                        console.log('[DualImport] Final buffer event:', data);
+                        console.log('[DualImport] Final buffer event:', data.type);
 
                         if (data.type === 'complete' && data.success) {
                             dualResult = {
                                 desktop: data.desktop,
                                 mobile: data.mobile,
                             };
+                            console.log('[DualImport] Complete found in final buffer! Desktop:', data.desktop?.length, 'Mobile:', data.mobile?.length);
                         }
                     } catch (parseError) {
-                        console.warn('[DualImport] Final buffer parse error:', parseError);
+                        console.warn('[DualImport] Final buffer parse error for line:', line.substring(0, 100));
+                    }
+                }
+            }
+
+            // 全レスポンスからcompleteイベントを再検索（フォールバック）
+            if (!dualResult && fullResponse.includes('"type":"complete"')) {
+                console.log('[DualImport] Searching complete event in full response...');
+                const completeMatch = fullResponse.match(/data:\s*(\{"type":"complete"[^}]+\})/);
+                if (completeMatch) {
+                    try {
+                        // JSONが途中で切れている可能性があるため、完全なJSONを探す
+                        const startIdx = fullResponse.lastIndexOf('data: {"type":"complete"');
+                        if (startIdx !== -1) {
+                            const jsonStart = fullResponse.indexOf('{', startIdx);
+                            let braceCount = 0;
+                            let jsonEnd = jsonStart;
+                            for (let i = jsonStart; i < fullResponse.length; i++) {
+                                if (fullResponse[i] === '{') braceCount++;
+                                if (fullResponse[i] === '}') braceCount--;
+                                if (braceCount === 0) {
+                                    jsonEnd = i + 1;
+                                    break;
+                                }
+                            }
+                            const jsonStr = fullResponse.substring(jsonStart, jsonEnd);
+                            const data = JSON.parse(jsonStr);
+                            if (data.type === 'complete' && data.success) {
+                                dualResult = {
+                                    desktop: data.desktop,
+                                    mobile: data.mobile,
+                                };
+                                console.log('[DualImport] Complete recovered from full response! Desktop:', data.desktop?.length, 'Mobile:', data.mobile?.length);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[DualImport] Failed to recover complete from full response:', e);
                     }
                 }
             }
 
             if (!dualResult) {
+                console.error('[DualImport] No result found. Full response preview:', fullResponse.substring(0, 500));
                 throw new Error('デュアルスクリーンショット結果を取得できませんでした。');
             }
 
