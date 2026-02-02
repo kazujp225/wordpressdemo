@@ -433,7 +433,8 @@ export async function POST(request: NextRequest) {
         colorScheme,
         layoutOption,
         customPrompt,
-        customSections  // ユーザーが調整したセクション境界
+        customSections,  // ユーザーが調整したセクション境界
+        startFrom = 0,   // 開始セクション番号（続きを取得用）
     } = validation.data;
 
     // デザインオプションをまとめる
@@ -504,6 +505,8 @@ export async function POST(request: NextRequest) {
         let viewportWidth = 0;
         let numCaptures = 0;
         let viewportBuffers: Buffer[] = [];
+        let hasMore = false;  // 続きがあるかどうか
+        let nextStartFrom = 0;  // 次の開始位置
 
         try {
         const page = await browser.newPage();
@@ -744,15 +747,24 @@ export async function POST(request: NextRequest) {
 
         // 本番環境では1回あたりの撮影枚数を制限（タイムアウト対策）
         const maxCapturesPerRequest = isDev ? 100 : 10;
-        numCaptures = Math.min(totalCaptures, maxCapturesPerRequest);
+
+        // startFromが指定されている場合は、その位置から取得
+        const startIndex = Math.min(startFrom, totalCaptures);
+        const remainingCaptures = totalCaptures - startIndex;
+        numCaptures = Math.min(remainingCaptures, maxCapturesPerRequest);
 
         log.info(`Document height: ${documentHeight}px, Viewport: ${deviceConfig.width}x${deviceConfig.height}`);
-        log.info(`Total captures needed: ${totalCaptures}, Limited to: ${numCaptures} (max per request: ${maxCapturesPerRequest})`);
+        log.info(`Total captures: ${totalCaptures}, Starting from: ${startIndex}, Capturing: ${numCaptures}`);
+
+        // まだ続きがあるかどうかを計算
+        hasMore = (startIndex + numCaptures) < totalCaptures;
+        nextStartFrom = startIndex + numCaptures;
 
         viewportBuffers = [];
 
         for (let i = 0; i < numCaptures; i++) {
-            const scrollY = i * deviceConfig.height;
+            const actualIndex = startIndex + i;
+            const scrollY = actualIndex * deviceConfig.height;
 
             // Scroll to position
             await page.evaluate((y) => window.scrollTo(0, y), scrollY);
@@ -775,7 +787,7 @@ export async function POST(request: NextRequest) {
             const viewportShot = await page.screenshot({ fullPage: false }) as Buffer;
             viewportBuffers.push(viewportShot);
 
-            log.info(`Captured viewport ${i + 1}/${numCaptures} at scrollY=${scrollY}`);
+            log.info(`Captured viewport ${actualIndex + 1}/${totalCaptures} at scrollY=${scrollY}`);
         }
 
         // ブラウザ操作完了、すぐにクローズしてメモリを解放
@@ -1086,7 +1098,9 @@ export async function POST(request: NextRequest) {
             media: createdMedia,
             device,
             importMode,
-            style
+            style,
+            hasMore,
+            nextStartFrom: hasMore ? nextStartFrom : null,
         });
     });
 }

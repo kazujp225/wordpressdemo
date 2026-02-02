@@ -369,6 +369,119 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
     const [isProcessingAssetDrop, setIsProcessingAssetDrop] = useState(false);
 
+    // 続きを取得（スクリーンショット追加取得）
+    const [isFetchingMoreSections, setIsFetchingMoreSections] = useState(false);
+    const [fetchMoreProgress, setFetchMoreProgress] = useState<string | null>(null);
+
+    // ソースURLを取得（最初のセクションの画像から）
+    const sourceUrl = sections.length > 0 && sections[0]?.image?.sourceUrl
+        ? sections[0].image.sourceUrl
+        : null;
+
+    // 続きを取得するハンドラー
+    const handleFetchMoreSections = async (device: 'desktop' | 'mobile') => {
+        if (!sourceUrl) {
+            toast.error('ソースURLが見つかりません');
+            return;
+        }
+
+        setIsFetchingMoreSections(true);
+        setFetchMoreProgress('取得を開始しています...');
+
+        try {
+            // 両方とも既存セクションに画像を追加（0から開始）
+            const startFrom = 0;
+            console.log(`[FetchMore] Starting from section ${startFrom} for ${device}`);
+
+            const res = await fetch('/api/import-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: sourceUrl,
+                    device,
+                    importMode: 'faithful',
+                    startFrom,
+                })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || '取得に失敗しました');
+            }
+
+            const reader = res.body?.getReader();
+            if (!reader) throw new Error('ストリームの読み取りに失敗しました');
+
+            const decoder = new TextDecoder();
+            let finalData: any = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const text = decoder.decode(value, { stream: true });
+                const lines = text.split('\n\n').filter(line => line.startsWith('data: '));
+
+                for (const line of lines) {
+                    try {
+                        const jsonStr = line.replace('data: ', '');
+                        const data = JSON.parse(jsonStr);
+
+                        if (data.type === 'progress') {
+                            setFetchMoreProgress(data.message || '処理中...');
+                        } else if (data.type === 'complete') {
+                            finalData = data;
+                        } else if (data.type === 'error') {
+                            throw new Error(data.error);
+                        }
+                    } catch (parseError) {
+                        // JSON parse error - skip
+                    }
+                }
+            }
+
+            if (!finalData || !finalData.media || finalData.media.length === 0) {
+                toast.error('画像が見つかりませんでした');
+                return;
+            }
+
+            // 既存のセクションに画像を追加
+            setSections(prev => {
+                const updatedSections = [...prev];
+                finalData.media.forEach((m: any, idx: number) => {
+                    if (idx < updatedSections.length) {
+                        if (device === 'mobile') {
+                            // モバイル画像を追加
+                            updatedSections[idx] = {
+                                ...updatedSections[idx],
+                                mobileImageId: m.id,
+                                mobileImage: m,
+                            };
+                        } else {
+                            // デスクトップ画像を追加
+                            updatedSections[idx] = {
+                                ...updatedSections[idx],
+                                imageId: m.id,
+                                image: m,
+                            };
+                        }
+                    }
+                });
+                return updatedSections;
+            });
+
+            const deviceName = device === 'mobile' ? 'モバイル' : 'デスクトップ';
+            toast.success(`${finalData.media.length}セクションに${deviceName}画像を追加しました${finalData.hasMore ? '（まだ続きがあります）' : ''}`);
+
+        } catch (error: any) {
+            console.error('[FetchMore] Error:', error);
+            toast.error(error.message || '取得に失敗しました');
+        } finally {
+            setIsFetchingMoreSections(false);
+            setFetchMoreProgress(null);
+        }
+    };
+
     // 素材ドロップハンドラー
     const handleAssetDrop = async (e: React.DragEvent, targetSectionId: string) => {
         e.preventDefault();
@@ -3012,6 +3125,43 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     ))}
                                 </SortableContext>
                             </DndContext>
+
+                            {/* 画像追加ボタン（ソースURLがある場合のみ表示） */}
+                            {sourceUrl && sections.length > 0 && !batchRegenerateMode && !backgroundUnifyMode && !sectionDeleteMode && (
+                                <div className="py-6 border-t border-dashed border-gray-300 mt-4">
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-500 mb-3">
+                                            現在 {sections.length} セクション
+                                        </p>
+                                        {isFetchingMoreSections ? (
+                                            <div className="flex items-center justify-center gap-2 text-gray-600">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span className="text-sm">{fetchMoreProgress || '取得中...'}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => handleFetchMoreSections('desktop')}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all"
+                                                >
+                                                    <Monitor className="h-4 w-4" />
+                                                    デスクトップ画像を取得
+                                                </button>
+                                                <button
+                                                    onClick={() => handleFetchMoreSections('mobile')}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition-all"
+                                                >
+                                                    <Smartphone className="h-4 w-4" />
+                                                    モバイル画像を取得
+                                                </button>
+                                            </div>
+                                        )}
+                                        <p className="text-[10px] text-gray-400 mt-2">
+                                            ※ 既存セクションに画像を追加します
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
 

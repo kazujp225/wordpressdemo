@@ -92,6 +92,7 @@ export const importUrlSchema = z.object({
     layoutOption: z.enum(['keep', 'modernize', 'compact']).optional(),
     customPrompt: z.string().max(500, 'カスタムプロンプトは500文字以内で入力してください').optional(),
     customSections: z.array(customSectionSchema).optional(), // ユーザーが調整したセクション境界
+    startFrom: z.number().int().min(0).optional(), // 続きを取得用：開始セクション番号
 });
 
 export type ImportUrlInput = z.infer<typeof importUrlSchema>;
