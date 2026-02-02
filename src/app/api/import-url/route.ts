@@ -474,17 +474,38 @@ export async function POST(request: NextRequest) {
             launchArgs = ['--no-sandbox', '--disable-setuid-sandbox'];
             log.info('Using local Chrome for development');
         } else {
-            // Vercel/本番環境: @sparticuz/chromiumを使用
+            // 本番環境: @sparticuz/chromiumを使用（メモリ最適化）
             executablePath = await chromium.executablePath();
-            launchArgs = chromium.args;
+            launchArgs = [
+                ...chromium.args,
+                '--disable-dev-shm-usage', // /dev/shm使用を無効化（メモリ節約）
+                '--disable-gpu', // GPU無効化
+                '--single-process', // シングルプロセスモード
+                '--no-zygote', // Zygoteプロセス無効化
+            ];
             log.info(`Using serverless Chromium: ${executablePath}`);
         }
 
-        const browser = await puppeteer.launch({
-            args: launchArgs,
-            executablePath,
-            headless: true,
-        });
+        let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+        try {
+            browser = await puppeteer.launch({
+                args: launchArgs,
+                executablePath,
+                headless: true,
+                protocolTimeout: 30000, // プロトコルタイムアウトを30秒に設定
+            });
+        } catch (launchError: any) {
+            log.error(`Failed to launch browser: ${launchError.message}`);
+            throw new Error(`ブラウザの起動に失敗しました: ${launchError.message}`);
+        }
+
+        // ブラウザ操作で使う変数を外部スコープで宣言
+        let viewportHeight = 0;
+        let viewportWidth = 0;
+        let numCaptures = 0;
+        let viewportBuffers: Buffer[] = [];
+
+        try {
         const page = await browser.newPage();
 
         await page.setViewport({
@@ -504,14 +525,15 @@ export async function POST(request: NextRequest) {
         log.info('Navigating to URL...');
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
-        // Scroll to trigger lazy loading
+        // Scroll to trigger lazy loading (本番環境では高速化のため1パスのみ)
         send({ type: 'progress', step: 'scroll', message: 'コンテンツを読み込み中...' });
-        for (let pass = 0; pass < 3; pass++) {
-            log.info(`Scroll pass ${pass + 1}/3 starting...`);
+        const scrollPasses = isDev ? 3 : 1;
+        for (let pass = 0; pass < scrollPasses; pass++) {
+            log.info(`Scroll pass ${pass + 1}/${scrollPasses} starting...`);
 
             await page.evaluate(async () => {
                 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-                const scrollStep = 300;
+                const scrollStep = 500; // Faster scrolling
 
                 let maxScroll = Math.max(
                     document.body.scrollHeight,
@@ -520,7 +542,7 @@ export async function POST(request: NextRequest) {
 
                 for (let y = 0; y < maxScroll; y += scrollStep) {
                     window.scrollTo(0, y);
-                    await delay(100); // Increased from 50ms to 100ms for better image loading
+                    await delay(50); // Faster in production
 
                     const newHeight = Math.max(
                         document.body.scrollHeight,
@@ -530,14 +552,14 @@ export async function POST(request: NextRequest) {
                 }
 
                 window.scrollTo(0, maxScroll);
-                await delay(500); // Increased from 300ms
+                await delay(300);
             });
 
-            await new Promise(resolve => setTimeout(resolve, 800)); // Increased from 500ms
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         await page.evaluate(() => window.scrollTo(0, 0));
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
         // Force load ALL images (including lazy-loaded ones)
         log.info('Force loading all images...');
@@ -704,13 +726,13 @@ export async function POST(request: NextRequest) {
             );
         });
 
-        const viewportHeight = deviceConfig.height * deviceConfig.deviceScaleFactor;
-        const viewportWidth = deviceConfig.width * deviceConfig.deviceScaleFactor;
-        const numCaptures = Math.ceil(documentHeight / deviceConfig.height);
+        viewportHeight = deviceConfig.height * deviceConfig.deviceScaleFactor;
+        viewportWidth = deviceConfig.width * deviceConfig.deviceScaleFactor;
+        numCaptures = Math.ceil(documentHeight / deviceConfig.height);
 
         log.info(`Document height: ${documentHeight}px, Viewport: ${deviceConfig.width}x${deviceConfig.height}, Captures needed: ${numCaptures}`);
 
-        const viewportBuffers: Buffer[] = [];
+        viewportBuffers = [];
 
         for (let i = 0; i < numCaptures; i++) {
             const scrollY = i * deviceConfig.height;
@@ -739,7 +761,25 @@ export async function POST(request: NextRequest) {
             log.info(`Captured viewport ${i + 1}/${numCaptures} at scrollY=${scrollY}`);
         }
 
-        await browser.close();
+        // ブラウザ操作完了、すぐにクローズしてメモリを解放
+        try {
+            await browser.close();
+            log.info('Browser closed successfully');
+        } catch (closeError: any) {
+            log.error(`Failed to close browser: ${closeError.message}`);
+        }
+        } catch (browserError: any) {
+            // ブラウザ操作でエラーが発生した場合
+            if (browser) {
+                try {
+                    await browser.close();
+                    log.info('Browser closed after error');
+                } catch (closeError: any) {
+                    log.error(`Failed to close browser after error: ${closeError.message}`);
+                }
+            }
+            throw browserError;
+        }
 
         // Stitch all viewport screenshots together using sharp
         log.info('Stitching viewport screenshots...');
