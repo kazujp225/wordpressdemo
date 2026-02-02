@@ -842,19 +842,17 @@ export async function POST(request: NextRequest) {
             await new Promise(resolve => setTimeout(resolve, scrollWait));
 
             // Remove fixed elements AGAIN before each capture (in case JS re-added them)
-            // 本番環境では最初の1回だけ実行（時間短縮）
-            if (isDev || i === 0) {
-                await page.evaluate(() => {
-                    const allElements = document.querySelectorAll('*');
-                    allElements.forEach(el => {
-                        const element = el as HTMLElement;
-                        const computedStyle = window.getComputedStyle(element);
-                        if (computedStyle.position === 'fixed' || computedStyle.position === 'sticky') {
-                            element.style.display = 'none';
-                        }
-                    });
+            // 毎回実行してヘッダーの繰り返しを防ぐ
+            await page.evaluate(() => {
+                const allElements = document.querySelectorAll('*');
+                allElements.forEach(el => {
+                    const element = el as HTMLElement;
+                    const computedStyle = window.getComputedStyle(element);
+                    if (computedStyle.position === 'fixed' || computedStyle.position === 'sticky') {
+                        element.remove(); // display:none ではなく完全に削除
+                    }
                 });
-            }
+            });
             await new Promise(resolve => setTimeout(resolve, captureWait));
 
             // Take viewport screenshot
