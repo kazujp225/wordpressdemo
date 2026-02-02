@@ -5982,26 +5982,38 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         setResizeSectionId(null);
                         setResizeImageUrl(null);
                     }}
-                    onSave={async (newImageUrl) => {
-                        // セクションの画像を更新
+                    onSave={async (newImageUrl, newImageId) => {
+                        console.log('[ResizeModal] onSave called with URL:', newImageUrl, 'ID:', newImageId);
+                        console.log('[ResizeModal] resizeSectionId:', resizeSectionId);
+                        console.log('[ResizeModal] viewMode:', viewMode);
+
+                        // セクションの画像を更新（imageIdも更新）
                         const updatedSections = sections.map(s => {
                             if (String(s.id) !== resizeSectionId) return s;
+
+                            console.log('[ResizeModal] Updating section:', s.id, 'with new imageId:', newImageId);
 
                             // viewModeに応じてデスクトップまたはモバイル画像を更新
                             if (viewMode === 'mobile' && s.mobileImage) {
                                 return {
                                     ...s,
-                                    mobileImage: { ...s.mobileImage, filePath: newImageUrl }
+                                    mobileImageId: newImageId ?? s.mobileImageId,
+                                    mobileImage: { ...s.mobileImage, id: newImageId ?? s.mobileImage.id, filePath: newImageUrl }
                                 };
                             }
                             return {
                                 ...s,
-                                image: { ...s.image, filePath: newImageUrl }
+                                imageId: newImageId ?? s.imageId,
+                                image: { ...s.image, id: newImageId ?? s.image?.id, filePath: newImageUrl }
                             };
                         });
 
+                        console.log('[ResizeModal] Updated sections:', updatedSections.map(s => ({ id: s.id, imageUrl: s.image?.filePath })));
+
                         setSections(updatedSections);
                         await handleSave(updatedSections);
+
+                        toast.success('画像を更新しました');
 
                         setShowResizeModal(false);
                         setResizeSectionId(null);

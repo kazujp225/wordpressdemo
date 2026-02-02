@@ -6,14 +6,14 @@ import toast from 'react-hot-toast';
 
 // アスペクト比プリセット
 const ASPECT_RATIO_PRESETS = [
-    { label: '1:1 (正方形)', value: '1:1', width: 1, height: 1, icon: '⬜' },
-    { label: '16:9 (YouTube)', value: '16:9', width: 16, height: 9, icon: '📺' },
-    { label: '9:16 (ストーリー)', value: '9:16', width: 9, height: 16, icon: '📱' },
-    { label: '4:3 (標準)', value: '4:3', width: 4, height: 3, icon: '🖼️' },
-    { label: '3:4 (ポートレート)', value: '3:4', width: 3, height: 4, icon: '📷' },
-    { label: '21:9 (ウルトラワイド)', value: '21:9', width: 21, height: 9, icon: '🎬' },
-    { label: '2:1 (パノラマ)', value: '2:1', width: 2, height: 1, icon: '🌄' },
-    { label: 'カスタム', value: 'custom', width: 0, height: 0, icon: '✏️' },
+    { label: '1:1 (正方形)', value: '1:1', width: 1, height: 1 },
+    { label: '16:9 (YouTube)', value: '16:9', width: 16, height: 9 },
+    { label: '9:16 (ストーリー)', value: '9:16', width: 9, height: 16 },
+    { label: '4:3 (標準)', value: '4:3', width: 4, height: 3 },
+    { label: '3:4 (ポートレート)', value: '3:4', width: 3, height: 4 },
+    { label: '21:9 (ウルトラワイド)', value: '21:9', width: 21, height: 9 },
+    { label: '2:1 (パノラマ)', value: '2:1', width: 2, height: 1 },
+    { label: 'カスタム', value: 'custom', width: 0, height: 0 },
 ];
 
 // SNSサイズプリセット
@@ -35,7 +35,7 @@ type ResizeMode = 'crop' | 'resize' | 'outpaint';
 interface ImageResizeModalProps {
     imageUrl: string;
     onClose: () => void;
-    onSave: (newImageUrl: string) => void;
+    onSave: (newImageUrl: string, newImageId?: number) => void;
 }
 
 export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModalProps) {
@@ -253,18 +253,20 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
             let newRect = { ...cropStart };
 
             if (dragType.includes('w')) {
-                newRect.x = Math.max(0, cropStart.x + dx);
-                newRect.width = cropStart.width - dx;
+                const newX = Math.max(0, Math.min(cropStart.x + cropStart.width - 50, cropStart.x + dx));
+                newRect.width = cropStart.x + cropStart.width - newX;
+                newRect.x = newX;
             }
             if (dragType.includes('e')) {
-                newRect.width = Math.min(image.width - cropStart.x, cropStart.width + dx);
+                newRect.width = Math.max(50, Math.min(image.width - cropStart.x, cropStart.width + dx));
             }
             if (dragType.includes('n')) {
-                newRect.y = Math.max(0, cropStart.y + dy);
-                newRect.height = cropStart.height - dy;
+                const newY = Math.max(0, Math.min(cropStart.y + cropStart.height - 50, cropStart.y + dy));
+                newRect.height = cropStart.y + cropStart.height - newY;
+                newRect.y = newY;
             }
             if (dragType.includes('s')) {
-                newRect.height = Math.min(image.height - cropStart.y, cropStart.height + dy);
+                newRect.height = Math.max(50, Math.min(image.height - cropStart.y, cropStart.height + dy));
             }
 
             // アスペクト比固定
@@ -335,33 +337,68 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
 
     // クロップ実行
     const executeCrop = async () => {
-        if (!image) return;
+        console.log('[Crop] ENTERED executeCrop', { image: !!image, cropRect });
+
+        if (!image) {
+            console.warn('[Crop] image is null, returning');
+            return;
+        }
+
+        // 座標を整数化して範囲内に収める
+        const x = Math.max(0, Math.round(cropRect.x));
+        const y = Math.max(0, Math.round(cropRect.y));
+        const width = Math.min(Math.round(cropRect.width), image.width - x);
+        const height = Math.min(Math.round(cropRect.height), image.height - y);
+
+        console.log('[Crop] Executing crop:', { x, y, width, height, imageWidth: image.width, imageHeight: image.height });
+
+        // クロップ範囲が画像全体と同じ場合は警告
+        if (x === 0 && y === 0 && width === image.width && height === image.height) {
+            console.warn('[Crop] cropRect equals full image, showing error');
+            toast.error('クロップ範囲を選択してください。アスペクト比ボタンをクリックするか、画像上でドラッグして範囲を指定してください。');
+            return;
+        }
 
         setIsProcessing(true);
         try {
+
             const canvas = document.createElement('canvas');
-            canvas.width = cropRect.width;
-            canvas.height = cropRect.height;
+            canvas.width = width;
+            canvas.height = height;
             const ctx = canvas.getContext('2d');
             if (!ctx) throw new Error('Canvas context failed');
 
-            ctx.drawImage(image, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 0, 0, cropRect.width, cropRect.height);
+            ctx.drawImage(image, x, y, width, height, 0, 0, width, height);
+
+            console.log('[Crop] Canvas created, converting to blob...');
 
             const blob = await new Promise<Blob>((resolve, reject) => {
-                canvas.toBlob(b => b ? resolve(b) : reject(new Error('Blob creation failed')), 'image/png');
+                canvas.toBlob(b => {
+                    console.log('[Crop] Blob result:', b);
+                    b ? resolve(b) : reject(new Error('Blob creation failed'));
+                }, 'image/png');
             });
+
+            console.log('[Crop] Blob created, size:', blob.size);
 
             // Supabaseにアップロード
             const formData = new FormData();
             formData.append('file', blob, 'cropped.png');
 
+            console.log('[Crop] Uploading to server...');
             const res = await fetch('/api/upload', { method: 'POST', body: formData });
+            console.log('[Crop] Upload response status:', res.status);
             const data = await res.json();
+            console.log('[Crop] Upload response data:', data);
 
             if (data.error) throw new Error(data.error);
 
+            const newUrl = data.filePath || data.url;
+            const newId = data.id;
+            console.log('[Crop] Final URL:', newUrl, 'ID:', newId);
             toast.success('クロップが完了しました');
-            onSave(data.url);
+            onSave(newUrl, newId);
+            console.log('[Crop] onSave called with ID:', newId);
         } catch (error: any) {
             toast.error(error.message || 'クロップに失敗しました');
         } finally {
@@ -398,8 +435,10 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
 
             if (data.error) throw new Error(data.error);
 
+            const newUrl = data.filePath || data.url;
+            const newId = data.id;
             toast.success('リサイズが完了しました');
-            onSave(data.url);
+            onSave(newUrl, newId);
         } catch (error: any) {
             toast.error(error.message || 'リサイズに失敗しました');
         } finally {
@@ -449,7 +488,7 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
             if (data.error) throw new Error(data.error);
 
             toast.success('AI拡張が完了しました');
-            onSave(data.url);
+            onSave(data.url, data.id);
         } catch (error: any) {
             toast.error(error.message || 'AI拡張に失敗しました');
         } finally {
@@ -458,17 +497,27 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
     };
 
     // 実行ボタン
-    const handleExecute = () => {
-        switch (mode) {
-            case 'crop':
-                executeCrop();
-                break;
-            case 'resize':
-                executeResize();
-                break;
-            case 'outpaint':
-                executeOutpaint();
-                break;
+    const handleExecute = async (e?: React.MouseEvent) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+
+        console.log('[handleExecute] Button clicked! mode:', mode);
+        try {
+            if (mode === 'crop') {
+                console.log('[handleExecute] Before executeCrop');
+                await executeCrop();
+                console.log('[handleExecute] After executeCrop');
+            } else if (mode === 'resize') {
+                console.log('[handleExecute] Before executeResize');
+                await executeResize();
+                console.log('[handleExecute] After executeResize');
+            } else if (mode === 'outpaint') {
+                console.log('[handleExecute] Before executeOutpaint');
+                await executeOutpaint();
+                console.log('[handleExecute] After executeOutpaint');
+            }
+        } catch (err) {
+            console.error('[handleExecute] Error:', err);
         }
     };
 
@@ -563,7 +612,6 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
                                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                     }`}
                                                 >
-                                                    <span className="mr-1">{preset.icon}</span>
                                                     {preset.label}
                                                 </button>
                                             ))}
@@ -582,6 +630,12 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
                                                 <span className="ml-1 font-mono">{Math.round(cropRect.height)}px</span>
                                             </div>
                                         </div>
+                                        {image && cropRect.x === 0 && cropRect.y === 0 &&
+                                         Math.round(cropRect.width) === image.width && Math.round(cropRect.height) === image.height && (
+                                            <p className="text-xs text-orange-600 mt-2">
+                                                アスペクト比を選択するか、画像上でドラッグして範囲を指定してください
+                                            </p>
+                                        )}
                                     </div>
                                 </>
                             )}
@@ -728,6 +782,7 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
                         {/* 実行ボタン */}
                         <div className="p-4 border-t bg-gray-50">
                             <button
+                                type="button"
                                 onClick={handleExecute}
                                 disabled={isProcessing}
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"

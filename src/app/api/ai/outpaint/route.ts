@@ -4,7 +4,7 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
-import { v4 as uuidv4 } from 'uuid';
+import { prisma } from '@/lib/db';
 
 export const maxDuration = 60;
 
@@ -24,10 +24,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 使用量チェック
-        const isDev = process.env.NODE_ENV === 'development';
-        const limitCheck = isDev
-            ? { allowed: true, skipCreditConsumption: true }
-            : await checkGenerationLimit(user.id);
+        const limitCheck = await checkGenerationLimit(user.id);
 
         if (!limitCheck.allowed) {
             return NextResponse.json({
@@ -73,7 +70,7 @@ ${prompt ? `【追加指示】\n${prompt}` : '【拡張内容】\n周囲の背�
 
         // Gemini APIコール
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -115,11 +112,11 @@ ${prompt ? `【追加指示】\n${prompt}` : '【拡張内容】\n周囲の背�
 
         // Supabaseにアップロード
         const buffer = Buffer.from(resultBase64, 'base64');
-        const fileName = `outpaint-${uuidv4()}.png`;
-        const filePath = `media/${user.id}/${fileName}`;
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filePath = `${uniqueSuffix}-outpaint.png`;
 
         const { error: uploadError } = await supabaseAdmin.storage
-            .from('media')
+            .from('images')
             .upload(filePath, buffer, {
                 contentType: 'image/png',
                 upsert: false
@@ -131,15 +128,26 @@ ${prompt ? `【追加指示】\n${prompt}` : '【拡張内容】\n周囲の背�
         }
 
         const { data: urlData } = supabaseAdmin.storage
-            .from('media')
+            .from('images')
             .getPublicUrl(filePath);
+
+        // MediaImageレコードを作成
+        const mediaImage = await prisma.mediaImage.create({
+            data: {
+                userId: user.id,
+                filePath: urlData.publicUrl,
+                mime: 'image/png',
+                width: targetWidth,
+                height: targetHeight,
+            }
+        });
 
         // ログ記録
         const logResult = await logGeneration({
             userId: user.id,
             type: 'outpaint',
             endpoint: '/api/ai/outpaint',
-            model: 'gemini-2.0-flash-exp-image-generation',
+            model: 'gemini-3-pro-image-preview',
             inputPrompt: fullPrompt,
             imageCount: 1,
             status: 'succeeded',
@@ -149,13 +157,14 @@ ${prompt ? `【追加指示】\n${prompt}` : '【拡張内容】\n周囲の背�
         // クレジット消費
         if (logResult && !limitCheck.skipCreditConsumption) {
             await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
-                model: 'gemini-2.0-flash-exp-image-generation',
+                model: 'gemini-3-pro-image-preview',
                 imageCount: 1,
             });
         }
 
         return NextResponse.json({
             url: urlData.publicUrl,
+            id: mediaImage.id,
             cost: logResult?.estimatedCost,
         });
 
