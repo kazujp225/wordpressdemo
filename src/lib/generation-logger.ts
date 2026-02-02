@@ -33,7 +33,8 @@ export type GenerationType =
   | 'llmo-analysis'
   | 'seo-llmo-combined'
   | 'suggest-benefits'
-  | 'extract-background-color';
+  | 'extract-background-color'
+  | 'outpaint';
 
 export interface LogGenerationParams {
   userId?: string | null;
