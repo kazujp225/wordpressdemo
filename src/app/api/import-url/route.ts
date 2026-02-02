@@ -518,8 +518,8 @@ export async function POST(request: NextRequest) {
                 const resourceType = req.resourceType();
                 const url = req.url();
 
-                // ブロック対象：media, font, analytics, third-party scripts
-                const blockedTypes = ['media', 'font'];
+                // ブロック対象：media, analytics（フォントはブロックしない - 文字化け防止）
+                const blockedTypes = ['media'];
                 const blockedPatterns = [
                     /google-analytics\.com/i,
                     /googletagmanager\.com/i,
@@ -554,7 +554,7 @@ export async function POST(request: NextRequest) {
 
                 req.continue();
             });
-            log.info('Request interception enabled for mobile (blocking media/font/analytics)');
+            log.info('Request interception enabled for mobile (blocking media/analytics)');
         }
 
         await page.setViewport({
@@ -812,8 +812,7 @@ export async function POST(request: NextRequest) {
         const totalCaptures = Math.ceil(documentHeight / deviceConfig.height);
 
         // 本番環境では1回あたりの撮影枚数を制限（タイムアウト対策）
-        // モバイルは特に厳しく制限（ページが長くなるため）
-        const maxCapturesPerRequest = isDev ? 100 : (device === 'mobile' ? 5 : 8);
+        const maxCapturesPerRequest = isDev ? 100 : (device === 'mobile' ? 10 : 12);
 
         // startFromが指定されている場合は、その位置から取得
         const startIndex = Math.min(startFrom, totalCaptures);
