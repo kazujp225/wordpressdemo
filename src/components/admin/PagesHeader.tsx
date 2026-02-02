@@ -54,6 +54,10 @@ export function PagesHeader() {
     const [progress, setProgress] = useState<ImportProgress | null>(null);
     const [isTextLPModalOpen, setIsTextLPModalOpen] = useState(false);
 
+    // デュアルインポート用の2段階state
+    const [dualStep, setDualStep] = useState<'idle' | 'desktop-done' | 'complete'>('idle');
+    const [desktopMedia, setDesktopMedia] = useState<any[]>([]);
+
     // テキストベースLP生成完了時のハンドラ
     const handleTextLPGenerated = async (sections: any[], meta?: { duration: number, estimatedCost: number }) => {
         try {
@@ -100,12 +104,6 @@ export function PagesHeader() {
 
         try {
             console.log('[Import] Starting import for URL:', importUrl, 'Mode:', importMode, 'Device:', device);
-
-            // デュアルモードの場合は別のAPIを使用
-            if (device === 'dual') {
-                await handleDualImport();
-                return;
-            }
 
             const res = await fetch('/api/import-url', {
                 method: 'POST',
@@ -282,103 +280,120 @@ export function PagesHeader() {
         return finalData.media;
     };
 
-    // デュアルインポート処理（デスクトップ→モバイルを2回に分けて処理）
-    const handleDualImport = async () => {
-        let desktopMedia: any[] = [];
-        let mobileMedia: any[] = [];
-        let desktopSuccess = false;
-        let mobileSuccess = false;
+    // デュアルインポート - ステップ1: デスクトップ取得
+    const handleDualImportDesktop = async () => {
+        setIsImporting(true);
+        setProgress({ message: 'デスクトップ版を取得中...' });
 
         try {
-            // 1. デスクトップ版をインポート
-            setProgress({ message: 'デスクトップ版を取得中...' });
             console.log('[DualImport] Starting desktop import...');
-            try {
-                desktopMedia = await importSingleDevice('desktop');
-                desktopSuccess = true;
-                console.log('[DualImport] Desktop complete:', desktopMedia.length, 'segments');
-            } catch (desktopError: any) {
-                console.error('[DualImport] Desktop failed:', desktopError);
-                // デスクトップが失敗したら全体を失敗させる
-                throw new Error(`デスクトップの取得に失敗しました: ${desktopError.message}`);
-            }
+            const media = await importSingleDevice('desktop');
+            console.log('[DualImport] Desktop complete:', media.length, 'segments');
 
-            // 少し待機してからモバイルをリクエスト（サーバーリソース解放のため）
-            setProgress({ message: 'モバイル版の準備中...' });
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            setDesktopMedia(media);
+            setDualStep('desktop-done');
+            setProgress(null);
+            toast.success(`デスクトップ ${media.length}セグメント取得完了！`);
+        } catch (error: any) {
+            console.error('[DualImport] Desktop failed:', error);
+            toast.error(`デスクトップの取得に失敗しました: ${error.message}`);
+            setProgress(null);
+        } finally {
+            setIsImporting(false);
+        }
+    };
 
-            // 2. モバイル版をインポート
-            setProgress({ message: 'モバイル版を取得中...' });
+    // デュアルインポート - ステップ2: モバイル取得 & ページ作成
+    const handleDualImportMobile = async () => {
+        setIsImporting(true);
+        setProgress({ message: 'モバイル版を取得中...' });
+
+        try {
             console.log('[DualImport] Starting mobile import...');
-            try {
-                mobileMedia = await importSingleDevice('mobile');
-                mobileSuccess = true;
-                console.log('[DualImport] Mobile complete:', mobileMedia.length, 'segments');
-            } catch (mobileError: any) {
-                console.error('[DualImport] Mobile failed:', mobileError);
-                // モバイルが失敗してもデスクトップがあればページを作成
-                toast.error(`モバイル版の取得に失敗しました: ${mobileError.message}`);
-            }
+            const mobileMedia = await importSingleDevice('mobile');
+            console.log('[DualImport] Mobile complete:', mobileMedia.length, 'segments');
 
-            // 3. ページ作成（デスクトップのみ、または両方）
+            // ページ作成（デスクトップとモバイルをペア）
             setProgress({ message: 'ページを作成中...' });
 
-            if (desktopSuccess && mobileSuccess) {
-                // 両方成功：デュアルレイアウト
-                const maxLength = Math.max(desktopMedia.length, mobileMedia.length);
-                const sectionsPayload = [];
+            const maxLength = Math.max(desktopMedia.length, mobileMedia.length);
+            const sectionsPayload = [];
 
-                for (let i = 0; i < maxLength; i++) {
-                    const desktopImg = desktopMedia[i];
-                    const mobileImg = mobileMedia[i];
+            for (let i = 0; i < maxLength; i++) {
+                const desktopImg = desktopMedia[i];
+                const mobileImg = mobileMedia[i];
 
-                    sectionsPayload.push({
-                        role: i === 0 ? 'hero' : 'other',
-                        imageId: desktopImg?.id || null,
-                        mobileImageId: mobileImg?.id || null,
-                        config: { layout: 'dual' }
-                    });
-                }
-
-                const pageRes = await fetch('/api/pages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        title: `Dual Import: ${importUrl}`,
-                        sections: sectionsPayload
-                    })
+                sectionsPayload.push({
+                    role: i === 0 ? 'hero' : 'other',
+                    imageId: desktopImg?.id || null,
+                    mobileImageId: mobileImg?.id || null,
+                    config: { layout: 'dual' }
                 });
-                const pageData = await pageRes.json();
-
-                console.log('[DualImport] Page created:', pageData);
-                toast.success(`デスクトップ ${desktopMedia.length}セグメント + モバイル ${mobileMedia.length}セグメント を取り込みました`);
-                router.push(`/admin/pages/${pageData.id}`);
-            } else if (desktopSuccess) {
-                // デスクトップのみ成功：デスクトップだけでページを作成
-                const sectionsPayload = desktopMedia.map((m: any, idx: number) => ({
-                    role: idx === 0 ? 'hero' : 'other',
-                    imageId: m.id,
-                    config: { layout: 'desktop' }
-                }));
-
-                const pageRes = await fetch('/api/pages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        title: `Imported (Desktop only): ${importUrl}`,
-                        sections: sectionsPayload
-                    })
-                });
-                const pageData = await pageRes.json();
-
-                console.log('[DualImport] Page created (desktop only):', pageData);
-                toast.success(`デスクトップ ${desktopMedia.length}セグメントのみ取り込みました（モバイル失敗）`);
-                router.push(`/admin/pages/${pageData.id}`);
             }
+
+            const pageRes = await fetch('/api/pages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: `Dual Import: ${importUrl}`,
+                    sections: sectionsPayload
+                })
+            });
+            const pageData = await pageRes.json();
+
+            console.log('[DualImport] Page created:', pageData);
+            toast.success(`デスクトップ ${desktopMedia.length} + モバイル ${mobileMedia.length}セグメントを取り込みました`);
+
+            // リセット
+            setDualStep('idle');
+            setDesktopMedia([]);
+            setShowSelection(false);
+            router.push(`/admin/pages/${pageData.id}`);
         } catch (error: any) {
-            console.error('[DualImport] Error:', error);
-            toast.error(error.message || 'デュアルインポートに失敗しました');
-            throw error;
+            console.error('[DualImport] Mobile failed:', error);
+            toast.error(`モバイルの取得に失敗しました: ${error.message}`);
+        } finally {
+            setIsImporting(false);
+            setProgress(null);
+        }
+    };
+
+    // デュアルインポート - デスクトップのみでページ作成（モバイルスキップ）
+    const handleDualImportSkipMobile = async () => {
+        setIsImporting(true);
+        setProgress({ message: 'ページを作成中...' });
+
+        try {
+            const sectionsPayload = desktopMedia.map((m: any, idx: number) => ({
+                role: idx === 0 ? 'hero' : 'other',
+                imageId: m.id,
+                config: { layout: 'desktop' }
+            }));
+
+            const pageRes = await fetch('/api/pages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: `Imported: ${importUrl}`,
+                    sections: sectionsPayload
+                })
+            });
+            const pageData = await pageRes.json();
+
+            console.log('[DualImport] Page created (desktop only):', pageData);
+            toast.success(`デスクトップ ${desktopMedia.length}セグメントを取り込みました`);
+
+            // リセット
+            setDualStep('idle');
+            setDesktopMedia([]);
+            setShowSelection(false);
+            router.push(`/admin/pages/${pageData.id}`);
+        } catch (error: any) {
+            console.error('[DualImport] Page creation failed:', error);
+            toast.error('ページの作成に失敗しました');
+        } finally {
+            setIsImporting(false);
+            setProgress(null);
         }
     };
 
@@ -521,26 +536,38 @@ export function PagesHeader() {
                                         </p>
                                     </div>
 
-                                    {/* デュアルモードの場合は変換モードをスキップ */}
+                                    {/* デュアルモードの場合は2段階インポート */}
                                     {device === 'dual' ? (
-                                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                            <div className="flex items-center gap-3 text-sm text-gray-900">
-                                                <div className="flex items-center gap-1">
-                                                    <Monitor className="w-5 h-5 text-gray-900" />
-                                                    <span className="text-gray-400">+</span>
-                                                    <Smartphone className="w-4 h-4 text-gray-900" />
-                                                </div>
-                                                <span>デスクトップとモバイル両方のスクリーンショットを同時に取得します</span>
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-2 ml-8">
-                                                取り込み後、エディタで両方のビューポートを並べて編集できます
-                                            </p>
-                                            <p className="text-xs text-red-600 mt-2 ml-8 bg-red-50 p-2 rounded border border-red-200 font-medium">
-                                                ※ ページ上部から最大8セクションまでの取得となります
-                                            </p>
-                                            <p className="text-xs text-amber-600 mt-2 ml-8 bg-amber-50 p-2 rounded border border-amber-200">
-                                                ※ 処理に1〜3分程度かかる場合があります
-                                            </p>
+                                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-4">
+                                            {dualStep === 'idle' ? (
+                                                <>
+                                                    <div className="flex items-center gap-3 text-sm text-gray-900">
+                                                        <div className="flex items-center gap-1">
+                                                            <Monitor className="w-5 h-5 text-gray-900" />
+                                                            <span className="text-gray-400">+</span>
+                                                            <Smartphone className="w-4 h-4 text-gray-900" />
+                                                        </div>
+                                                        <span>2段階でスクリーンショットを取得します</span>
+                                                    </div>
+                                                    <div className="text-xs text-gray-600 ml-8 space-y-1">
+                                                        <p>1. まずデスクトップ版を取得</p>
+                                                        <p>2. 次にモバイル版を取得</p>
+                                                    </div>
+                                                    <p className="text-xs text-red-600 ml-8 bg-red-50 p-2 rounded border border-red-200 font-medium">
+                                                        ※ 各デバイス上部から最大8セクションまでの取得となります
+                                                    </p>
+                                                </>
+                                            ) : dualStep === 'desktop-done' ? (
+                                                <>
+                                                    <div className="flex items-center gap-2 text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                                                        <Monitor className="w-5 h-5" />
+                                                        <span className="font-medium">デスクトップ {desktopMedia.length}セグメント取得完了!</span>
+                                                    </div>
+                                                    <p className="text-sm text-gray-700">
+                                                        次にモバイル版を取得しますか？
+                                                    </p>
+                                                </>
+                                            ) : null}
                                         </div>
                                     ) : (
                                         <>
@@ -730,20 +757,57 @@ export function PagesHeader() {
 
                                     <div className="flex gap-3">
                                         <button
-                                            onClick={() => setMode('select')}
+                                            onClick={() => {
+                                                setMode('select');
+                                                setDualStep('idle');
+                                                setDesktopMedia([]);
+                                            }}
                                             disabled={isImporting}
                                             className="flex-1 rounded-md border border-border py-3 text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-surface-50 transition-all disabled:opacity-50"
                                         >
                                             <span>戻る</span>
                                         </button>
-                                        <button
-                                            onClick={handleImport}
-                                            disabled={isImporting || !importUrl}
-                                            className="flex-[2] flex items-center justify-center gap-2 rounded-md bg-primary py-3 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
-                                        >
-                                            {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                                            <span>{isImporting ? '処理中...' : 'インポート実行'}</span>
-                                        </button>
+
+                                        {/* デュアルモードの場合は段階別ボタン */}
+                                        {device === 'dual' ? (
+                                            dualStep === 'idle' ? (
+                                                <button
+                                                    onClick={handleDualImportDesktop}
+                                                    disabled={isImporting || !importUrl}
+                                                    className="flex-[2] flex items-center justify-center gap-2 rounded-md bg-blue-600 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                                                >
+                                                    {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Monitor className="h-4 w-4" />}
+                                                    <span>{isImporting ? '取得中...' : '① デスクトップを取得'}</span>
+                                                </button>
+                                            ) : dualStep === 'desktop-done' ? (
+                                                <>
+                                                    <button
+                                                        onClick={handleDualImportSkipMobile}
+                                                        disabled={isImporting}
+                                                        className="flex-1 rounded-md border border-gray-300 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50"
+                                                    >
+                                                        <span>デスクトップのみで作成</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={handleDualImportMobile}
+                                                        disabled={isImporting}
+                                                        className="flex-[2] flex items-center justify-center gap-2 rounded-md bg-green-600 py-3 text-sm font-bold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+                                                    >
+                                                        {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />}
+                                                        <span>{isImporting ? '取得中...' : '② モバイルを取得'}</span>
+                                                    </button>
+                                                </>
+                                            ) : null
+                                        ) : (
+                                            <button
+                                                onClick={handleImport}
+                                                disabled={isImporting || !importUrl}
+                                                className="flex-[2] flex items-center justify-center gap-2 rounded-md bg-primary py-3 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+                                            >
+                                                {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                                                <span>{isImporting ? '処理中...' : 'インポート実行'}</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )}
