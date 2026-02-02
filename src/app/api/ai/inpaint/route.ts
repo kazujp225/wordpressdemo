@@ -240,36 +240,78 @@ Generate the complete edited image with pixel-perfect quality now.`;
         requestParts.push({ text: inpaintPrompt });
 
         // Gemini 3.0 Pro（最新画像生成モデル）を使用
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: requestParts
-                    }],
-                    generationConfig: {
-                        responseModalities: ["IMAGE", "TEXT"],
-                        temperature: 0.6,  // 日本語テキスト精度向上のため低めに設定
-                        // 最高解像度出力
-                        imageConfig: {
-                            imageSize: "4K"  // 日本語文字の鮮明度向上
-                        }
-                    },
-                    toolConfig: {
-                        functionCallingConfig: {
-                            mode: "NONE"
-                        }
-                    }
-                })
-            }
-        );
+        // リトライ機能付き（503エラー対策）
+        const maxRetries = 3;
+        let response: Response | null = null;
+        let lastError: Error | null = null;
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Gemini Flash API error:', errorText);
-            throw new Error(`インペインティングに失敗しました: ${response.status}`);
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[INPAINT] Attempt ${attempt}/${maxRetries}...`);
+                response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: requestParts
+                            }],
+                            generationConfig: {
+                                responseModalities: ["IMAGE", "TEXT"],
+                                temperature: 0.6,  // 日本語テキスト精度向上のため低めに設定
+                                // 最高解像度出力
+                                imageConfig: {
+                                    imageSize: "4K"  // 日本語文字の鮮明度向上
+                                }
+                            },
+                            toolConfig: {
+                                functionCallingConfig: {
+                                    mode: "NONE"
+                                }
+                            }
+                        })
+                    }
+                );
+
+                if (response.ok) {
+                    console.log(`[INPAINT] Success on attempt ${attempt}`);
+                    break;
+                }
+
+                // 503/429エラーの場合はリトライ
+                if (response.status === 503 || response.status === 429) {
+                    const errorText = await response.text();
+                    console.error(`[INPAINT] Attempt ${attempt} failed with ${response.status}:`, errorText);
+                    lastError = new Error(`インペインティングに失敗しました: ${response.status}`);
+
+                    if (attempt < maxRetries) {
+                        // 指数バックオフで待機（2秒、4秒、8秒）
+                        const waitTime = Math.pow(2, attempt) * 1000;
+                        console.log(`[INPAINT] Retrying in ${waitTime}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        response = null;
+                        continue;
+                    }
+                } else {
+                    // その他のエラーは即座に失敗
+                    const errorText = await response.text();
+                    console.error('Gemini Flash API error:', errorText);
+                    throw new Error(`インペインティングに失敗しました: ${response.status}`);
+                }
+            } catch (fetchError: any) {
+                console.error(`[INPAINT] Attempt ${attempt} fetch error:`, fetchError.message);
+                lastError = fetchError;
+                if (attempt < maxRetries) {
+                    const waitTime = Math.pow(2, attempt) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    continue;
+                }
+            }
+        }
+
+        if (!response || !response.ok) {
+            throw lastError || new Error('インペインティングに失敗しました');
         }
 
         const data = await response.json();

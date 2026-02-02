@@ -5,6 +5,7 @@ import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { prisma } from '@/lib/db';
+import { fetchWithRetry } from '@/lib/gemini-retry';
 
 export const maxDuration = 60;
 
@@ -75,8 +76,8 @@ ${prompt ? `【追加指示】\n${prompt}` : '【拡張内容】\n周囲の背�
         // Base64データを抽出
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
 
-        // Gemini APIコール
-        const response = await fetch(
+        // Gemini APIコール（リトライ付き）
+        const response = await fetchWithRetry(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
@@ -95,12 +96,6 @@ ${prompt ? `【追加指示】\n${prompt}` : '【拡張内容】\n周囲の背�
                 })
             }
         );
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[OUTPAINT] Gemini API error:', errorText);
-            throw new Error('AI画像生成に失敗しました');
-        }
 
         const data = await response.json();
         const parts = data.candidates?.[0]?.content?.parts || [];
