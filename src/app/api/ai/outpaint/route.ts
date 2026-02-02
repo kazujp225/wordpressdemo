@@ -17,7 +17,14 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { image, direction, expandAmount, prompt, targetWidth, targetHeight } = await request.json();
+        const { image, direction, expandAmount, prompt, targetWidth, targetHeight } = await request.json() as {
+            image: string;
+            direction: 'left' | 'right' | 'top' | 'bottom' | 'all';
+            expandAmount: number;
+            prompt?: string;
+            targetWidth: number;
+            targetHeight: number;
+        };
 
         if (!image) {
             return NextResponse.json({ error: '画像が必要です' }, { status: 400 });
