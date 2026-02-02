@@ -204,19 +204,35 @@ export function PagesHeader() {
 
     // 単体インポート処理を行うヘルパー関数
     const importSingleDevice = async (targetDevice: 'desktop' | 'mobile'): Promise<any[]> => {
-        const res = await fetch('/api/import-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                url: importUrl,
-                device: targetDevice,
-                importMode: 'faithful',
-            })
-        });
+        console.log(`[DualImport-${targetDevice}] Starting fetch request...`);
+
+        let res: Response;
+        try {
+            res = await fetch('/api/import-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: importUrl,
+                    device: targetDevice,
+                    importMode: 'faithful',
+                })
+            });
+        } catch (fetchError: any) {
+            console.error(`[DualImport-${targetDevice}] Fetch error:`, fetchError);
+            throw new Error(`${targetDevice}のリクエストに失敗しました: ${fetchError.message}`);
+        }
+
+        console.log(`[DualImport-${targetDevice}] Response status: ${res.status}`);
 
         if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(errorData.error || `${targetDevice}のインポートに失敗しました`);
+            let errorMessage = `${targetDevice}のインポートに失敗しました (${res.status})`;
+            try {
+                const errorData = await res.json();
+                errorMessage = errorData.error || errorData.message || errorMessage;
+            } catch {
+                // JSONパースに失敗した場合はデフォルトメッセージを使用
+            }
+            throw new Error(errorMessage);
         }
 
         const reader = res.body?.getReader();
@@ -224,10 +240,14 @@ export function PagesHeader() {
 
         const decoder = new TextDecoder();
         let finalData: any = null;
+        let lastProgress = '';
 
         while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+                console.log(`[DualImport-${targetDevice}] Stream ended`);
+                break;
+            }
 
             const text = decoder.decode(value, { stream: true });
             const lines = text.split('\n\n').filter(line => line.startsWith('data: '));
@@ -236,23 +256,27 @@ export function PagesHeader() {
                 try {
                     const jsonStr = line.replace('data: ', '');
                     const data = JSON.parse(jsonStr);
-                    console.log(`[DualImport-${targetDevice}] Stream event:`, data.type);
+                    console.log(`[DualImport-${targetDevice}] Stream event:`, data.type, data.message || '');
 
                     if (data.type === 'progress') {
+                        lastProgress = data.message || '';
                         setProgress({ message: `${targetDevice === 'desktop' ? 'デスクトップ' : 'モバイル'}版: ${data.message}` });
                     } else if (data.type === 'complete') {
+                        console.log(`[DualImport-${targetDevice}] Complete event received, segments:`, data.media?.length);
                         finalData = data;
                     } else if (data.type === 'error') {
+                        console.error(`[DualImport-${targetDevice}] Error event:`, data.error);
                         throw new Error(data.error);
                     }
                 } catch (parseError) {
-                    // ignore parse errors
+                    // JSONパースエラーは無視（部分的なデータの可能性）
                 }
             }
         }
 
         if (!finalData || !finalData.media) {
-            throw new Error(`${targetDevice}のインポート結果を取得できませんでした`);
+            console.error(`[DualImport-${targetDevice}] No complete event received. Last progress: ${lastProgress}`);
+            throw new Error(`${targetDevice}のインポート結果を取得できませんでした。最後のステータス: ${lastProgress}`);
         }
 
         return finalData.media;
@@ -260,51 +284,97 @@ export function PagesHeader() {
 
     // デュアルインポート処理（デスクトップ→モバイルを2回に分けて処理）
     const handleDualImport = async () => {
+        let desktopMedia: any[] = [];
+        let mobileMedia: any[] = [];
+        let desktopSuccess = false;
+        let mobileSuccess = false;
+
         try {
             // 1. デスクトップ版をインポート
             setProgress({ message: 'デスクトップ版を取得中...' });
             console.log('[DualImport] Starting desktop import...');
-            const desktopMedia = await importSingleDevice('desktop');
-            console.log('[DualImport] Desktop complete:', desktopMedia.length, 'segments');
+            try {
+                desktopMedia = await importSingleDevice('desktop');
+                desktopSuccess = true;
+                console.log('[DualImport] Desktop complete:', desktopMedia.length, 'segments');
+            } catch (desktopError: any) {
+                console.error('[DualImport] Desktop failed:', desktopError);
+                // デスクトップが失敗したら全体を失敗させる
+                throw new Error(`デスクトップの取得に失敗しました: ${desktopError.message}`);
+            }
+
+            // 少し待機してからモバイルをリクエスト（サーバーリソース解放のため）
+            setProgress({ message: 'モバイル版の準備中...' });
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             // 2. モバイル版をインポート
             setProgress({ message: 'モバイル版を取得中...' });
             console.log('[DualImport] Starting mobile import...');
-            const mobileMedia = await importSingleDevice('mobile');
-            console.log('[DualImport] Mobile complete:', mobileMedia.length, 'segments');
-
-            // 3. ページ作成（デスクトップとモバイルをペアで保存）
-            setProgress({ message: 'ページを作成中...' });
-
-            const maxLength = Math.max(desktopMedia.length, mobileMedia.length);
-            const sectionsPayload = [];
-
-            for (let i = 0; i < maxLength; i++) {
-                const desktopImg = desktopMedia[i];
-                const mobileImg = mobileMedia[i];
-
-                sectionsPayload.push({
-                    role: i === 0 ? 'hero' : 'other',
-                    imageId: desktopImg?.id || null,
-                    mobileImageId: mobileImg?.id || null,
-                    config: { layout: 'dual' }
-                });
+            try {
+                mobileMedia = await importSingleDevice('mobile');
+                mobileSuccess = true;
+                console.log('[DualImport] Mobile complete:', mobileMedia.length, 'segments');
+            } catch (mobileError: any) {
+                console.error('[DualImport] Mobile failed:', mobileError);
+                // モバイルが失敗してもデスクトップがあればページを作成
+                toast.error(`モバイル版の取得に失敗しました: ${mobileError.message}`);
             }
 
-            const pageRes = await fetch('/api/pages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: `Dual Import: ${importUrl}`,
-                    sections: sectionsPayload
-                })
-            });
-            const pageData = await pageRes.json();
+            // 3. ページ作成（デスクトップのみ、または両方）
+            setProgress({ message: 'ページを作成中...' });
 
-            console.log('[DualImport] Page created:', pageData);
+            if (desktopSuccess && mobileSuccess) {
+                // 両方成功：デュアルレイアウト
+                const maxLength = Math.max(desktopMedia.length, mobileMedia.length);
+                const sectionsPayload = [];
 
-            toast.success(`デスクトップ ${desktopMedia.length}セグメント + モバイル ${mobileMedia.length}セグメント を取り込みました`);
-            router.push(`/admin/pages/${pageData.id}`);
+                for (let i = 0; i < maxLength; i++) {
+                    const desktopImg = desktopMedia[i];
+                    const mobileImg = mobileMedia[i];
+
+                    sectionsPayload.push({
+                        role: i === 0 ? 'hero' : 'other',
+                        imageId: desktopImg?.id || null,
+                        mobileImageId: mobileImg?.id || null,
+                        config: { layout: 'dual' }
+                    });
+                }
+
+                const pageRes = await fetch('/api/pages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: `Dual Import: ${importUrl}`,
+                        sections: sectionsPayload
+                    })
+                });
+                const pageData = await pageRes.json();
+
+                console.log('[DualImport] Page created:', pageData);
+                toast.success(`デスクトップ ${desktopMedia.length}セグメント + モバイル ${mobileMedia.length}セグメント を取り込みました`);
+                router.push(`/admin/pages/${pageData.id}`);
+            } else if (desktopSuccess) {
+                // デスクトップのみ成功：デスクトップだけでページを作成
+                const sectionsPayload = desktopMedia.map((m: any, idx: number) => ({
+                    role: idx === 0 ? 'hero' : 'other',
+                    imageId: m.id,
+                    config: { layout: 'desktop' }
+                }));
+
+                const pageRes = await fetch('/api/pages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: `Imported (Desktop only): ${importUrl}`,
+                        sections: sectionsPayload
+                    })
+                });
+                const pageData = await pageRes.json();
+
+                console.log('[DualImport] Page created (desktop only):', pageData);
+                toast.success(`デスクトップ ${desktopMedia.length}セグメントのみ取り込みました（モバイル失敗）`);
+                router.push(`/admin/pages/${pageData.id}`);
+            }
         } catch (error: any) {
             console.error('[DualImport] Error:', error);
             toast.error(error.message || 'デュアルインポートに失敗しました');
