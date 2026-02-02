@@ -68,34 +68,32 @@ function createStreamResponse(processFunction: (send: (data: any) => void) => Pr
     });
 }
 
-// Helper: capture full page screenshot with manual scrolling
+// Helper: capture full page screenshot with manual scrolling (optimized for speed)
 async function captureFullPage(
     page: Page,
     deviceConfig: DeviceConfig
 ): Promise<Buffer> {
-    // Scroll to trigger lazy loading
-    for (let pass = 0; pass < 3; pass++) {
-        await page.evaluate(async () => {
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-            const scrollStep = 300;
-            let maxScroll = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+    // Fast scroll to trigger lazy loading (1 pass only)
+    await page.evaluate(async () => {
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+        const scrollStep = 500; // Larger steps for speed
+        let maxScroll = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
 
-            for (let y = 0; y < maxScroll; y += scrollStep) {
-                window.scrollTo(0, y);
-                await delay(100);
-                const newHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-                if (newHeight > maxScroll) maxScroll = newHeight;
-            }
-            window.scrollTo(0, maxScroll);
-            await delay(500);
-        });
-        await new Promise(resolve => setTimeout(resolve, 800));
-    }
+        for (let y = 0; y < maxScroll; y += scrollStep) {
+            window.scrollTo(0, y);
+            await delay(50); // Reduced from 100ms
+            const newHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+            if (newHeight > maxScroll) maxScroll = newHeight;
+        }
+        window.scrollTo(0, maxScroll);
+        await delay(200); // Reduced from 500ms
+    });
+    await new Promise(resolve => setTimeout(resolve, 300)); // Reduced from 800ms
 
     await page.evaluate(() => window.scrollTo(0, 0));
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 2500ms
 
-    // Force load images
+    // Force load images (with shorter timeout)
     await page.evaluate(async () => {
         const lazyImages = document.querySelectorAll('img[loading="lazy"], img[data-src], img[data-lazy]');
         lazyImages.forEach(img => {
@@ -112,12 +110,12 @@ async function captureFullPage(
             return new Promise((resolve) => {
                 img.onload = () => resolve(undefined);
                 img.onerror = resolve;
-                setTimeout(resolve, 5000);
+                setTimeout(resolve, 1500); // Reduced from 5000ms
             });
         }));
     });
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 2000ms
 
     // Remove popups
     await page.evaluate(() => {
@@ -154,8 +152,29 @@ async function captureFullPage(
         document.documentElement.style.overflowX = 'hidden';
     });
 
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from 300ms
 
+    // Remove fixed/sticky elements once before capture
+    await page.evaluate(() => {
+        document.querySelectorAll('*').forEach(el => {
+            const element = el as HTMLElement;
+            const position = window.getComputedStyle(element).position;
+            if (position === 'fixed' || position === 'sticky') {
+                element.style.display = 'none';
+            }
+        });
+    });
+
+    // Use Puppeteer's built-in fullPage screenshot (faster than manual stitching)
+    const fullScreenshot = await page.screenshot({ fullPage: true }) as Buffer;
+    return fullScreenshot;
+}
+
+// Legacy manual capture function (kept for reference but not used)
+async function captureFullPageManual(
+    page: Page,
+    deviceConfig: DeviceConfig
+): Promise<Buffer> {
     // Manual viewport-by-viewport capture
     const documentHeight = await page.evaluate(() => {
         return Math.max(
@@ -175,19 +194,7 @@ async function captureFullPage(
     for (let i = 0; i < numCaptures; i++) {
         const scrollY = i * deviceConfig.height;
         await page.evaluate((y: number) => window.scrollTo(0, y), scrollY);
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Remove fixed elements again
-        await page.evaluate(() => {
-            document.querySelectorAll('*').forEach(el => {
-                const element = el as HTMLElement;
-                const position = window.getComputedStyle(element).position;
-                if (position === 'fixed' || position === 'sticky') {
-                    element.style.display = 'none';
-                }
-            });
-        });
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const viewportShot = await page.screenshot({ fullPage: false }) as Buffer;
         viewportBuffers.push(viewportShot);
@@ -201,7 +208,7 @@ async function captureFullPage(
         left: 0
     }));
 
-    const fullScreenshot = await sharp({
+    const fullScreenshotResult = await sharp({
         create: {
             width: viewportWidth,
             height: stitchedHeight,
@@ -213,7 +220,7 @@ async function captureFullPage(
         .png()
         .toBuffer();
 
-    return fullScreenshot;
+    return fullScreenshotResult;
 }
 
 // Helper: segment and upload screenshots (parallelized)
