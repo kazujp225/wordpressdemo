@@ -670,7 +670,7 @@ export async function POST(request: NextRequest) {
             document.documentElement.style.overflow = 'auto';
         });
 
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, isDev ? 500 : 100));
 
         // Fix fixed/sticky elements for proper fullPage screenshot
         // These elements repeat at every viewport position, corrupting the final image
@@ -746,7 +746,8 @@ export async function POST(request: NextRequest) {
         const totalCaptures = Math.ceil(documentHeight / deviceConfig.height);
 
         // 本番環境では1回あたりの撮影枚数を制限（タイムアウト対策）
-        const maxCapturesPerRequest = isDev ? 100 : 10;
+        // モバイルは特に厳しく制限（ページが長くなるため）
+        const maxCapturesPerRequest = isDev ? 100 : (device === 'mobile' ? 5 : 8);
 
         // startFromが指定されている場合は、その位置から取得
         const startIndex = Math.min(startFrom, totalCaptures);
@@ -762,26 +763,33 @@ export async function POST(request: NextRequest) {
 
         viewportBuffers = [];
 
+        // 本番環境では待ち時間を短縮
+        const scrollWait = isDev ? 100 : 30;
+        const captureWait = isDev ? 100 : 30;
+
         for (let i = 0; i < numCaptures; i++) {
             const actualIndex = startIndex + i;
             const scrollY = actualIndex * deviceConfig.height;
 
             // Scroll to position
             await page.evaluate((y) => window.scrollTo(0, y), scrollY);
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, scrollWait));
 
             // Remove fixed elements AGAIN before each capture (in case JS re-added them)
-            await page.evaluate(() => {
-                const allElements = document.querySelectorAll('*');
-                allElements.forEach(el => {
-                    const element = el as HTMLElement;
-                    const computedStyle = window.getComputedStyle(element);
-                    if (computedStyle.position === 'fixed' || computedStyle.position === 'sticky') {
-                        element.style.display = 'none';
-                    }
+            // 本番環境では最初の1回だけ実行（時間短縮）
+            if (isDev || i === 0) {
+                await page.evaluate(() => {
+                    const allElements = document.querySelectorAll('*');
+                    allElements.forEach(el => {
+                        const element = el as HTMLElement;
+                        const computedStyle = window.getComputedStyle(element);
+                        if (computedStyle.position === 'fixed' || computedStyle.position === 'sticky') {
+                            element.style.display = 'none';
+                        }
+                    });
                 });
-            });
-            await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            await new Promise(resolve => setTimeout(resolve, captureWait));
 
             // Take viewport screenshot
             const viewportShot = await page.screenshot({ fullPage: false }) as Buffer;
