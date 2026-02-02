@@ -325,43 +325,46 @@ export async function POST(request: NextRequest) {
 
         let browser;
         try {
-            const isDev = process.env.NODE_ENV === 'development';
+            // 優先順位: 環境変数 > システムChrome > @sparticuz/chromium
+            const possiblePaths = [
+                process.env.PUPPETEER_EXECUTABLE_PATH, // Docker/Render環境
+                '/usr/bin/chromium', // Docker (Debian)
+                '/usr/bin/chromium-browser', // Linux Chromium
+                '/usr/bin/google-chrome', // Linux Chrome
+                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // macOS
+                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', // Windows
+                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe', // Windows x86
+            ];
 
-            if (isDev) {
-                // ローカル開発環境: システムのChromeを使用
-                const possiblePaths = [
-                    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // macOS
-                    '/usr/bin/google-chrome', // Linux
-                    '/usr/bin/chromium-browser', // Linux Chromium
-                    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', // Windows
-                    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe', // Windows x86
-                ];
+            let chromePath: string | undefined;
+            for (const p of possiblePaths) {
+                if (!p) continue;
+                try {
+                    const fs = await import('fs');
+                    if (fs.existsSync(p)) {
+                        chromePath = p;
+                        break;
+                    }
+                } catch {}
+            }
 
-                let localChromePath: string | undefined;
-                for (const p of possiblePaths) {
-                    try {
-                        const fs = await import('fs');
-                        if (fs.existsSync(p)) {
-                            localChromePath = p;
-                            break;
-                        }
-                    } catch {}
-                }
-
-                if (!localChromePath) {
-                    throw new Error('ローカルにChromeが見つかりません。Google Chromeをインストールしてください。');
-                }
-
-                log.info(`Local Chrome path: ${localChromePath}`);
+            if (chromePath) {
+                // システムChrome/Chromiumを使用
+                log.info(`Using system Chrome: ${chromePath}`);
                 browser = await puppeteer.launch({
-                    executablePath: localChromePath,
+                    executablePath: chromePath,
                     headless: true,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                    ],
                 });
             } else {
-                // 本番環境: @sparticuz/chromiumを使用
+                // フォールバック: @sparticuz/chromiumを使用 (サーバーレス環境)
                 const executablePath = await chromium.executablePath();
-                log.info(`Chromium path: ${executablePath}`);
+                log.info(`Using @sparticuz/chromium: ${executablePath}`);
 
                 browser = await puppeteer.launch({
                     args: chromium.args,
