@@ -921,53 +921,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         handleSave(updatedSections);
     };
 
-    // PDFアップロード処理
-    const [isUploadingPdf, setIsUploadingPdf] = useState(false);
-    const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files?.length) return;
-        const file = e.target.files[0];
-
-        if (file.type !== 'application/pdf') {
-            toast.error('PDFファイルのみアップロード可能です');
-            return;
-        }
-
-        setIsUploadingPdf(true);
-        toast.loading('PDFを処理中...', { id: 'pdf-upload' });
-
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const res = await fetch('/api/upload/pdf', { method: 'POST', body: formData });
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || 'PDFの処理に失敗しました');
-            }
-
-            const newItems = data.media.map((media: any, idx: number) => ({
-                id: `pdf-${Date.now()}-${idx}`,
-                role: idx === 0 ? 'hero' : 'solution',
-                imageId: media.id,
-                image: media,
-                order: sections.length + idx
-            }));
-
-            const updatedSections = [...sections, ...newItems];
-            setSections(updatedSections);
-            handleSave(updatedSections);
-
-            toast.success(`${data.pageCount}ページをインポートしました`, { id: 'pdf-upload' });
-        } catch (error: any) {
-            console.error('PDFアップロードに失敗しました:', error);
-            toast.error(error.message || 'PDFの処理に失敗しました', { id: 'pdf-upload' });
-        } finally {
-            setIsUploadingPdf(false);
-            e.target.value = '';
-        }
-    };
-
     // デュアルスクリーンショット取り込み結果を処理
     const handleDualImport = (result: { desktop: any[]; mobile: any[] }) => {
         // デスクトップとモバイルをペアにしてセクションを作成
@@ -2122,13 +2075,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 onChange={handleFileUpload}
                 className="hidden"
             />
-            <input
-                id="pdf-upload-input"
-                type="file"
-                accept="application/pdf"
-                onChange={handlePdfUpload}
-                className="hidden"
-            />
 
             {/* 完全LPプレビュー - メインビュー */}
             <div className="flex justify-center pt-4 pb-24 lg:py-20 px-2 sm:px-4">
@@ -2166,14 +2112,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 >
                                     <Upload className="w-4 h-4" />
                                     画像をアップロード
-                                </button>
-                                <button
-                                    onClick={() => document.getElementById('pdf-upload-input')?.click()}
-                                    disabled={isUploadingPdf}
-                                    className="px-4 py-2 bg-white border border-orange-300 rounded-lg text-sm font-medium text-orange-700 hover:bg-orange-50 transition-all flex items-center gap-2 disabled:opacity-50"
-                                >
-                                    <FileText className="w-4 h-4" />
-                                    {isUploadingPdf ? '処理中...' : 'PDFをインポート'}
                                 </button>
                                 <button
                                     onClick={() => setShowDualImportModal(true)}
