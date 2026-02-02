@@ -28,8 +28,9 @@ import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
 import ClaudeCodeGeneratorModal from '@/components/admin/ClaudeCodeGeneratorModal';
 import HtmlCodeEditModal from '@/components/admin/HtmlCodeEditModal';
 import PageDeployModal from '@/components/admin/PageDeployModal';
+import { ImageResizeModal } from '@/components/admin/ImageResizeModal';
 import { SEOLLMOOptimizer } from '@/components/lp-builder/SEOLLMOOptimizer';
-import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight, Search, TrendingUp } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight, Search, TrendingUp, Maximize2 } from 'lucide-react';
 import {
     EditorMenuSection,
     EditorMenuItem,
@@ -138,6 +139,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [inpaintMobileImageUrl, setInpaintMobileImageUrl] = useState<string | null>(null);
     const [inpaintInitialMode, setInpaintInitialMode] = useState<'inpaint' | 'button' | 'text-fix'>('inpaint');
 
+    // 画像リサイズモーダル
+    const [showResizeModal, setShowResizeModal] = useState(false);
+    const [resizeImageUrl, setResizeImageUrl] = useState<string | null>(null);
+    const [resizeSectionId, setResizeSectionId] = useState<string | null>(null);
+
     // モバイル用メニューサイドバー表示
     const [showMobileMenu, setShowMobileMenu] = useState(false);
 
@@ -184,6 +190,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // メニュー検索フィルタリング用のヘルパー
     const menuItems = {
         crop: { title: '画像を切り取る', keywords: ['切り取り', 'カット', 'トリミング', 'crop'] },
+        resize: { title: '画像をリサイズ', keywords: ['リサイズ', 'サイズ変更', 'アスペクト比', '16:9', '1:1', 'バナー', 'SNS', 'AI拡張', 'outpaint'] },
         overlay: { title: 'ボタン・文字を重ねる', keywords: ['オーバーレイ', 'テキスト', 'ボタン'] },
         delete: { title: 'ブロックを削除', keywords: ['削除', '消す', 'remove'] },
         background: { title: '背景色をそろえる', keywords: ['背景', '色', 'カラー'] },
@@ -389,9 +396,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         setFetchMoreProgress('取得を開始しています...');
 
         try {
-            // 両方とも既存セクションに画像を追加（0から開始）
-            const startFrom = 0;
-            console.log(`[FetchMore] Starting from section ${startFrom} for ${device}`);
+            // 既存セクション数の続きから取得
+            const startFrom = sections.length;
+            console.log(`[FetchMore] Starting from section ${startFrom} for ${device} (existing sections: ${sections.length})`);
 
             const res = await fetch('/api/import-url', {
                 method: 'POST',
@@ -445,33 +452,23 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 return;
             }
 
-            // 既存のセクションに画像を追加
+            // 新しいセクションとして追加
             setSections(prev => {
-                const updatedSections = [...prev];
-                finalData.media.forEach((m: any, idx: number) => {
-                    if (idx < updatedSections.length) {
-                        if (device === 'mobile') {
-                            // モバイル画像を追加
-                            updatedSections[idx] = {
-                                ...updatedSections[idx],
-                                mobileImageId: m.id,
-                                mobileImage: m,
-                            };
-                        } else {
-                            // デスクトップ画像を追加
-                            updatedSections[idx] = {
-                                ...updatedSections[idx],
-                                imageId: m.id,
-                                image: m,
-                            };
-                        }
-                    }
-                });
-                return updatedSections;
+                const newSections = finalData.media.map((m: any, idx: number) => ({
+                    id: `new-${Date.now()}-${idx}`,
+                    role: `section-${prev.length + idx + 1}`,
+                    order: prev.length + idx,
+                    imageId: device === 'desktop' ? m.id : null,
+                    image: device === 'desktop' ? m : null,
+                    mobileImageId: device === 'mobile' ? m.id : null,
+                    mobileImage: device === 'mobile' ? m : null,
+                    config: {},
+                }));
+                return [...prev, ...newSections];
             });
 
             const deviceName = device === 'mobile' ? 'モバイル' : 'デスクトップ';
-            toast.success(`${finalData.media.length}セクションに${deviceName}画像を追加しました${finalData.hasMore ? '（まだ続きがあります）' : ''}`);
+            toast.success(`${finalData.media.length}セクションを追加しました${finalData.hasMore ? '（まだ続きがあります）' : ''}`);
 
         } catch (error: any) {
             console.error('[FetchMore] Error:', error);
@@ -3963,7 +3960,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </div>
 
                     {/* 見た目を調整する */}
-                    {isSectionVisible(['crop', 'overlay', 'delete', 'background', 'colorPalette']) && (
+                    {isSectionVisible(['crop', 'resize', 'overlay', 'delete', 'background', 'colorPalette']) && (
                         <EditorMenuSection title="見た目を調整する" color="indigo">
                             {/* 画像を切り取る */}
                             {isMenuItemVisible('crop') && (
@@ -3992,6 +3989,42 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 setCropSectionId(String(section.id));
                                                 setCropImageUrl(section.image.filePath);
                                                 setShowCropModal(true);
+                                            }
+                                        }}
+                                    />
+                                </EditorMenuItem>
+                            )}
+
+                            {/* 画像をリサイズ */}
+                            {isMenuItemVisible('resize') && (
+                                <EditorMenuItem
+                                    icon={<Maximize2 className="h-3.5 w-3.5" />}
+                                    title="画像をリサイズ"
+                                    description="サイズ変更・アスペクト比変換・AI拡張"
+                                    tooltip="クロップ、リサイズ、AIによる画像拡張ができます"
+                                    open={expandedTools.has('resize')}
+                                    onOpenChange={(open) => {
+                                        if (open) {
+                                            setExpandedTools(prev => new Set([...prev, 'resize']));
+                                        } else {
+                                            setExpandedTools(prev => {
+                                                const next = new Set(prev);
+                                                next.delete('resize');
+                                                return next;
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <EditorSectionList
+                                        sections={sections}
+                                        onSelect={(section) => {
+                                            const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
+                                                ? section.mobileImage.filePath
+                                                : section.image?.filePath;
+                                            if (imageUrl) {
+                                                setResizeSectionId(String(section.id));
+                                                setResizeImageUrl(imageUrl);
+                                                setShowResizeModal(true);
                                             }
                                         }}
                                     />
@@ -5936,6 +5969,43 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                         // 変更をサーバーに保存
                         await handleSave(updatedSections);
+                    }}
+                />
+            )}
+
+            {/* 画像リサイズモーダル */}
+            {showResizeModal && resizeImageUrl && resizeSectionId && (
+                <ImageResizeModal
+                    imageUrl={resizeImageUrl}
+                    onClose={() => {
+                        setShowResizeModal(false);
+                        setResizeSectionId(null);
+                        setResizeImageUrl(null);
+                    }}
+                    onSave={async (newImageUrl) => {
+                        // セクションの画像を更新
+                        const updatedSections = sections.map(s => {
+                            if (String(s.id) !== resizeSectionId) return s;
+
+                            // viewModeに応じてデスクトップまたはモバイル画像を更新
+                            if (viewMode === 'mobile' && s.mobileImage) {
+                                return {
+                                    ...s,
+                                    mobileImage: { ...s.mobileImage, filePath: newImageUrl }
+                                };
+                            }
+                            return {
+                                ...s,
+                                image: { ...s.image, filePath: newImageUrl }
+                            };
+                        });
+
+                        setSections(updatedSections);
+                        await handleSave(updatedSections);
+
+                        setShowResizeModal(false);
+                        setResizeSectionId(null);
+                        setResizeImageUrl(null);
                     }}
                 />
             )}
