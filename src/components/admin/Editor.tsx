@@ -1539,7 +1539,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 });
             } else {
                 console.error('[History] API error:', data.error);
-                toast.error(data.error || '履歴の取得に失敗しました');
+                if (data.error === 'Section not found') {
+                    toast.error('このセクションはまだ保存されていません。保存後に履歴を確認できます。');
+                } else {
+                    toast.error(data.error || '履歴の取得に失敗しました');
+                }
             }
         } catch (error) {
             console.error('[History] Failed to fetch:', error);
@@ -1841,6 +1845,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 });
 
                 if (res.ok) {
+                    const data = await res.json();
+                    // 保存後のセクションIDを反映
+                    if (data.sections && Array.isArray(data.sections)) {
+                        setSections(data.sections);
+                    }
                     setAutoSaveStatus('saved');
                     setLastAutoSaveTime(new Date());
                     // 3秒後にステータスをアイドルに戻す
