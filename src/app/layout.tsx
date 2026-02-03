@@ -15,8 +15,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "そっくりLP",
-  description: "参考サイトからそっくりなLPを自動生成",
+  title: "AI画像編集くん",
+  description: "AIで画像を簡単編集",
 };
 
 export default function RootLayout({

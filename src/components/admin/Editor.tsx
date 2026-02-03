@@ -30,7 +30,7 @@ import HtmlCodeEditModal from '@/components/admin/HtmlCodeEditModal';
 import PageDeployModal from '@/components/admin/PageDeployModal';
 import { ImageResizeModal } from '@/components/admin/ImageResizeModal';
 import { SEOLLMOOptimizer } from '@/components/lp-builder/SEOLLMOOptimizer';
-import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight, Search, TrendingUp, Maximize2 } from 'lucide-react';
+import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight, Search, TrendingUp, Maximize2, Settings2 } from 'lucide-react';
 import {
     EditorMenuSection,
     EditorMenuItem,
@@ -3979,6 +3979,138 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             </button>
                         </div>
                     </div>
+
+                    {/* ヘッダー設定 */}
+                    <EditorMenuSection title="ヘッダー設定" color="purple">
+                        <EditorMenuItem
+                            icon={<Settings2 className="h-3.5 w-3.5" />}
+                            title="ヘッダーを編集"
+                            description="ロゴ・ナビ・CTAボタン"
+                            tooltip="公開ページのヘッダーを設定できます"
+                            open={expandedTools.has('header')}
+                            onOpenChange={(open) => {
+                                if (open) {
+                                    setExpandedTools(prev => new Set([...prev, 'header']));
+                                } else {
+                                    setExpandedTools(prev => {
+                                        const next = new Set(prev);
+                                        next.delete('header');
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            <div className="space-y-3 p-2">
+                                {/* ロゴテキスト */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">ロゴテキスト</label>
+                                    <input
+                                        type="text"
+                                        value={headerConfig.logoText || ''}
+                                        onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoText: e.target.value }))}
+                                        placeholder="サイト名"
+                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                    />
+                                </div>
+                                {/* CTAボタン */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">CTAボタンテキスト</label>
+                                    <input
+                                        type="text"
+                                        value={headerConfig.ctaText || ''}
+                                        onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaText: e.target.value }))}
+                                        placeholder="お問い合わせ"
+                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">CTAリンク先</label>
+                                    <input
+                                        type="text"
+                                        value={headerConfig.ctaLink || ''}
+                                        onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
+                                        placeholder="#contact"
+                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                    />
+                                </div>
+                                {/* ナビゲーション項目 */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">ナビゲーション</label>
+                                    <div className="space-y-2">
+                                        {headerConfig.navItems.map((item: { id: string; label: string; href: string }, index: number) => (
+                                            <div key={item.id} className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={item.label}
+                                                    onChange={(e) => {
+                                                        const newLabel = e.target.value;
+                                                        setHeaderConfig((prev: typeof headerConfig) => ({
+                                                            ...prev,
+                                                            navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                i === index ? { ...navItem, label: newLabel } : navItem
+                                                            )
+                                                        }));
+                                                    }}
+                                                    placeholder="ラベル"
+                                                    className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={item.href}
+                                                    onChange={(e) => {
+                                                        const newHref = e.target.value;
+                                                        setHeaderConfig((prev: typeof headerConfig) => ({
+                                                            ...prev,
+                                                            navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                i === index ? { ...navItem, href: newHref } : navItem
+                                                            )
+                                                        }));
+                                                    }}
+                                                    placeholder="#section"
+                                                    className="w-24 px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        setHeaderConfig((prev: typeof headerConfig) => ({
+                                                            ...prev,
+                                                            navItems: prev.navItems.filter((_: { id: string; label: string; href: string }, i: number) => i !== index)
+                                                        }));
+                                                    }}
+                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            onClick={() => {
+                                                setHeaderConfig((prev: typeof headerConfig) => ({
+                                                    ...prev,
+                                                    navItems: [...(prev.navItems || []), { id: `nav-${Date.now()}`, label: '', href: '' }]
+                                                }));
+                                            }}
+                                            className="w-full py-1.5 text-xs text-purple-600 border border-dashed border-purple-300 rounded hover:bg-purple-50 transition-colors"
+                                        >
+                                            + ナビを追加
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* ヘッダー固定設定 */}
+                                <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                                    <input
+                                        type="checkbox"
+                                        id="header-sticky"
+                                        checked={headerConfig.sticky}
+                                        onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, sticky: e.target.checked }))}
+                                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                    />
+                                    <label htmlFor="header-sticky" className="text-xs text-gray-600">
+                                        スクロール時にヘッダーを固定
+                                    </label>
+                                </div>
+                            </div>
+                        </EditorMenuItem>
+                    </EditorMenuSection>
 
                     {/* 見た目を調整する */}
                     {isSectionVisible(['crop', 'resize', 'overlay', 'delete', 'background', 'colorPalette']) && (

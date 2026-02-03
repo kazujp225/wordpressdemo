@@ -198,7 +198,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
     const isDesktopLayout = pageLayout === 'desktop';
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-white flex flex-col">
             {/* ステルスSEO/LLMO: 構造化データ (JSON-LD) */}
             {structuredDataList.map((data, index) => (
                 <script
@@ -260,12 +260,8 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                 </a>
             </header>
 
-            {/* Main Content: レイアウトに応じて幅を調整 */}
-            <main className={`mx-auto w-full bg-white shadow-2xl ${
-                isDesktopLayout
-                    ? 'max-w-7xl' // デスクトップ: ほぼ全幅
-                    : 'max-w-md md:max-w-xl lg:max-w-2xl' // モバイル: 縦長中央
-            }`}>
+            {/* Main Content: フル幅表示 */}
+            <main className="w-full bg-white">
                 {page.sections.map((section) => (
                     <section key={section.id} id={section.role} className={`relative w-full group ${section.role !== 'html-embed' ? 'overflow-hidden' : ''}`}>
                         {/* Visual Adjustments & Text Overlay */}
