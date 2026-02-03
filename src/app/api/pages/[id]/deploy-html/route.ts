@@ -165,7 +165,7 @@ export async function GET(
   ${mobileMediaQuery}
   body { margin: 0; font-family: 'Noto Sans JP', sans-serif; background: #f9fafb; }
   .header { ${headerConfig.sticky ? 'position:sticky;top:0;' : 'position:relative;'} z-index:50; display:flex; height:64px; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.9); padding:0 32px; box-shadow:0 1px 3px rgba(0,0,0,0.1); backdrop-filter:blur(8px); }
-  .header-logo { font-size:1.25rem; font-weight:700; color:#111827; }
+  .header-logo { font-size:1.25rem; font-weight:700; color:#2563eb; }
   .header-cta { display:inline-block; background:#2563eb; color:#fff; padding:8px 24px; border-radius:9999px; font-size:0.875rem; font-weight:700; text-decoration:none; box-shadow:0 4px 6px rgba(37,99,235,0.3); transition:transform 0.15s; }
   .header-cta:hover { transform:scale(1.05); }
   .main-content { max-width:768px; margin:0 auto; background:#fff; box-shadow:0 25px 50px -12px rgba(0,0,0,0.15); }
