@@ -2197,15 +2197,37 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             </div>
                             <nav className="hidden md:flex gap-6">
                                 {headerConfig.navItems?.map((item: any) => (
-                                    <span key={item.id} className="text-sm font-medium text-gray-700">
+                                    <a
+                                        key={item.id}
+                                        href={item.href}
+                                        onClick={(e) => {
+                                            if (item.href?.startsWith('#')) {
+                                                e.preventDefault();
+                                                const targetId = item.href.substring(1);
+                                                document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
+                                            }
+                                        }}
+                                        className="text-sm font-medium text-gray-700 hover:text-blue-600 cursor-pointer"
+                                    >
                                         {item.label}
-                                    </span>
+                                    </a>
                                 ))}
                             </nav>
                             {headerConfig.ctaText && (
-                                <span className="rounded-full bg-blue-600 px-6 py-2 text-sm font-bold text-white">
+                                <a
+                                    href={headerConfig.ctaLink || '#contact'}
+                                    onClick={(e) => {
+                                        const href = headerConfig.ctaLink || '#contact';
+                                        if (href.startsWith('#')) {
+                                            e.preventDefault();
+                                            const targetId = href.substring(1);
+                                            document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
+                                        }
+                                    }}
+                                    className="rounded-full bg-blue-600 px-6 py-2 text-sm font-bold text-white cursor-pointer hover:bg-blue-700 transition-colors"
+                                >
                                     {headerConfig.ctaText}
-                                </span>
+                                </a>
                             )}
                         </header>
                     )}
