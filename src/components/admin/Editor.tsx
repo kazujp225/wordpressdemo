@@ -4123,6 +4123,24 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     >
                                         削除するブロックを選ぶ
                                     </EditorActionButton>
+                                    <EditorActionButton
+                                        onClick={() => {
+                                            const noImageSections = sections.filter(s => !s.image?.filePath);
+                                            if (noImageSections.length === 0) {
+                                                toast('画像なしのセクションはありません');
+                                                return;
+                                            }
+                                            if (confirm(`${noImageSections.length}件の画像なしセクションを削除しますか？`)) {
+                                                setSections(prev => prev.filter(s => s.image?.filePath));
+                                                toast.success(`${noImageSections.length}件の画像なしセクションを削除しました`);
+                                            }
+                                        }}
+                                        disabled={sections.filter(s => !s.image?.filePath).length === 0}
+                                        icon={<ImageIcon className="h-3.5 w-3.5" />}
+                                        variant="danger"
+                                    >
+                                        画像なしを一括削除
+                                    </EditorActionButton>
                                 </EditorMenuItem>
                             )}
 
