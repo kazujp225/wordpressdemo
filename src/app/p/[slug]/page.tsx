@@ -348,7 +348,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
 
                                     {section.role === 'html-embed' && config.htmlContent ? (
                                         <iframe
-                                            srcDoc={config.htmlContent}
+                                            srcDoc={`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box;max-width:100%}body{margin:0;padding:0;overflow-x:hidden}img{max-width:100%;height:auto}</style></head><body>${config.htmlContent}</body></html>`}
                                             className="w-full border-0"
                                             style={{ minHeight: '400px', height: '800px' }}
                                             sandbox="allow-scripts allow-forms"
