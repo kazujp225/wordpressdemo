@@ -103,6 +103,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     // Validate input
     const validation = validateRequest(pageSectionsUpdateSchema, body);
     if (!validation.success) {
+        console.error('[PUT /api/pages] Validation failed:', JSON.stringify(validation.details, null, 2));
+        console.error('[PUT /api/pages] Request body sections sample:', JSON.stringify(body.sections?.slice(0, 2), null, 2));
         return NextResponse.json({
             error: validation.error,
             details: validation.details
