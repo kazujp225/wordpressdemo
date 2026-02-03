@@ -1986,17 +1986,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         const refFilePath = referenceSection?.image?.filePath;
         const styleReferenceUrl = refFilePath && refFilePath.startsWith('http') ? refFilePath : undefined;
 
-        console.log('=== Starting Parallel Batch Regenerate ===');
-        console.log(`Processing ${sectionIds.length} sections in parallel`);
+        console.log('=== Starting Sequential Batch Regenerate ===');
+        console.log(`Processing ${sectionIds.length} sections sequentially`);
         console.log(`Style reference URL: ${styleReferenceUrl}`);
 
-        // 各セクションを並列で処理
-        const regeneratePromises = sectionIds.map(async (sectionId, i) => {
+        // 各セクションを順次処理（サーバー負荷を軽減）
+        const results: { sectionId: string; success: boolean; error?: string; data?: any }[] = [];
+
+        for (const sectionId of sectionIds) {
             const section = sections.find(s => String(s.id) === String(sectionId));
 
             if (!section) {
                 console.warn(`Section not found for ID: ${sectionId}`);
-                return { sectionId, success: false, error: 'not found' };
+                results.push({ sectionId, success: false, error: 'not found' });
+                continue;
             }
 
             const dbSectionId = typeof section.id === 'string' && section.id.startsWith('temp-')
@@ -2005,11 +2008,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
             if (!dbSectionId || isNaN(dbSectionId)) {
                 console.warn(`Section ${section.id} skipped - not saved yet`);
-                return { sectionId, success: false, error: 'not saved' };
+                results.push({ sectionId, success: false, error: 'not saved' });
+                continue;
             }
 
             try {
-                console.log(`[Parallel] Starting section ${dbSectionId}...`);
+                console.log(`[Sequential] Starting section ${dbSectionId} (${completedCount + 1}/${sectionIds.length})...`);
 
                 const response: Response = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
                     method: 'POST',
@@ -2042,7 +2046,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 });
 
                 if (response.ok) {
-                    console.log(`✅ [Parallel] Section ${dbSectionId} completed`);
+                    console.log(`✅ [Sequential] Section ${dbSectionId} completed (${completedCount}/${sectionIds.length})`);
+                    successCount++;
 
                     // 履歴に追加
                     if (section.imageId && section.image) {
@@ -2062,10 +2067,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             : s
                     ));
 
-                    // モバイル画像も並列で再生成（オプションがONの場合）
+                    // モバイル画像も再生成（オプションがONの場合）
                     if (includeMobileInBatch && section.mobileImage?.filePath) {
                         const generatedImageUrl = data.media?.filePath || data.newImageUrl;
                         try {
+                            console.log(`[Sequential] Starting mobile for section ${dbSectionId}...`);
                             const mobileResponse = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -2084,6 +2090,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             });
                             const mobileData = await mobileResponse.json();
                             if (mobileResponse.ok) {
+                                console.log(`✅ [Sequential] Mobile for section ${dbSectionId} completed`);
                                 setSections(prev => prev.map(s =>
                                     s.id === sectionId
                                         ? { ...s, mobileImageId: mobileData.newImageId, mobileImage: mobileData.media }
@@ -2095,10 +2102,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         }
                     }
 
-                    return { sectionId, success: true, data };
+                    results.push({ sectionId, success: true, data });
                 } else {
-                    console.error(`❌ [Parallel] Section ${dbSectionId} failed:`, data.error);
-                    return { sectionId, success: false, error: data.error };
+                    console.error(`❌ [Sequential] Section ${dbSectionId} failed:`, data.error);
+                    results.push({ sectionId, success: false, error: data.error });
                 }
             } catch (error: any) {
                 completedCount++;
@@ -2108,17 +2115,14 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     next.delete(sectionId);
                     return next;
                 });
-                console.error(`❌ [Parallel] Section ${sectionId} error:`, error.message);
-                return { sectionId, success: false, error: error.message };
+                console.error(`❌ [Sequential] Section ${sectionId} error:`, error.message);
+                results.push({ sectionId, success: false, error: error.message });
             }
-        });
+        }
 
-        // 全ての並列処理を待機
-        const results = await Promise.all(regeneratePromises);
-        successCount = results.filter(r => r.success).length;
         const failedCount = results.filter(r => !r.success).length;
 
-        console.log(`=== Parallel Batch Complete: ${successCount} success, ${failedCount} failed ===`);
+        console.log(`=== Sequential Batch Complete: ${successCount} success, ${failedCount} failed ===`);
 
         if (failedCount > 0) {
             toast.error(`${failedCount}件のセクションで再生成に失敗しました`);
