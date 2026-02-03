@@ -119,12 +119,12 @@ export type PageUpdateInput = z.infer<typeof pageUpdateSchema>;
 export const pageSectionsUpdateSchema = z.object({
     sections: z.array(z.object({
         role: z.string(),
-        imageId: z.number().nullable().optional(),
-        mobileImageId: z.number().nullable().optional(),
+        imageId: z.union([z.number(), z.string()]).nullable().optional().transform(v => v ? Number(v) : null),
+        mobileImageId: z.union([z.number(), z.string()]).nullable().optional().transform(v => v ? Number(v) : null),
         config: z.record(z.string(), z.unknown()).nullable().optional(),
         boundaryOffsetTop: z.number().optional(),
         boundaryOffsetBottom: z.number().optional(),
-    })),
+    }).passthrough()), // passthrough allows additional fields
     headerConfig: z.record(z.string(), z.unknown()).optional(),
     status: z.enum(['draft', 'published']).optional(),
     designDefinition: z.record(z.string(), z.unknown()).nullable().optional(),
