@@ -323,7 +323,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                         ? JSON.parse(section.config)
                                         : section.config;
                                     config = { ...config, ...parsed };
-                                    // LP Builderからの保存形式: properties.clickableAreas または clickableAreas
+                                    // AI画像編集くんからの保存形式: properties.clickableAreas または clickableAreas
                                     if (parsed.properties?.clickableAreas) {
                                         config.clickableAreas = parsed.properties.clickableAreas;
                                     } else if (parsed.clickableAreas) {

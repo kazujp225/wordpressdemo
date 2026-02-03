@@ -49,7 +49,7 @@ export default function LPPreviewPage() {
                 <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
                     <div className="text-center">
                         <h1 className="text-2xl font-bold text-gray-900 mb-2">No Preview Data</h1>
-                        <p className="text-gray-500">Please open preview from the LP Builder.</p>
+                        <p className="text-gray-500">Please open preview from the AI画像編集くん.</p>
                     </div>
                 </div>
             </>
