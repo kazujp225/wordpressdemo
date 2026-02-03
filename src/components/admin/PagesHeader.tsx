@@ -442,8 +442,8 @@ export function PagesHeader() {
                                         </button>
                                     </div>
 
-                                    {/* テキストベースLP作成 - 一時的に非表示 */}
-                                    {/* <button
+                                    {/* テキストベースLP作成 */}
+                                    <button
                                         onClick={() => {
                                             setShowSelection(false);
                                             setIsTextLPModalOpen(true);
@@ -468,7 +468,7 @@ export function PagesHeader() {
                                         <div className="text-green-500 group-hover:translate-x-1 transition-transform">
                                             <Sparkles className="h-5 w-5" />
                                         </div>
-                                    </button> */}
+                                    </button>
                                 </div>
                             ) : (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
