@@ -15,8 +15,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "LP Builder",
-  description: "Vertical LP Builder",
+  title: "そっくりLP",
+  description: "参考サイトからそっくりなLPを自動生成",
 };
 
 export default function RootLayout({

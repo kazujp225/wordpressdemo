@@ -315,7 +315,7 @@ export default function LandingPage() {
       <footer className="border-t border-gray-100 mt-16">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <p className="text-sm text-center text-muted-foreground">
-            © 2024 ZettAI Inc. All rights reserved.
+            © 2024 そっくりLP All rights reserved.
           </p>
         </div>
       </footer>
