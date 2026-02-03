@@ -3330,6 +3330,21 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         </button>
                         <button
                             onClick={() => {
+                                // 画像なしセクションを選択
+                                const noImageSections = sections.filter(s => !s.image?.filePath);
+                                if (noImageSections.length === 0) {
+                                    toast('画像なしのセクションはありません');
+                                    return;
+                                }
+                                setSelectedSectionsForDelete(new Set(noImageSections.map(s => s.id)));
+                                toast.success(`${noImageSections.length}件の画像なしセクションを選択しました`);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
+                        >
+                            画像なしを選択
+                        </button>
+                        <button
+                            onClick={() => {
                                 setSectionDeleteMode(false);
                                 setSelectedSectionsForDelete(new Set());
                             }}
