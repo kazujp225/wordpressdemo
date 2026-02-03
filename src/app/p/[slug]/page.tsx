@@ -348,7 +348,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
 
                                     {section.role === 'html-embed' && config.htmlContent ? (
                                         <iframe
-                                            srcDoc={`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box;max-width:100%}body{margin:0;padding:0;overflow-x:hidden}img{max-width:100%;height:auto}</style></head><body>${config.htmlContent}</body></html>`}
+                                            srcDoc={`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box;max-width:100%!important}body{margin:0;padding:8px;overflow-x:hidden}img{max-width:100%;height:auto}input,select,textarea{max-width:100%!important;width:100%!important}form{max-width:100%!important}@media(max-width:480px){.grid,.flex,[class*="grid-cols"],[class*="col-span"]{display:block!important;grid-template-columns:1fr!important}[class*="gap-"]{gap:8px!important}}</style></head><body>${config.htmlContent}</body></html>`}
                                             className="w-full border-0"
                                             style={{ minHeight: '400px', height: '800px' }}
                                             sandbox="allow-scripts allow-forms"

@@ -3045,7 +3045,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             <span className="text-xs font-medium text-gray-700">編集</span>
                                                         </button>
                                                         <iframe
-                                                            srcDoc={section.config.htmlContent}
+                                                            srcDoc={`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box;max-width:100%!important}body{margin:0;padding:8px;overflow-x:hidden}img{max-width:100%;height:auto}input,select,textarea{max-width:100%!important}form{max-width:100%!important}@media(max-width:480px){.grid,.flex,[class*="grid-cols"],[class*="col-span"]{display:block!important;grid-template-columns:1fr!important}[class*="gap-"]{gap:8px!important}}</style></head><body>${section.config.htmlContent}</body></html>`}
                                                             className="w-full border-0 overflow-auto"
                                                             style={{ minHeight: '300px', height: '600px' }}
                                                             sandbox="allow-scripts allow-forms"
