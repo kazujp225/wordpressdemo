@@ -2191,11 +2191,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl bg-white shadow-2xl">
                     {/* ヘッダー - 設定がある場合のみ表示 */}
                     {(headerConfig.logoText || headerConfig.ctaText || (headerConfig.navItems && headerConfig.navItems.length > 0)) && (
-                        <header className="flex h-16 items-center justify-between bg-white/90 px-4 shadow-sm backdrop-blur-md">
-                            <div className="text-xl font-bold text-gray-900">
+                        <header className="flex h-14 items-center justify-between bg-white/90 px-3 shadow-sm backdrop-blur-md gap-2">
+                            <div className="text-sm font-bold text-gray-900 truncate max-w-[40%]">
                                 {headerConfig.logoText}
                             </div>
-                            <nav className="hidden md:flex gap-6">
+                            <nav className="hidden gap-6">
                                 {headerConfig.navItems?.map((item: any) => (
                                     <a
                                         key={item.id}
@@ -2224,7 +2224,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
                                         }
                                     }}
-                                    className="rounded-full bg-blue-600 px-6 py-2 text-sm font-bold text-white cursor-pointer hover:bg-blue-700 transition-colors"
+                                    className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white cursor-pointer hover:bg-blue-700 transition-colors whitespace-nowrap flex-shrink-0"
                                 >
                                     {headerConfig.ctaText}
                                 </a>

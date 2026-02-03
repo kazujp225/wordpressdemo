@@ -238,8 +238,8 @@ export default async function PublicPage({ params }: { params: { slug: string } 
             )}
 
             {/* Dynamic Header */}
-            <header className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex h-16 items-center justify-between bg-white/90 px-4 shadow-sm backdrop-blur-md md:px-8`}>
-                <div className="text-xl font-bold text-gray-900">
+            <header className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex h-14 md:h-16 items-center justify-between bg-white/90 px-3 md:px-8 shadow-sm backdrop-blur-md gap-2`}>
+                <div className="text-sm md:text-xl font-bold text-gray-900 truncate max-w-[40%] md:max-w-none">
                     {headerConfig.logoText}
                 </div>
                 <nav className="hidden md:flex gap-6">
@@ -255,7 +255,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                         </>
                     )}
                 </nav>
-                <a href={headerConfig.ctaLink} className="rounded-full bg-blue-600 px-6 py-2 text-sm font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95">
+                <a href={headerConfig.ctaLink} className="rounded-full bg-blue-600 px-3 md:px-6 py-1.5 md:py-2 text-xs md:text-sm font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95 whitespace-nowrap flex-shrink-0">
                     {headerConfig.ctaText}
                 </a>
             </header>
