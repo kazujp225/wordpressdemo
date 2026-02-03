@@ -3144,7 +3144,13 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                     <Monitor className="h-4 w-4" />
                                                     デスクトップ画像を取得
                                                 </button>
-                                                {/* モバイル追加取得は本番環境で不安定なため一時的に無効化 */}
+                                                <button
+                                                    onClick={() => handleFetchMoreSections('mobile')}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition-all"
+                                                >
+                                                    <Smartphone className="h-4 w-4" />
+                                                    モバイル画像を取得
+                                                </button>
                                             </div>
                                         )}
                                         <p className="text-[10px] text-gray-400 mt-2">
