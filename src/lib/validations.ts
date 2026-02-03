@@ -121,7 +121,12 @@ export const pageSectionsUpdateSchema = z.object({
         role: z.string(),
         imageId: z.union([z.number(), z.string()]).nullable().optional().transform(v => v ? Number(v) : null),
         mobileImageId: z.union([z.number(), z.string()]).nullable().optional().transform(v => v ? Number(v) : null),
-        config: z.record(z.string(), z.unknown()).nullable().optional(),
+        config: z.union([
+            z.record(z.string(), z.unknown()),
+            z.string().transform(v => {
+                try { return JSON.parse(v); } catch { return {}; }
+            })
+        ]).nullable().optional(),
         boundaryOffsetTop: z.number().optional(),
         boundaryOffsetBottom: z.number().optional(),
     }).passthrough()), // passthrough allows additional fields
