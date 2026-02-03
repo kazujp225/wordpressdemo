@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Loader2, Wand2, Download, RotateCcw, Check, Maximize2, Minimize2, Move, Crop, Sparkles } from 'lucide-react';
+import { X, Loader2, Check, Maximize2, Crop } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // アスペクト比プリセット
@@ -30,7 +30,7 @@ const SIZE_PRESETS = [
     { label: 'Webバナー (300x250)', width: 300, height: 250, platform: 'web' },
 ];
 
-type ResizeMode = 'crop' | 'resize' | 'outpaint';
+type ResizeMode = 'crop' | 'resize';
 
 interface ImageResizeModalProps {
     imageUrl: string;
@@ -63,10 +63,6 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
     const [targetSize, setTargetSize] = useState({ width: 0, height: 0 });
     const [maintainAspect, setMaintainAspect] = useState(true);
 
-    // アウトペインティング用state
-    const [outpaintDirection, setOutpaintDirection] = useState<'left' | 'right' | 'top' | 'bottom' | 'all'>('all');
-    const [outpaintAmount, setOutpaintAmount] = useState(50); // パーセント
-    const [outpaintPrompt, setOutpaintPrompt] = useState('');
 
     // 処理状態
     const [isProcessing, setIsProcessing] = useState(false);
@@ -161,43 +157,8 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
             });
         }
 
-        // アウトペイントモードのプレビュー
-        if (mode === 'outpaint') {
-            const expandX = outpaintDirection === 'left' || outpaintDirection === 'right' || outpaintDirection === 'all'
-                ? image.width * (outpaintAmount / 100) : 0;
-            const expandY = outpaintDirection === 'top' || outpaintDirection === 'bottom' || outpaintDirection === 'all'
-                ? image.height * (outpaintAmount / 100) : 0;
-
-            ctx.strokeStyle = '#10b981';
-            ctx.lineWidth = 2 / scale;
-            ctx.setLineDash([5 / scale, 5 / scale]);
-
-            const newX = outpaintDirection === 'left' || outpaintDirection === 'all' ? -expandX : 0;
-            const newY = outpaintDirection === 'top' || outpaintDirection === 'all' ? -expandY : 0;
-            const newW = image.width + (outpaintDirection === 'all' ? expandX * 2 : expandX);
-            const newH = image.height + (outpaintDirection === 'all' ? expandY * 2 : expandY);
-
-            ctx.strokeRect(newX, newY, newW, newH);
-            ctx.setLineDash([]);
-
-            // 拡張エリアをハイライト
-            ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
-            if (outpaintDirection === 'left' || outpaintDirection === 'all') {
-                ctx.fillRect(-expandX, outpaintDirection === 'all' ? -expandY : 0, expandX, outpaintDirection === 'all' ? image.height + expandY * 2 : image.height);
-            }
-            if (outpaintDirection === 'right' || outpaintDirection === 'all') {
-                ctx.fillRect(image.width, outpaintDirection === 'all' ? -expandY : 0, expandX, outpaintDirection === 'all' ? image.height + expandY * 2 : image.height);
-            }
-            if (outpaintDirection === 'top' || outpaintDirection === 'all') {
-                ctx.fillRect(0, -expandY, image.width, expandY);
-            }
-            if (outpaintDirection === 'bottom' || outpaintDirection === 'all') {
-                ctx.fillRect(0, image.height, image.width, expandY);
-            }
-        }
-
         ctx.restore();
-    }, [image, scale, offset, cropRect, mode, outpaintDirection, outpaintAmount]);
+    }, [image, scale, offset, cropRect, mode]);
 
     // マウスイベント
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -446,56 +407,6 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
         }
     };
 
-    // アウトペインティング実行
-    const executeOutpaint = async () => {
-        if (!image) return;
-
-        setIsProcessing(true);
-        try {
-            // 元画像をbase64に変換
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = image.width;
-            tempCanvas.height = image.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            if (!tempCtx) throw new Error('Canvas context failed');
-            tempCtx.drawImage(image, 0, 0);
-            const base64 = tempCanvas.toDataURL('image/png');
-
-            // 拡張サイズを計算
-            const expandX = outpaintDirection === 'left' || outpaintDirection === 'right' || outpaintDirection === 'all'
-                ? Math.round(image.width * (outpaintAmount / 100)) : 0;
-            const expandY = outpaintDirection === 'top' || outpaintDirection === 'bottom' || outpaintDirection === 'all'
-                ? Math.round(image.height * (outpaintAmount / 100)) : 0;
-
-            const newWidth = image.width + (outpaintDirection === 'all' ? expandX * 2 : expandX);
-            const newHeight = image.height + (outpaintDirection === 'all' ? expandY * 2 : expandY);
-
-            // APIコール
-            const res = await fetch('/api/ai/outpaint', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    image: base64,
-                    direction: outpaintDirection,
-                    expandAmount: outpaintAmount,
-                    prompt: outpaintPrompt || '周囲の背景を自然に拡張してください',
-                    targetWidth: newWidth,
-                    targetHeight: newHeight,
-                })
-            });
-
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-
-            toast.success('AI拡張が完了しました');
-            onSave(data.url, data.id);
-        } catch (error: any) {
-            toast.error(error.message || 'AI拡張に失敗しました');
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
     // 実行ボタン
     const handleExecute = async (e?: React.MouseEvent) => {
         e?.preventDefault?.();
@@ -511,10 +422,6 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
                 console.log('[handleExecute] Before executeResize');
                 await executeResize();
                 console.log('[handleExecute] After executeResize');
-            } else if (mode === 'outpaint') {
-                console.log('[handleExecute] Before executeOutpaint');
-                await executeOutpaint();
-                console.log('[handleExecute] After executeOutpaint');
             }
         } catch (err) {
             console.error('[handleExecute] Error:', err);
@@ -579,7 +486,6 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
                                 {[
                                     { mode: 'crop' as ResizeMode, label: 'クロップ', Icon: Crop },
                                     { mode: 'resize' as ResizeMode, label: 'リサイズ', Icon: Maximize2 },
-                                    { mode: 'outpaint' as ResizeMode, label: 'AI拡張', Icon: Sparkles },
                                 ].map(({ mode: m, label, Icon }) => (
                                     <button
                                         key={m}
@@ -701,82 +607,6 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
                                 </>
                             )}
 
-                            {mode === 'outpaint' && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">拡張方向</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[
-                                                { value: 'left', label: '←' },
-                                                { value: 'top', label: '↑' },
-                                                { value: 'right', label: '→' },
-                                                { value: 'all', label: '全方向' },
-                                                { value: 'bottom', label: '↓' },
-                                            ].map(dir => (
-                                                <button
-                                                    key={dir.value}
-                                                    onClick={() => setOutpaintDirection(dir.value as any)}
-                                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                                                        outpaintDirection === dir.value
-                                                            ? 'bg-green-600 text-white'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    } ${dir.value === 'all' ? 'col-span-1' : ''}`}
-                                                >
-                                                    {dir.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            拡張量: {outpaintAmount}%
-                                        </label>
-                                        <input
-                                            type="range"
-                                            min="10"
-                                            max="100"
-                                            value={outpaintAmount}
-                                            onChange={(e) => setOutpaintAmount(parseInt(e.target.value))}
-                                            className="w-full"
-                                        />
-                                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                                            <span>10%</span>
-                                            <span>100%</span>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            生成プロンプト（任意）
-                                        </label>
-                                        <textarea
-                                            value={outpaintPrompt}
-                                            onChange={(e) => setOutpaintPrompt(e.target.value)}
-                                            placeholder="拡張部分に何を生成するか指定..."
-                                            className="w-full px-3 py-2 border rounded-lg text-sm resize-none"
-                                            rows={3}
-                                        />
-                                    </div>
-
-                                    {image && (
-                                        <div className="pt-4 border-t">
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">出力サイズ</label>
-                                            <div className="text-sm text-gray-600">
-                                                {(() => {
-                                                    const expandX = outpaintDirection === 'left' || outpaintDirection === 'right' || outpaintDirection === 'all'
-                                                        ? Math.round(image.width * (outpaintAmount / 100)) : 0;
-                                                    const expandY = outpaintDirection === 'top' || outpaintDirection === 'bottom' || outpaintDirection === 'all'
-                                                        ? Math.round(image.height * (outpaintAmount / 100)) : 0;
-                                                    const newW = image.width + (outpaintDirection === 'all' ? expandX * 2 : expandX);
-                                                    const newH = image.height + (outpaintDirection === 'all' ? expandY * 2 : expandY);
-                                                    return `${newW} × ${newH}px`;
-                                                })()}
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
                         </div>
 
                         {/* 実行ボタン */}
@@ -795,7 +625,7 @@ export function ImageResizeModal({ imageUrl, onClose, onSave }: ImageResizeModal
                                 ) : (
                                     <>
                                         <Check className="h-5 w-5" />
-                                        {mode === 'crop' ? 'クロップを適用' : mode === 'resize' ? 'リサイズを適用' : 'AI拡張を実行'}
+                                        {mode === 'crop' ? 'クロップを適用' : 'リサイズを適用'}
                                     </>
                                 )}
                             </button>
