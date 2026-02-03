@@ -20,7 +20,7 @@ interface ClaudeCodeGeneratorModalProps {
   sections: Section[];
   designDefinition?: DesignContext | null;
   layoutMode: 'desktop' | 'responsive';
-  onInsertHtml: (html: string, insertIndex: number, meta: { templateType: string; prompt: string }) => void | Promise<void>;
+  onInsertHtml: (html: string, insertIndex: number, meta: { templateType: string; prompt: string; mobileHtmlContent?: string }) => void | Promise<void>;
 }
 
 type Step = 'template' | 'fields' | 'prompt' | 'generating' | 'preview' | 'insert' | 'deploy';
@@ -139,6 +139,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
   const [formFields, setFormFields] = useState<FormField[]>([]);
   const [prompt, setPrompt] = useState('');
   const [generatedHtml, setGeneratedHtml] = useState('');
+  const [generatedHtmlMobile, setGeneratedHtmlMobile] = useState('');
   const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview');
   const [copied, setCopied] = useState(false);
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
@@ -239,32 +240,56 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
 
     try {
       const template = TEMPLATES.find(t => t.id === selectedTemplate);
-      const response = await fetch('/api/ai/claude-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          templateId: selectedTemplate,
-          prompt: prompt.trim(),
-          layoutMode,
-          designContext: designDefinition || null,
-          formFields: template?.hasFormFields ? formFields : undefined,
-          enableFormSubmission: template?.hasFormFields ? enableFormSubmission : undefined,
+
+      // デスクトップ用とモバイル用を並列生成
+      setLogs(prev => [...prev, { time: getTimestamp(), message: 'Generating desktop & mobile versions in parallel...', type: 'system' }]);
+
+      const [desktopResponse, mobileResponse] = await Promise.all([
+        fetch('/api/ai/claude-generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            templateId: selectedTemplate,
+            prompt: prompt.trim(),
+            layoutMode: 'desktop',
+            designContext: designDefinition || null,
+            formFields: template?.hasFormFields ? formFields : undefined,
+            enableFormSubmission: template?.hasFormFields ? enableFormSubmission : undefined,
+          }),
         }),
-      });
+        fetch('/api/ai/claude-generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            templateId: selectedTemplate,
+            prompt: prompt.trim(),
+            layoutMode: 'responsive',
+            designContext: designDefinition || null,
+            formFields: template?.hasFormFields ? formFields : undefined,
+            enableFormSubmission: template?.hasFormFields ? enableFormSubmission : undefined,
+          }),
+        }),
+      ]);
 
-      const data = await response.json();
+      const [desktopData, mobileData] = await Promise.all([
+        desktopResponse.json(),
+        mobileResponse.json(),
+      ]);
 
-      if (!response.ok) {
+      if (!desktopResponse.ok || !mobileResponse.ok) {
         abortRef.current = true;
-        setLogs(prev => [...prev, { time: getTimestamp(), message: `ERROR: ${data.message || 'Failed'}`, type: 'warn' }]);
+        const errorMsg = desktopData.message || mobileData.message || 'Failed';
+        setLogs(prev => [...prev, { time: getTimestamp(), message: `ERROR: ${errorMsg}`, type: 'warn' }]);
         setTimeout(() => setStep('prompt'), 1500);
-        toast.error(data.message || 'Generation failed');
+        toast.error(errorMsg || 'Generation failed');
         return;
       }
 
-      setGeneratedHtml(data.html);
-      setEstimatedCost(data.estimatedCost || 0);
+      setGeneratedHtml(desktopData.html);
+      setGeneratedHtmlMobile(mobileData.html);
+      setEstimatedCost((desktopData.estimatedCost || 0) + (mobileData.estimatedCost || 0));
       setApiDone(true);
+      setLogs(prev => [...prev, { time: getTimestamp(), message: 'Both versions generated successfully!', type: 'success' }]);
     } catch (error) {
       abortRef.current = true;
       setLogs(prev => [...prev, { time: getTimestamp(), message: 'FATAL: Connection error', type: 'warn' }]);
@@ -280,7 +305,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
   };
 
   const handleInsertAt = (index: number) => {
-    onInsertHtml(generatedHtml, index, { templateType: selectedTemplate, prompt });
+    onInsertHtml(generatedHtml, index, { templateType: selectedTemplate, prompt, mobileHtmlContent: generatedHtmlMobile });
     toast.success(`セクション ${index + 1} の位置に配置しました`);
     onClose();
   };
@@ -909,22 +934,22 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
                   <div
                     className="h-full transition-all duration-300 ease-out bg-white"
                     style={{
-                      width: previewDevice === 'mobile' && layoutMode === 'responsive' ? '375px' : '100%',
-                      boxShadow: previewDevice === 'mobile' && layoutMode === 'responsive' ? '0 0 0 1px rgba(0,0,0,0.05), 0 4px 24px rgba(0,0,0,0.08)' : 'none',
-                      borderRadius: previewDevice === 'mobile' && layoutMode === 'responsive' ? '0' : '0',
+                      width: previewDevice === 'mobile' ? '375px' : '100%',
+                      boxShadow: previewDevice === 'mobile' ? '0 0 0 1px rgba(0,0,0,0.05), 0 4px 24px rgba(0,0,0,0.08)' : 'none',
+                      borderRadius: previewDevice === 'mobile' ? '0' : '0',
                     }}
                   >
-                    <iframe srcDoc={generatedHtml} className="w-full h-full bg-white" sandbox="allow-scripts" title="Preview" />
+                    <iframe srcDoc={previewDevice === 'mobile' && generatedHtmlMobile ? generatedHtmlMobile : generatedHtml} className="w-full h-full bg-white" sandbox="allow-scripts" title="Preview" />
                   </div>
                 ) : (
                   <div className="h-full w-full bg-gray-950 overflow-auto rounded-xl">
-                    <pre className="p-4 text-[11px] leading-relaxed text-gray-400 font-mono"><code>{generatedHtml}</code></pre>
+                    <pre className="p-4 text-[11px] leading-relaxed text-gray-400 font-mono"><code>{previewDevice === 'mobile' && generatedHtmlMobile ? generatedHtmlMobile : generatedHtml}</code></pre>
                   </div>
                 )}
               </div>
-              {previewDevice === 'mobile' && layoutMode === 'responsive' && viewMode === 'preview' && (
+              {previewDevice === 'mobile' && viewMode === 'preview' && (
                 <div className="mt-2 text-center">
-                  <span className="text-[10px] text-gray-400">375px viewport</span>
+                  <span className="text-[10px] text-gray-400">375px viewport (mobile version)</span>
                 </div>
               )}
             </div>

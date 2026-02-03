@@ -3045,7 +3045,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             <span className="text-xs font-medium text-gray-700">編集</span>
                                                         </button>
                                                         <iframe
-                                                            srcDoc={`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box!important}body{margin:0!important;padding:16px!important;overflow-x:hidden!important;width:100%!important}div,form,section,article{max-width:100%!important;width:100%!important}input,select,textarea{max-width:100%!important;width:100%!important;min-width:0!important}img{max-width:100%!important;height:auto!important}[style*="grid"],[style*="display: grid"],[style*="display:grid"]{display:block!important}[style*="grid-template-columns"]{grid-template-columns:1fr!important}[style*="width: 50%"],[style*="width:50%"],[style*="width: calc"],[style*="width:calc"]{width:100%!important}[style*="flex"]{flex-wrap:wrap!important}[style*="gap"]{gap:12px!important}</style></head><body>${section.config.htmlContent}</body></html>`}
+                                                            srcDoc={(() => {
+                                                                const htmlToUse = viewMode === 'mobile' && section.config.mobileHtmlContent
+                                                                    ? section.config.mobileHtmlContent
+                                                                    : section.config.htmlContent;
+                                                                return htmlToUse;
+                                                            })()}
                                                             className="w-full border-0 overflow-auto"
                                                             style={{ minHeight: '300px', height: '600px' }}
                                                             sandbox="allow-scripts allow-forms"
@@ -6286,6 +6291,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             order: insertIndex,
                             config: {
                                 htmlContent: html,
+                                mobileHtmlContent: meta.mobileHtmlContent || null,
                                 templateType: meta.templateType,
                                 prompt: meta.prompt,
                             }

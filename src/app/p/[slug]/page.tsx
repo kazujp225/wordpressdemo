@@ -275,6 +275,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                 overlayColor: string;
                                 overlayOpacity: number;
                                 htmlContent?: string;
+                                mobileHtmlContent?: string;
                                 clickableAreas?: ClickableArea[];
                                 properties?: {
                                     clickableAreas?: ClickableArea[];
@@ -347,13 +348,26 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                     {/* テキストオーバーレイは無効化 - 画像に直接焼き込む方式に変更 */}
 
                                     {section.role === 'html-embed' && config.htmlContent ? (
-                                        <iframe
-                                            srcDoc={`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box!important}body{margin:0!important;padding:16px!important;overflow-x:hidden!important;width:100%!important}div,form,section,article{max-width:100%!important;width:100%!important}input,select,textarea{max-width:100%!important;width:100%!important;min-width:0!important}img{max-width:100%!important;height:auto!important}[style*="grid"],[style*="display: grid"],[style*="display:grid"]{display:block!important}[style*="grid-template-columns"]{grid-template-columns:1fr!important}[style*="width: 50%"],[style*="width:50%"],[style*="width: calc"],[style*="width:calc"]{width:100%!important}[style*="flex"]{flex-wrap:wrap!important}[style*="gap"]{gap:12px!important}</style></head><body>${config.htmlContent}</body></html>`}
-                                            className="w-full border-0"
-                                            style={{ minHeight: '400px', height: '800px' }}
-                                            sandbox="allow-scripts allow-forms"
-                                            title="Embedded content"
-                                        />
+                                        <>
+                                            {/* デスクトップ用 - モバイル用がある場合のみ768px以上で表示 */}
+                                            <iframe
+                                                srcDoc={config.htmlContent}
+                                                className={`w-full border-0 ${config.mobileHtmlContent ? 'hidden md:block' : ''}`}
+                                                style={{ minHeight: '400px', height: '800px' }}
+                                                sandbox="allow-scripts allow-forms"
+                                                title="Embedded content (desktop)"
+                                            />
+                                            {/* モバイル用 - 768px未満で表示 */}
+                                            {config.mobileHtmlContent && (
+                                                <iframe
+                                                    srcDoc={config.mobileHtmlContent}
+                                                    className="w-full border-0 md:hidden"
+                                                    style={{ minHeight: '400px', height: '800px' }}
+                                                    sandbox="allow-scripts allow-forms"
+                                                    title="Embedded content (mobile)"
+                                                />
+                                            )}
+                                        </>
                                     ) : section.image ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img
