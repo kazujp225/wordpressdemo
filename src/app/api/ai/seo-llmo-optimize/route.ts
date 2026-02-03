@@ -150,15 +150,15 @@ export interface CombinedOptimizationResult {
 type AnalysisMode = 'seo' | 'llmo' | 'combined';
 
 /**
- * 画像をBase64に変換
+ * 画像をBase64に変換し、メディアタイプも返す
  */
-async function getImageBase64(imageUrl: string): Promise<string> {
+async function getImageBase64(imageUrl: string): Promise<{ base64: string; mediaType: string }> {
   if (imageUrl.startsWith('data:')) {
-    const matches = imageUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
+    const matches = imageUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
     if (!matches) {
       throw new Error('Invalid base64 data URL format');
     }
-    return matches[1];
+    return { base64: matches[2], mediaType: matches[1] };
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -168,8 +168,10 @@ async function getImageBase64(imageUrl: string): Promise<string> {
   if (!imgRes.ok) {
     throw new Error(`Failed to fetch image: ${imgRes.statusText}`);
   }
+
+  const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
   const buffer = await imgRes.arrayBuffer();
-  return Buffer.from(buffer).toString('base64');
+  return { base64: Buffer.from(buffer).toString('base64'), mediaType: contentType };
 }
 
 /**
@@ -307,7 +309,7 @@ export async function POST(request: NextRequest) {
     const client = getClaudeClient();
 
     // 画像をBase64に変換
-    const base64Content = await getImageBase64(imageUrl);
+    const { base64: base64Content, mediaType } = await getImageBase64(imageUrl);
 
     // LP全体のテキストを抽出（pageIdがあれば）
     let pageText = '';
@@ -341,7 +343,7 @@ export async function POST(request: NextRequest) {
               type: 'image',
               source: {
                 type: 'base64',
-                media_type: 'image/jpeg',
+                media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
                 data: base64Content,
               },
             },
