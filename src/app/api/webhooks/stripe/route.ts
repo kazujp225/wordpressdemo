@@ -271,32 +271,63 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       });
 
       // パスワード設定リンクを生成（recovery = パスワードリセット機能を流用）
+      // リトライ機能付き（最大3回）
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://xn--lp-xv5crjy08r.com';
-      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email,
-        options: {
-          redirectTo: `${baseUrl}/welcome?setup=true`,
-        },
-      });
+      const planName = plan?.name || planId;
 
-      if (linkError || !linkData?.properties?.action_link) {
-        console.error('Failed to generate password setup link:', linkError);
-        // リンク生成失敗してもユーザー作成は完了しているので続行
-      } else {
-        // ウェルカムメールでパスワード設定リンクを送信
-        const planName = plan?.name || planId;
-        const emailResult = await sendWelcomeEmail({
-          to: email,
-          planName,
-          passwordSetupUrl: linkData.properties.action_link,
-        });
+      let emailSent = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'recovery',
+            email,
+            options: {
+              redirectTo: `${baseUrl}/welcome?setup=true`,
+            },
+          });
 
-        if (emailResult.success) {
-          console.log(`Welcome email with password setup link sent to ${email}`);
-        } else {
-          console.error(`Failed to send welcome email: ${emailResult.error}`);
+          if (linkError || !linkData?.properties?.action_link) {
+            console.error(`[Attempt ${attempt}/3] Failed to generate password setup link:`, linkError);
+            if (attempt < 3) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // 1s, 2s待機
+              continue;
+            }
+          } else {
+            // ウェルカムメールでパスワード設定リンクを送信
+            const emailResult = await sendWelcomeEmail({
+              to: email,
+              planName,
+              passwordSetupUrl: linkData.properties.action_link,
+            });
+
+            if (emailResult.success) {
+              console.log(`Welcome email with password setup link sent to ${email}`);
+              emailSent = true;
+              break;
+            } else {
+              console.error(`[Attempt ${attempt}/3] Failed to send welcome email:`, emailResult.error);
+              if (attempt < 3) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                continue;
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[Attempt ${attempt}/3] Error in password setup flow:`, err);
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
         }
+      }
+
+      if (!emailSent) {
+        // 全リトライ失敗時、DBにフラグを記録して後で手動対応できるようにする
+        console.error(`CRITICAL: Failed to send welcome email to ${email} after 3 attempts. Manual intervention required.`);
+        await prisma.userSettings.upsert({
+          where: { userId },
+          update: { welcomeEmailPending: true },
+          create: { userId, email, plan: planId, welcomeEmailPending: true },
+        });
       }
     }
 

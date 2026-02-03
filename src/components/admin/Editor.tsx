@@ -376,9 +376,18 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
     const [isProcessingAssetDrop, setIsProcessingAssetDrop] = useState(false);
 
+    // 自動保存機能
+    const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false);
+    const [lastAutoSaveTime, setLastAutoSaveTime] = useState<Date | null>(null);
+    const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
     // 続きを取得（スクリーンショット追加取得）
     const [isFetchingMoreSections, setIsFetchingMoreSections] = useState(false);
     const [fetchMoreProgress, setFetchMoreProgress] = useState<string | null>(null);
+
+    // デスクトップ追加後のモバイル確認ダイアログ
+    const [showMobileConfirmDialog, setShowMobileConfirmDialog] = useState(false);
+    const [pendingDesktopSections, setPendingDesktopSections] = useState<any[] | null>(null);
 
     // ソースURLを取得（最初のセクションの画像から）
     const sourceUrl = sections.length > 0 && sections[0]?.image?.sourceUrl
@@ -386,7 +395,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         : null;
 
     // 続きを取得するハンドラー
-    const handleFetchMoreSections = async (device: 'desktop' | 'mobile') => {
+    const handleFetchMoreSections = async (device: 'desktop' | 'mobile', skipMobileConfirm?: boolean) => {
         if (!sourceUrl) {
             toast.error('ソースURLが見つかりません');
             return;
@@ -452,23 +461,47 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 return;
             }
 
-            // 新しいセクションとして追加
-            setSections(prev => {
-                const newSections = finalData.media.map((m: any, idx: number) => ({
-                    id: `new-${Date.now()}-${idx}`,
-                    role: `section-${prev.length + idx + 1}`,
-                    order: prev.length + idx,
-                    imageId: device === 'desktop' ? m.id : null,
-                    image: device === 'desktop' ? m : null,
-                    mobileImageId: device === 'mobile' ? m.id : null,
-                    mobileImage: device === 'mobile' ? m : null,
-                    config: {},
-                }));
-                return [...prev, ...newSections];
-            });
+            // デスクトップ取得の場合、モバイルへの追加を確認
+            if (device === 'desktop' && !skipMobileConfirm) {
+                // デスクトップのみでセクションを追加
+                setSections(prev => {
+                    const newSections = finalData.media.map((m: any, idx: number) => ({
+                        id: `new-${Date.now()}-${idx}`,
+                        role: `section-${prev.length + idx + 1}`,
+                        order: prev.length + idx,
+                        imageId: m.id,
+                        image: m,
+                        mobileImageId: null,
+                        mobileImage: null,
+                        config: {},
+                    }));
+                    return [...prev, ...newSections];
+                });
 
-            const deviceName = device === 'mobile' ? 'モバイル' : 'デスクトップ';
-            toast.success(`${finalData.media.length}セクションを追加しました${finalData.hasMore ? '（まだ続きがあります）' : ''}`);
+                toast.success(`${finalData.media.length}セクション（デスクトップ）を追加しました`);
+
+                // モバイル追加の確認ダイアログを表示
+                setPendingDesktopSections(finalData.media);
+                setShowMobileConfirmDialog(true);
+            } else {
+                // モバイル取得、または確認後の追加
+                setSections(prev => {
+                    const newSections = finalData.media.map((m: any, idx: number) => ({
+                        id: `new-${Date.now()}-${idx}`,
+                        role: `section-${prev.length + idx + 1}`,
+                        order: prev.length + idx,
+                        imageId: device === 'desktop' ? m.id : null,
+                        image: device === 'desktop' ? m : null,
+                        mobileImageId: device === 'mobile' ? m.id : null,
+                        mobileImage: device === 'mobile' ? m : null,
+                        config: {},
+                    }));
+                    return [...prev, ...newSections];
+                });
+
+                const deviceName = device === 'mobile' ? 'モバイル' : 'デスクトップ';
+                toast.success(`${finalData.media.length}セクション（${deviceName}）を追加しました${finalData.hasMore ? '（まだ続きがあります）' : ''}`);
+            }
 
         } catch (error: any) {
             console.error('[FetchMore] Error:', error);
@@ -476,6 +509,97 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         } finally {
             setIsFetchingMoreSections(false);
             setFetchMoreProgress(null);
+        }
+    };
+
+    // モバイル画像も追加する処理
+    const handleAddMobileToNewSections = async () => {
+        if (!sourceUrl || !pendingDesktopSections) return;
+
+        setShowMobileConfirmDialog(false);
+        setIsFetchingMoreSections(true);
+        setFetchMoreProgress('モバイル画像を取得中...');
+
+        try {
+            const startFrom = sections.length - pendingDesktopSections.length;
+
+            const res = await fetch('/api/import-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: sourceUrl,
+                    device: 'mobile',
+                    importMode: 'faithful',
+                    startFrom,
+                })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'モバイル画像の取得に失敗しました');
+            }
+
+            const reader = res.body?.getReader();
+            if (!reader) throw new Error('ストリームの読み取りに失敗しました');
+
+            const decoder = new TextDecoder();
+            let finalData: any = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const text = decoder.decode(value, { stream: true });
+                const lines = text.split('\n\n').filter(line => line.startsWith('data: '));
+
+                for (const line of lines) {
+                    try {
+                        const jsonStr = line.replace('data: ', '');
+                        const data = JSON.parse(jsonStr);
+
+                        if (data.type === 'progress') {
+                            setFetchMoreProgress(data.message || '処理中...');
+                        } else if (data.type === 'complete') {
+                            finalData = data;
+                        } else if (data.type === 'error') {
+                            throw new Error(data.error);
+                        }
+                    } catch (parseError) {
+                        // JSON parse error - skip
+                    }
+                }
+            }
+
+            if (finalData?.media && finalData.media.length > 0) {
+                // 既存の新規セクションにモバイル画像を追加
+                setSections(prev => {
+                    const updatedSections = [...prev];
+                    const newSectionStartIndex = prev.length - pendingDesktopSections.length;
+
+                    finalData.media.forEach((m: any, idx: number) => {
+                        const sectionIndex = newSectionStartIndex + idx;
+                        if (updatedSections[sectionIndex]) {
+                            updatedSections[sectionIndex] = {
+                                ...updatedSections[sectionIndex],
+                                mobileImageId: m.id,
+                                mobileImage: m,
+                            };
+                        }
+                    });
+
+                    return updatedSections;
+                });
+
+                toast.success(`${finalData.media.length}セクションにモバイル画像を追加しました`);
+            }
+
+        } catch (error: any) {
+            console.error('[FetchMore Mobile] Error:', error);
+            toast.error(error.message || 'モバイル画像の取得に失敗しました');
+        } finally {
+            setIsFetchingMoreSections(false);
+            setFetchMoreProgress(null);
+            setPendingDesktopSections(null);
         }
     };
 
@@ -1688,6 +1812,51 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [regeneratingSectionIds, setRegeneratingSectionIds] = useState<Set<string>>(new Set());
 
+    // 自動保存のuseEffect（デバウンス付き）
+    useEffect(() => {
+        if (!isAutoSaveEnabled || pageId === 'new') return;
+
+        // 保存中や他の処理中は自動保存をスキップ
+        if (isSaving || isGenerating || isRegenerating || isBatchRegenerating) return;
+
+        const autoSaveTimer = setTimeout(async () => {
+            setAutoSaveStatus('saving');
+            try {
+                const method = 'PUT';
+                const url = `/api/pages/${pageId}`;
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sections: sections.map((s, i) => ({
+                            ...s,
+                            order: i,
+                            config: s.config || {}
+                        })),
+                        headerConfig: headerConfig,
+                        status: status,
+                        designDefinition: designDefinition
+                    })
+                });
+
+                if (res.ok) {
+                    setAutoSaveStatus('saved');
+                    setLastAutoSaveTime(new Date());
+                    // 3秒後にステータスをアイドルに戻す
+                    setTimeout(() => setAutoSaveStatus('idle'), 3000);
+                } else {
+                    setAutoSaveStatus('error');
+                }
+            } catch (e) {
+                console.error('Auto-save failed:', e);
+                setAutoSaveStatus('error');
+            }
+        }, 2000); // 2秒のデバウンス
+
+        return () => clearTimeout(autoSaveTimer);
+    }, [sections, headerConfig, status, designDefinition, isAutoSaveEnabled, pageId, isSaving, isGenerating, isRegenerating, isBatchRegenerating]);
+
     // セグメント個別再生成モーダルを開く
     const handleOpenRegenerate = (sectionId: string) => {
         setRegenerateSectionId(sectionId);
@@ -2126,6 +2295,36 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     )}
                     <span className="whitespace-nowrap">{isSaving ? '保存中...' : '保存'}</span>
                 </button>
+
+                {/* 自動保存トグル */}
+                <div className="flex items-center gap-2 ml-2">
+                    <button
+                        onClick={() => setIsAutoSaveEnabled(!isAutoSaveEnabled)}
+                        className={clsx(
+                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                            isAutoSaveEnabled ? "bg-blue-600" : "bg-gray-300"
+                        )}
+                    >
+                        <span
+                            className={clsx(
+                                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                isAutoSaveEnabled ? "translate-x-6" : "translate-x-1"
+                            )}
+                        />
+                    </button>
+                    <span className="text-xs text-gray-600 whitespace-nowrap">
+                        自動保存
+                        {isAutoSaveEnabled && autoSaveStatus === 'saving' && (
+                            <span className="ml-1 text-blue-600">保存中...</span>
+                        )}
+                        {isAutoSaveEnabled && autoSaveStatus === 'saved' && (
+                            <span className="ml-1 text-green-600">保存完了</span>
+                        )}
+                        {isAutoSaveEnabled && autoSaveStatus === 'error' && (
+                            <span className="ml-1 text-red-600">エラー</span>
+                        )}
+                    </span>
+                </div>
             </div>
 
             {/* モバイル用ボトムツールバー */}
@@ -4036,36 +4235,47 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         value={headerConfig.logoText || ''}
                                         onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoText: e.target.value }))}
                                         placeholder="サイト名"
-                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                     />
                                 </div>
-                                {/* CTAボタン */}
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">CTAボタンテキスト</label>
-                                    <input
-                                        type="text"
-                                        value={headerConfig.ctaText || ''}
-                                        onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaText: e.target.value }))}
-                                        placeholder="お問い合わせ"
-                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                                    />
+                                {/* CTAボタン - 横並び */}
+                                <div className="flex gap-2">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">CTAテキスト</label>
+                                        <input
+                                            type="text"
+                                            value={headerConfig.ctaText || ''}
+                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaText: e.target.value }))}
+                                            placeholder="お問い合わせ"
+                                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">リンク先</label>
+                                        <select
+                                            value={headerConfig.ctaLink || ''}
+                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
+                                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white"
+                                        >
+                                            <option value="">選択...</option>
+                                            {sections.map((section: any) => (
+                                                <option key={section.id} value={`#${section.role}`}>
+                                                    #{section.role}
+                                                </option>
+                                            ))}
+                                            <option value="#contact">#contact</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">CTAリンク先</label>
-                                    <input
-                                        type="text"
-                                        value={headerConfig.ctaLink || ''}
-                                        onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
-                                        placeholder="#contact"
-                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                                    />
-                                </div>
-                                {/* ナビゲーション項目 */}
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">ナビゲーション</label>
-                                    <div className="space-y-2">
+                                {/* ナビゲーション - アコーディオン */}
+                                <details className="group">
+                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600">
+                                        <span>ナビゲーション ({headerConfig.navItems?.length || 0}件)</span>
+                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                    </summary>
+                                    <div className="pt-2 space-y-2">
                                         {headerConfig.navItems.map((item: { id: string; label: string; href: string }, index: number) => (
-                                            <div key={item.id} className="flex gap-2">
+                                            <div key={item.id} className="flex gap-1.5 items-center">
                                                 <input
                                                     type="text"
                                                     value={item.label}
@@ -4079,10 +4289,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                         }));
                                                     }}
                                                     placeholder="ラベル"
-                                                    className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                    className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
                                                 />
-                                                <input
-                                                    type="text"
+                                                <select
                                                     value={item.href}
                                                     onChange={(e) => {
                                                         const newHref = e.target.value;
@@ -4093,9 +4302,16 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             )
                                                         }));
                                                     }}
-                                                    placeholder="#section"
-                                                    className="w-24 px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
-                                                />
+                                                    className="w-28 px-1.5 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30 bg-white"
+                                                >
+                                                    <option value="">リンク...</option>
+                                                    {sections.map((section: any) => (
+                                                        <option key={section.id} value={`#${section.role}`}>
+                                                            #{section.role}
+                                                        </option>
+                                                    ))}
+                                                    <option value="#contact">#contact</option>
+                                                </select>
                                                 <button
                                                     onClick={() => {
                                                         setHeaderConfig((prev: typeof headerConfig) => ({
@@ -4103,9 +4319,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             navItems: prev.navItems.filter((_: { id: string; label: string; href: string }, i: number) => i !== index)
                                                         }));
                                                     }}
-                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                                                    className="p-1 text-red-500 hover:bg-red-50 rounded"
                                                 >
-                                                    <X className="h-3.5 w-3.5" />
+                                                    <X className="h-3 w-3" />
                                                 </button>
                                             </div>
                                         ))}
@@ -4116,12 +4332,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                     navItems: [...(prev.navItems || []), { id: `nav-${Date.now()}`, label: '', href: '' }]
                                                 }));
                                             }}
-                                            className="w-full py-1.5 text-xs text-purple-600 border border-dashed border-purple-300 rounded hover:bg-purple-50 transition-colors"
+                                            className="w-full py-1 text-xs text-purple-600 border border-dashed border-purple-300 rounded hover:bg-purple-50 transition-colors"
                                         >
                                             + ナビを追加
                                         </button>
                                     </div>
-                                </div>
+                                </details>
                                 {/* ヘッダー固定設定 */}
                                 <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                                     <input
@@ -4650,6 +4866,42 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         }, 1500);
                     }}
                 />
+            )}
+
+            {/* モバイル画像追加確認ダイアログ */}
+            {showMobileConfirmDialog && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md mx-4 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-blue-100 rounded-lg">
+                                <Smartphone className="h-6 w-6 text-blue-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900">モバイル画像も追加しますか？</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-6">
+                            デスクトップ画像を{pendingDesktopSections?.length || 0}セクション追加しました。
+                            同じセクションにモバイル用の画像も取得して追加しますか？
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowMobileConfirmDialog(false);
+                                    setPendingDesktopSections(null);
+                                }}
+                                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                            >
+                                デスクトップのみ
+                            </button>
+                            <button
+                                onClick={handleAddMobileToNewSections}
+                                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Smartphone className="h-4 w-4" />
+                                モバイルも追加
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* セクション復元モーダル */}
@@ -6327,6 +6579,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         originalPrompt={targetSection.config.prompt}
                         designDefinition={designDefinition}
                         layoutMode={sections[0]?.config?.layout === 'desktop' ? 'desktop' : 'responsive'}
+                        pageSlug={initialSlug || pageId}
                         onSave={async (newHtml) => {
                             // セクションのHTMLコンテンツを更新
                             const updatedSections = sections.map(s =>

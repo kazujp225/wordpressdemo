@@ -34,11 +34,16 @@ export default function ThumbnailTransformModal({
     const selectedSection = sectionsWithImages.find(s => s.id === selectedSectionId);
     const sourceImageUrl = selectedSection?.image?.filePath || '';
 
-    const steps = [
-        '元画像を分析中...',
-        '参考サムネイルを分析中...',
-        'サムネイルを生成中...',
-    ];
+    const steps = referenceImage
+        ? [
+            '元画像を分析中...',
+            '参考サムネイルを分析中...',
+            'サムネイルを生成中...',
+        ]
+        : [
+            '元画像を分析中...',
+            'サムネイルを生成中...',
+        ];
 
     const handleReferenceUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -64,8 +69,8 @@ export default function ThumbnailTransformModal({
     };
 
     const handleGenerate = async () => {
-        if (!sourceImageUrl || !referenceImage) {
-            setError('元画像と参考サムネイルの両方を選択してください');
+        if (!sourceImageUrl) {
+            setError('元画像を選択してください');
             return;
         }
 
@@ -90,7 +95,7 @@ export default function ThumbnailTransformModal({
                 body: JSON.stringify({
                     mode: 'thumbnail',
                     sourceImageBase64: sourceBase64,
-                    referenceImageBase64: referenceImage,
+                    referenceImageBase64: referenceImage || undefined, // 参考画像はオプション
                 }),
             });
 
@@ -182,10 +187,10 @@ export default function ThumbnailTransformModal({
                         )}
                     </div>
 
-                    {/* Step 2: Upload reference thumbnail */}
+                    {/* Step 2: Upload reference thumbnail (Optional) */}
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            2. 参考サムネイルをアップロード
+                            2. 参考サムネイルをアップロード <span className="text-gray-400 font-normal">(任意)</span>
                         </label>
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
                             {referenceImage ? (
@@ -206,6 +211,7 @@ export default function ThumbnailTransformModal({
                                 <label className="cursor-pointer block">
                                     <ImageIcon className="w-8 h-8 mx-auto text-gray-400 mb-2" />
                                     <span className="text-sm text-gray-500">参考にしたいサムネイルを選択</span>
+                                    <p className="text-xs text-gray-400 mt-1">なくてもAIがスタイルを自動で決定します</p>
                                     <input
                                         type="file"
                                         accept="image/*"
@@ -243,7 +249,7 @@ export default function ThumbnailTransformModal({
                     )}
 
                     {/* Arrow indicator */}
-                    {sourceImageUrl && referenceImage && !isGenerating && !resultImage && (
+                    {sourceImageUrl && !isGenerating && !resultImage && (
                         <div className="flex items-center justify-center mb-6">
                             <ArrowRight className="w-8 h-8 text-blue-500" />
                         </div>
@@ -290,7 +296,7 @@ export default function ThumbnailTransformModal({
                         )}
                         <button
                             onClick={handleGenerate}
-                            disabled={!sourceImageUrl || !referenceImage || isGenerating}
+                            disabled={!sourceImageUrl || isGenerating}
                             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             {isGenerating ? (

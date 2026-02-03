@@ -119,9 +119,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'mode and sourceImageBase64 are required' }, { status: 400 });
         }
 
-        if (mode === 'thumbnail' && !referenceImageBase64) {
-            return NextResponse.json({ error: 'referenceImageBase64 is required for thumbnail mode' }, { status: 400 });
-        }
+        // referenceImageBase64 is now optional for thumbnail mode
 
         // クレジットチェック（画像生成分のみ）
         const imageCount = mode === 'thumbnail' ? 1 : slideCount;
@@ -154,7 +152,7 @@ export async function POST(request: NextRequest) {
         const results: string[] = [];
 
         if (mode === 'thumbnail') {
-            // ===== サムネイル変換（2段階OCR方式） =====
+            // ===== サムネイル変換 =====
 
             // Step 1: 元画像のOCR分析
             console.log('[Thumbnail] Step 1: Analyzing source image...');
@@ -165,20 +163,43 @@ export async function POST(request: NextRequest) {
             );
             console.log('[Thumbnail] Source analysis:', sourceAnalysis);
 
-            // Step 2: 参考サムネイルのOCR分析
-            console.log('[Thumbnail] Step 2: Analyzing reference thumbnail...');
-            const referenceAnalysis = await analyzeImageWithOCR(
-                GOOGLE_API_KEY,
-                REFERENCE_OCR_PROMPT,
-                referenceImageBase64!
-            );
-            console.log('[Thumbnail] Reference analysis:', referenceAnalysis);
+            let generationPrompt: string;
 
-            // Step 3: 分析結果を元に画像生成
-            console.log('[Thumbnail] Step 3: Generating thumbnail...');
-            const generationPrompt = THUMBNAIL_GENERATION_PROMPT
-                .replace('{sourceAnalysis}', sourceAnalysis)
-                .replace('{referenceAnalysis}', referenceAnalysis);
+            if (referenceImageBase64) {
+                // 参考画像がある場合: 2段階OCR方式
+                console.log('[Thumbnail] Step 2: Analyzing reference thumbnail...');
+                const referenceAnalysis = await analyzeImageWithOCR(
+                    GOOGLE_API_KEY,
+                    REFERENCE_OCR_PROMPT,
+                    referenceImageBase64
+                );
+                console.log('[Thumbnail] Reference analysis:', referenceAnalysis);
+
+                // Step 3: 分析結果を元に画像生成
+                console.log('[Thumbnail] Step 3: Generating thumbnail with reference...');
+                generationPrompt = THUMBNAIL_GENERATION_PROMPT
+                    .replace('{sourceAnalysis}', sourceAnalysis)
+                    .replace('{referenceAnalysis}', referenceAnalysis);
+            } else {
+                // 参考画像がない場合: AIが自動でスタイルを決定
+                console.log('[Thumbnail] Step 2: Generating thumbnail without reference...');
+                generationPrompt = `あなたはプロフェッショナルなYouTubeサムネイルデザイナーです。
+
+以下の元画像の分析結果を元に、YouTubeサムネイル画像を生成してください。
+
+【元画像から抽出したコンテンツ】
+${sourceAnalysis}
+
+【重要な指示】
+1. YouTubeで映える高コントラスト、視認性の高いデザイン
+2. 元画像の「テキスト内容・テーマ」を大きく目立つように配置
+3. テキストは必ず画像内に含める（大きく、読みやすく）
+4. 16:9の横長画像
+5. 目を引くインパクトのあるデザイン（ポップな配色、太字テキスト、縁取りなど）
+6. サムネイルとして適切な情報量（詰め込みすぎない）
+
+サムネイル画像を1枚生成してください。`;
+            }
 
             const result = await generateImageWithGemini(
                 GOOGLE_API_KEY,
@@ -190,14 +211,53 @@ export async function POST(request: NextRequest) {
 
         } else {
             // ===== 資料化モード =====
+
+            // Step 1: 元画像のOCR分析（重要: 画像の内容を正確に把握する）
+            console.log('[Document] Step 1: Analyzing source image content...');
+            const documentOcrPrompt = `この画像を詳細に分析し、プレゼン資料に変換するための情報を抽出してください。
+
+【抽出してほしい情報】
+1. 画像内のすべてのテキスト（タイトル、見出し、本文、箇条書き、表の内容等）
+2. 画像の主題・テーマ（何についての内容か）
+3. 情報の構造（セクション分け、階層関係）
+4. 重要なキーワードやデータ
+5. 図表やグラフがあればその内容
+
+JSON形式で回答してください:
+{
+  "mainTitle": "メインのタイトル",
+  "theme": "全体のテーマ・主題",
+  "sections": [
+    {"heading": "セクション見出し", "content": "内容", "keyPoints": ["ポイント1", "ポイント2"]}
+  ],
+  "keyData": ["重要なデータ1", "重要なデータ2"],
+  "allTexts": ["画像内の全テキスト"]
+}`;
+
+            const sourceAnalysis = await analyzeImageWithOCR(
+                GOOGLE_API_KEY,
+                documentOcrPrompt,
+                sourceImageBase64
+            );
+            console.log('[Document] Source analysis:', sourceAnalysis.substring(0, 500));
+
+            // Step 2: 分析結果を元にスライドを生成
             for (let i = 0; i < slideCount; i++) {
-                const slidePrompt = `この画像の内容を分析し、${slideCount}枚のプレゼンスライドのうち${i + 1}枚目を生成してください。
+                console.log(`[Document] Step 2: Generating slide ${i + 1}/${slideCount}...`);
 
-${i === 0 ? '【1枚目】タイトルスライド：全体の概要や主題を表現。大きなタイトルテキストを含める。' : ''}
-${i > 0 && i < slideCount - 1 ? `【${i + 1}枚目】本文スライド：詳細情報やポイントを図解で表現。箇条書きやキーワードを含める。` : ''}
-${i === slideCount - 1 && slideCount > 1 ? `【${slideCount}枚目】まとめスライド：重要ポイントの総括。結論やCTAを含める。` : ''}
+                const slidePrompt = `以下の画像分析結果を元に、${slideCount}枚のプレゼンスライドのうち${i + 1}枚目を生成してください。
 
-16:9の横長スライド画像を生成してください。テキストも画像内に含めてください。`;
+【元画像から抽出した情報】
+${sourceAnalysis}
+
+${i === 0 ? '【1枚目】タイトルスライド：上記分析から得られたメインタイトルとテーマを大きく表示。' : ''}
+${i > 0 && i < slideCount - 1 ? `【${i + 1}枚目】本文スライド：上記分析から得られた具体的な内容・データを図解で表現。` : ''}
+${i === slideCount - 1 && slideCount > 1 ? `【${slideCount}枚目】まとめスライド：上記分析から得られた重要ポイントの総括。` : ''}
+
+【重要】
+- 元画像に含まれていた実際のテキスト・データを必ず使用してください
+- 勝手に内容を作り変えないでください
+- 16:9の横長スライド画像を生成してください`;
 
                 const result = await generateImageWithGemini(
                     GOOGLE_API_KEY,
@@ -269,46 +329,79 @@ ${i === slideCount - 1 && slideCount > 1 ? `【${slideCount}枚目】まとめ�
     }
 }
 
-// OCR分析（テキストモデル使用）
+// OCR分析（テキストモデル使用）- リトライ機能付き
 async function analyzeImageWithOCR(
     apiKey: string,
     prompt: string,
     imageBase64: string
 ): Promise<string> {
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: prompt },
-                        {
-                            inlineData: {
-                                mimeType: 'image/png',
-                                data: imageBase64.replace(/^data:image\/\w+;base64,/, ''),
-                            }
-                        }
-                    ]
-                }],
-                generationConfig: {
-                    temperature: 0.2,
-                    maxOutputTokens: 2048,
-                }
-            })
-        }
-    );
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Gemini OCR error:', errorText);
-        return '分析に失敗しました';
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`[OCR] Attempt ${attempt}/${maxRetries}...`);
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inlineData: {
+                                        mimeType: 'image/png',
+                                        data: imageBase64.replace(/^data:image\/\w+;base64,/, ''),
+                                    }
+                                }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.2,
+                            maxOutputTokens: 2048,
+                        }
+                    })
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (text) {
+                    console.log(`[OCR] Success on attempt ${attempt}`);
+                    return text;
+                }
+                // テキストが空の場合もリトライ
+                lastError = new Error('OCR returned empty response');
+            } else if (response.status === 503 || response.status === 429) {
+                const errorText = await response.text();
+                console.error(`[OCR] Attempt ${attempt} failed with ${response.status}:`, errorText);
+                lastError = new Error(`OCR failed: ${response.status}`);
+            } else {
+                const errorText = await response.text();
+                console.error('Gemini OCR error:', errorText);
+                throw new Error(`OCR分析に失敗しました: ${response.status}`);
+            }
+
+            if (attempt < maxRetries) {
+                const waitTime = Math.pow(2, attempt) * 1000;
+                console.log(`[OCR] Retrying in ${waitTime}ms...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        } catch (fetchError: any) {
+            console.error(`[OCR] Attempt ${attempt} fetch error:`, fetchError.message);
+            lastError = fetchError;
+            if (attempt < maxRetries) {
+                const waitTime = Math.pow(2, attempt) * 1000;
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        }
     }
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return text;
+    // 全リトライ失敗
+    throw lastError || new Error('OCR分析に失敗しました');
 }
 
 // 画像生成（Gemini 3 Pro Image使用）

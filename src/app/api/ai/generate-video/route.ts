@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { supabase as supabaseStorage } from '@/lib/supabase';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
-import { checkFeatureAccess, recordApiUsage } from '@/lib/usage';
+import { checkFeatureAccess, checkVideoGenerationLimit, recordApiUsage } from '@/lib/usage';
 
 // Veo 2 API (Gemini API経由)
 // https://ai.google.dev/gemini-api/docs/video
@@ -37,6 +37,35 @@ export async function POST(request: NextRequest) {
 
         const body = await request.json();
         const { prompt, sourceImageUrl, duration = 5 } = body;
+
+        // クレジット残高チェック
+        const creditCheck = await checkVideoGenerationLimit(user.id, duration);
+        if (!creditCheck.allowed) {
+            if (creditCheck.needApiKey) {
+                return NextResponse.json({
+                    error: 'API_KEY_REQUIRED',
+                    message: creditCheck.reason,
+                }, { status: 402 });
+            }
+            if (creditCheck.needSubscription) {
+                return NextResponse.json({
+                    error: 'SUBSCRIPTION_REQUIRED',
+                    message: creditCheck.reason,
+                }, { status: 402 });
+            }
+            return NextResponse.json({
+                error: 'INSUFFICIENT_CREDIT',
+                message: creditCheck.reason,
+                credits: {
+                    currentBalance: creditCheck.currentBalanceUsd,
+                    estimatedCost: creditCheck.estimatedCostUsd,
+                },
+                needPurchase: true,
+            }, { status: 402 });
+        }
+
+        // クレジット消費をスキップするかどうか
+        const skipCreditConsumption = creditCheck.skipCreditConsumption || false;
 
         if (!prompt || typeof prompt !== 'string') {
             return NextResponse.json({ error: 'プロンプトは必須です' }, { status: 400 });
@@ -256,8 +285,8 @@ export async function POST(request: NextRequest) {
             startTime,
         });
 
-        // クレジット消費
-        if (logResult) {
+        // クレジット消費（自分のAPIキー使用時はスキップ）
+        if (logResult && !skipCreditConsumption) {
             await recordApiUsage(user.id, logResult.id, estimatedCost, {
                 model: VEO_MODEL,
             });

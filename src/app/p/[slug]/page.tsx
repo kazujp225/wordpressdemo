@@ -239,7 +239,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
 
             {/* Dynamic Header */}
             <header className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex h-14 md:h-16 items-center justify-between bg-white/90 px-3 md:px-8 shadow-sm backdrop-blur-md gap-2`}>
-                <div className="text-sm md:text-xl font-bold text-gray-900 truncate max-w-[40%] md:max-w-none">
+                <div className="text-sm md:text-xl font-bold text-blue-600 truncate max-w-[40%] md:max-w-none">
                     {headerConfig.logoText}
                 </div>
                 <nav className="hidden md:flex gap-6">
@@ -263,7 +263,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
             {/* Main Content: フル幅表示 */}
             <main className="w-full bg-white">
                 {page.sections.map((section) => (
-                    <section key={section.id} id={section.role} className={`relative w-full group ${section.role !== 'html-embed' ? 'overflow-hidden' : ''}`}>
+                    <section key={section.id} id={section.role} className={`relative w-full group scroll-mt-16 ${section.role !== 'html-embed' ? 'overflow-hidden' : ''}`}>
                         {/* Visual Adjustments & Text Overlay */}
                         {(() => {
                             let config: {

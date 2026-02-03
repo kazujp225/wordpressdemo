@@ -85,36 +85,87 @@ ${productInfo}
 ${prompt ? `追加指示: ${prompt}` : ''}`
             : `${prompt}\n\n【重要】縦長の画像（ポートレート形式）で出力してください。`;
 
-        // Call Gemini 3 Pro Image (Nano Banana Pro) for image editing - 最新モデルで日本語性能が高い
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: editPrompt },
-                            {
-                                inlineData: {
-                                    mimeType: mimeType,
-                                    data: base64Data
-                                }
+        // リトライ設定（503/429エラー対応）
+        const maxRetries = 3;
+        let response: Response | null = null;
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[EDIT-IMAGE] Attempt ${attempt}/${maxRetries}...`);
+                response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: editPrompt },
+                                    {
+                                        inlineData: {
+                                            mimeType: mimeType,
+                                            data: base64Data
+                                        }
+                                    }
+                                ]
+                            }],
+                            generationConfig: {
+                                responseModalities: ["TEXT", "IMAGE"]
                             }
-                        ]
-                    }],
-                    generationConfig: {
-                        responseModalities: ["TEXT", "IMAGE"]
+                        })
                     }
-                })
+                );
+
+                if (response.ok) {
+                    console.log(`[EDIT-IMAGE] Success on attempt ${attempt}`);
+                    break;
+                }
+
+                // 503/429エラーの場合はリトライ
+                if (response.status === 503 || response.status === 429) {
+                    const errorText = await response.text();
+                    console.error(`[EDIT-IMAGE] Attempt ${attempt} failed with ${response.status}:`, errorText);
+                    lastError = new Error(`画像編集に失敗しました: ${response.status}`);
+
+                    if (attempt < maxRetries) {
+                        const waitTime = Math.pow(2, attempt) * 1000;
+                        console.log(`[EDIT-IMAGE] Retrying in ${waitTime}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        response = null;
+                        continue;
+                    }
+                } else {
+                    // その他のエラーは即座に失敗
+                    const errorText = await response.text();
+                    console.error('Image editing failed:', errorText);
+
+                    await logGeneration({
+                        userId: user.id,
+                        type: 'edit-image',
+                        endpoint: '/api/ai/edit-image',
+                        model: modelUsed,
+                        inputPrompt: editPrompt,
+                        imageCount: 1,
+                        status: 'failed',
+                        errorMessage: `${response.status} - ${errorText.substring(0, 200)}`,
+                        startTime
+                    });
+
+                    throw new Error(`Image editing failed: ${response.status} - ${errorText}`);
+                }
+            } catch (fetchError: any) {
+                console.error(`[EDIT-IMAGE] Attempt ${attempt} fetch error:`, fetchError.message);
+                lastError = fetchError;
+                if (attempt < maxRetries) {
+                    const waitTime = Math.pow(2, attempt) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    continue;
+                }
             }
-        );
+        }
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Image editing failed:', errorText);
-
-            // ログ記録（失敗）
+        if (!response || !response.ok) {
             await logGeneration({
                 userId: user.id,
                 type: 'edit-image',
@@ -123,11 +174,10 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
                 inputPrompt: editPrompt,
                 imageCount: 1,
                 status: 'failed',
-                errorMessage: `${response.status} - ${errorText.substring(0, 200)}`,
+                errorMessage: lastError?.message || 'Unknown error after retries',
                 startTime
             });
-
-            throw new Error(`Image editing failed: ${response.status} - ${errorText}`);
+            throw lastError || new Error('画像編集に失敗しました');
         }
 
         const data = await response.json();

@@ -43,10 +43,50 @@ async function getOwnerId(apiKey: string): Promise<string> {
   return owners[0].owner.id;
 }
 
-// Create a Static Site on Render (free tier)
+// Find existing service by name
+async function findServiceByName(name: string, apiKey: string): Promise<RenderService | null> {
+  const response = await fetch(`${RENDER_API_BASE}/services?name=${encodeURIComponent(name)}&limit=1`, {
+    method: 'GET',
+    headers: getRenderHeaders(apiKey),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const services = await response.json();
+  if (services && services.length > 0) {
+    const svc = services[0].service;
+    return {
+      id: svc.id,
+      name: svc.name,
+      status: svc.suspended === 'suspended' ? 'suspended' : 'live',
+      serviceDetails: svc.serviceDetails,
+    };
+  }
+  return null;
+}
+
+// Create a Static Site on Render (free tier), or update if exists
 export async function createStaticSite(params: CreateStaticSiteParams): Promise<RenderService> {
   const { name, repoUrl, branch = 'main', apiKey } = params;
 
+  // まず既存サービスを検索
+  const existingService = await findServiceByName(name, apiKey);
+
+  if (existingService) {
+    // 既存サービスが見つかった場合、再デプロイをトリガー
+    console.log(`[Render] Found existing service: ${existingService.id}, triggering redeploy`);
+    await triggerDeploy(existingService.id, apiKey);
+    return {
+      id: existingService.id,
+      name: existingService.name,
+      status: 'building',
+      serviceDetails: existingService.serviceDetails,
+    };
+  }
+
+  // 新規作成
   const ownerId = await getOwnerId(apiKey);
 
   const response = await fetch(`${RENDER_API_BASE}/services`, {

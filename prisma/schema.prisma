@@ -99,24 +99,25 @@ model GlobalConfig {
 }
 
 model UserSettings {
-  id                Int       @id @default(autoincrement())
-  userId            String    @unique
-  email             String?
-  role              String    @default("user") // 'user' | 'admin'
-  plan              String    @default("free")
-  googleApiKey      String?
-  renderApiKey      String?
-  githubToken       String?
-  githubDeployOwner String?
-  isBanned          Boolean   @default(false)
-  bannedAt          DateTime?
-  bannedBy          String?
-  banReason         String?
-  resendApiKey      String?
-  notificationEmail String?
-  resendFromDomain  String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                  Int       @id @default(autoincrement())
+  userId              String    @unique
+  email               String?
+  role                String    @default("user") // 'user' | 'admin'
+  plan                String    @default("free")
+  googleApiKey        String?
+  renderApiKey        String?
+  githubToken         String?
+  githubDeployOwner   String?
+  isBanned            Boolean   @default(false)
+  bannedAt            DateTime?
+  bannedBy            String?
+  banReason           String?
+  resendApiKey        String?
+  notificationEmail   String?
+  resendFromDomain    String?
+  welcomeEmailPending Boolean   @default(false) // ウェルカムメール送信失敗フラグ
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 }
 
 model InpaintHistory {

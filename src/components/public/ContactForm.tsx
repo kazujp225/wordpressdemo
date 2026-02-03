@@ -57,7 +57,7 @@ export function ContactForm({ pageSlug }: ContactFormProps) {
 
     if (isSubmitted) {
         return (
-            <section id="contact" className="px-6 md:px-12 py-32 bg-[#f8f8f8] border-t border-black/5">
+            <section id="contact" className="px-6 md:px-12 py-32 bg-[#f8f8f8] border-t border-black/5 scroll-mt-16">
                 <div className="max-w-[1400px] mx-auto flex flex-col items-center justify-center text-center py-16">
                     <CheckCircle className="w-12 h-12 text-green-600 mb-4" />
                     <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 font-manrope">送信完了</h2>
@@ -71,7 +71,7 @@ export function ContactForm({ pageSlug }: ContactFormProps) {
     }
 
     return (
-        <section id="contact" className="px-6 md:px-12 py-32 bg-[#f8f8f8] border-t border-black/5">
+        <section id="contact" className="px-6 md:px-12 py-32 bg-[#f8f8f8] border-t border-black/5 scroll-mt-16">
             <div className="max-w-[1400px] mx-auto grid md:grid-cols-2 gap-16">
                 <div>
                     <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6 font-manrope">Contact</h2>

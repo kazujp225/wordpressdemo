@@ -147,35 +147,86 @@ Generate the image to EXACTLY match this visual style and color palette.
 【アスペクト比指定】
 必ず${arConfig.prompt}で出力してください。幅${arConfig.width}px、高さ${arConfig.height}pxの比率。`;
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    systemInstruction: {
-                        parts: [{ text: LP_DESIGNER_SYSTEM_PROMPT }]
-                    },
-                    contents: [{
-                        parts: [{ text: imagePrompt }]
-                    }],
-                    generationConfig: {
-                        responseModalities: ["IMAGE", "TEXT"],
-                        temperature: 0.8,  // 創造性を維持しつつ品質を安定
-                        // 最高解像度出力
-                        imageConfig: {
-                            imageSize: "4K"  // LP用高解像度画像
-                        }
+        // リトライ設定（503/429エラー対応）
+        const maxRetries = 3;
+        let response: Response | null = null;
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[IMAGE-GEN] Attempt ${attempt}/${maxRetries}...`);
+                response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            systemInstruction: {
+                                parts: [{ text: LP_DESIGNER_SYSTEM_PROMPT }]
+                            },
+                            contents: [{
+                                parts: [{ text: imagePrompt }]
+                            }],
+                            generationConfig: {
+                                responseModalities: ["IMAGE", "TEXT"],
+                                temperature: 0.8,
+                                imageConfig: {
+                                    imageSize: "4K"
+                                }
+                            }
+                        })
                     }
-                })
+                );
+
+                if (response.ok) {
+                    console.log(`[IMAGE-GEN] Success on attempt ${attempt}`);
+                    break;
+                }
+
+                // 503/429エラーの場合はリトライ
+                if (response.status === 503 || response.status === 429) {
+                    const errorText = await response.text();
+                    console.error(`[IMAGE-GEN] Attempt ${attempt} failed with ${response.status}:`, errorText);
+                    lastError = new Error(`画像生成に失敗しました: ${response.status}`);
+
+                    if (attempt < maxRetries) {
+                        const waitTime = Math.pow(2, attempt) * 1000;
+                        console.log(`[IMAGE-GEN] Retrying in ${waitTime}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        response = null;
+                        continue;
+                    }
+                } else {
+                    // その他のエラーは即座に失敗
+                    const errorText = await response.text();
+                    console.error('Image generation failed:', errorText);
+
+                    await logGeneration({
+                        userId: user.id,
+                        type: 'image',
+                        endpoint: '/api/ai/generate-image',
+                        model: modelUsed,
+                        inputPrompt: imagePrompt,
+                        imageCount: 1,
+                        status: 'failed',
+                        errorMessage: `${response.status} - ${errorText.substring(0, 200)}`,
+                        startTime
+                    });
+
+                    throw new Error(`画像生成に失敗しました: ${response.status} - ${errorText}`);
+                }
+            } catch (fetchError: any) {
+                console.error(`[IMAGE-GEN] Attempt ${attempt} fetch error:`, fetchError.message);
+                lastError = fetchError;
+                if (attempt < maxRetries) {
+                    const waitTime = Math.pow(2, attempt) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    continue;
+                }
             }
-        );
+        }
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Image generation failed:', errorText);
-
-            // ログ記録（失敗）
+        if (!response || !response.ok) {
             await logGeneration({
                 userId: user.id,
                 type: 'image',
@@ -184,11 +235,10 @@ Generate the image to EXACTLY match this visual style and color palette.
                 inputPrompt: imagePrompt,
                 imageCount: 1,
                 status: 'failed',
-                errorMessage: `${response.status} - ${errorText.substring(0, 200)}`,
+                errorMessage: lastError?.message || 'Unknown error after retries',
                 startTime
             });
-
-            throw new Error(`画像生成に失敗しました: ${response.status} - ${errorText}`);
+            throw lastError || new Error('画像生成に失敗しました');
         }
 
         const data = await response.json();

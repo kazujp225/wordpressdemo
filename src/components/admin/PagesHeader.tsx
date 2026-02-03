@@ -8,12 +8,12 @@ import { TextBasedLPGenerator } from '@/components/lp-builder/TextBasedLPGenerat
 
 // スタイル定義
 const STYLE_OPTIONS = [
-    { id: 'sampling', label: '元のまま', icon: '📐' },
-    { id: 'professional', label: 'ビジネス', icon: '💼' },
-    { id: 'pops', label: 'ポップ', icon: '🎨' },
-    { id: 'luxury', label: '高級', icon: '✨' },
-    { id: 'minimal', label: 'シンプル', icon: '◻️' },
-    { id: 'emotional', label: '情熱', icon: '🔥' },
+    { id: 'sampling', label: '元のまま' },
+    { id: 'professional', label: 'ビジネス' },
+    { id: 'pops', label: 'ポップ' },
+    { id: 'luxury', label: '高級' },
+    { id: 'minimal', label: 'シンプル' },
+    { id: 'emotional', label: '情熱' },
 ];
 
 // カラースキーム定義
@@ -442,8 +442,8 @@ export function PagesHeader() {
                                         </button>
                                     </div>
 
-                                    {/* テキストベースLP作成（フル幅） */}
-                                    <button
+                                    {/* テキストベースLP作成 - 一時的に非表示 */}
+                                    {/* <button
                                         onClick={() => {
                                             setShowSelection(false);
                                             setIsTextLPModalOpen(true);
@@ -468,7 +468,7 @@ export function PagesHeader() {
                                         <div className="text-green-500 group-hover:translate-x-1 transition-transform">
                                             <Sparkles className="h-5 w-5" />
                                         </div>
-                                    </button>
+                                    </button> */}
                                 </div>
                             ) : (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
@@ -639,12 +639,11 @@ export function PagesHeader() {
                                                                     type="button"
                                                                     onClick={() => setStyle(opt.id)}
                                                                     disabled={isImporting}
-                                                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 ${style === opt.id
+                                                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all disabled:opacity-50 ${style === opt.id
                                                                         ? 'bg-primary text-primary-foreground'
                                                                         : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                                                                         }`}
                                                                 >
-                                                                    <span>{opt.icon}</span>
                                                                     {opt.label}
                                                                 </button>
                                                             ))}

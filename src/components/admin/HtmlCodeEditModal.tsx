@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from 'react';
-import { X, Copy, Check, Eye, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send } from 'lucide-react';
+import { X, Copy, Check, Eye, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail } from 'lucide-react';
 import type { DesignContext } from '@/lib/claude-templates';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,7 @@ interface HtmlCodeEditModalProps {
   designDefinition?: DesignContext | null;
   layoutMode: 'desktop' | 'responsive';
   onSave: (newHtml: string) => void | Promise<void>;
+  pageSlug?: string;
 }
 
 interface UploadedImage {
@@ -33,6 +34,7 @@ export default function HtmlCodeEditModal({
   designDefinition,
   layoutMode,
   onSave,
+  pageSlug,
 }: HtmlCodeEditModalProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [modifiedHtml, setModifiedHtml] = useState(currentHtml);
@@ -194,6 +196,118 @@ export default function HtmlCodeEditModal({
     toast.success('リセットしました');
   };
 
+  // フォーム有効化: HTMLを修正してResend API連携を追加
+  const handleEnableFormSubmission = async () => {
+    if (!pageSlug) {
+      toast.error('ページ情報が取得できません');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // AIにフォーム有効化を依頼
+      const response = await fetch('/api/ai/claude-edit-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentHtml: modifiedHtml,
+          editPrompt: `このHTMLフォームを有効化してください。
+
+【重要な変更点】
+1. formタグにonsubmit属性を追加して、JavaScriptでフォーム送信を処理する
+2. 送信先は /api/form-submissions (POSTリクエスト)
+3. 送信データはJSON形式で以下の構造:
+   {
+     "pageSlug": "${pageSlug}",
+     "formTitle": "お問い合わせ",
+     "formFields": [
+       { "fieldName": "name", "fieldLabel": "お名前", "value": "入力値" },
+       { "fieldName": "email", "fieldLabel": "メールアドレス", "value": "入力値" },
+       ...（フォームの各フィールドを含める）
+     ]
+   }
+4. 送信成功時は「送信完了しました」のメッセージを表示
+5. 送信失敗時はエラーメッセージを表示
+6. 送信中はボタンを無効化して「送信中...」と表示
+
+【フォームフィールドの取得方法】
+- 各input, select, textareaからname属性とlabel要素のテキストを取得
+- labelが見つからない場合はplaceholderやname属性を使用
+
+【サンプルコード参考】
+<script>
+document.querySelector('form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = this.querySelector('button[type="submit"]');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  const formData = new FormData(this);
+  const fields = [];
+  for (const [name, value] of formData.entries()) {
+    const input = this.querySelector('[name="' + name + '"]');
+    const label = input?.closest('div')?.querySelector('label')?.textContent || name;
+    fields.push({ fieldName: name, fieldLabel: label.replace('*', '').trim(), value: String(value) });
+  }
+
+  try {
+    const res = await fetch('/api/form-submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pageSlug: '${pageSlug}',
+        formTitle: 'お問い合わせ',
+        formFields: fields
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('送信完了しました');
+      this.reset();
+    } else {
+      alert(data.error || '送信に失敗しました');
+    }
+  } catch (err) {
+    alert('送信に失敗しました');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+</script>
+
+元のフォームのデザインは一切変更せず、上記のスクリプトを</body>の前に追加してください。`,
+          layoutMode,
+          designContext: designDefinition || null,
+          templateType,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.message || 'フォーム有効化に失敗しました');
+        return;
+      }
+
+      setModifiedHtml(data.html);
+      setHasChanges(true);
+      toast.success('フォームを有効化しました。設定画面でResend APIキーを設定すると、メール通知が届きます。');
+
+      const successMsg: ChatMessage = {
+        role: 'assistant',
+        content: 'フォームを有効化しました。送信データは管理画面で確認でき、Resend APIキーを設定するとメール通知も届きます。',
+      };
+      setMessages(prev => [...prev, successMsg]);
+
+    } catch (error) {
+      toast.error('フォーム有効化に失敗しました');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1200px] h-[85vh] overflow-hidden flex flex-col">
@@ -317,6 +431,27 @@ export default function HtmlCodeEditModal({
                     <p>例: 「見出しを大きく」</p>
                     <p>例: 「この画像を追加して」</p>
                   </div>
+
+                  {/* フォーム有効化ボタン */}
+                  {pageSlug && (
+                    <button
+                      onClick={handleEnableFormSubmission}
+                      disabled={isGenerating}
+                      className="mt-6 flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          処理中...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="h-4 w-4" />
+                          フォームを有効化
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               ) : (
                 messages.map((msg, idx) => (
