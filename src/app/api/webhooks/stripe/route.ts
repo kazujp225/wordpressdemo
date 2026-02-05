@@ -203,12 +203,19 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
     const planId = metadata.planId || 'pro';
     const plan = PLANS[planId as keyof typeof PLANS];
-    const email = metadata.email || session.customer_email;
+    // メールアドレスは複数の場所に格納される可能性がある
+    const email = metadata.email || session.customer_email || session.customer_details?.email;
 
     if (!email) {
-      console.error('No email in checkout session');
+      console.error('No email in checkout session', {
+        metadata,
+        customer_email: session.customer_email,
+        customer_details: session.customer_details
+      });
       return;
     }
+
+    console.log(`Processing checkout for email: ${email}, plan: ${planId}`);
 
     let userId: string;
     let existingUser = null;

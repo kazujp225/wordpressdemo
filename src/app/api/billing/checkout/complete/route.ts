@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
     const customer = session.customer as Stripe.Customer;
     const sessionMetadata = session.metadata || {};
 
-    const email = session.customer_email || customer?.email || '';
+    // メールアドレスは複数の場所に格納される可能性がある
+    const email = session.customer_email || session.customer_details?.email || customer?.email || '';
 
     const planId = sessionMetadata.planId || 'pro';
     const plan = PLANS[planId as keyof typeof PLANS];
