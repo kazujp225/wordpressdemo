@@ -2757,107 +2757,110 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                                                                 return (
                                                                     <div
-                                                                        className="absolute z-30 cursor-move group"
+                                                                        className="absolute z-30 group"
                                                                         style={{
                                                                             left: `${video.x || 50}%`,
                                                                             top: `${video.y || 50}%`,
                                                                             width: `${video.width || 40}%`,
                                                                             transform: 'translate(-50%, -50%)',
                                                                         }}
-                                                                        onMouseDown={(e) => {
-                                                                            if ((e.target as HTMLElement).closest('.resize-handle')) return;
-                                                                            e.stopPropagation();
-                                                                            e.preventDefault();
-                                                                            const rect = e.currentTarget.parentElement?.getBoundingClientRect();
-                                                                            if (!rect) return;
-                                                                            const startX = e.clientX;
-                                                                            const startY = e.clientY;
-                                                                            const startVideoX = video.x || 50;
-                                                                            const startVideoY = video.y || 50;
-
-                                                                            const handleMouseMove = (moveEvent: MouseEvent) => {
-                                                                                const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
-                                                                                const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
-                                                                                const newX = Math.max(10, Math.min(90, startVideoX + deltaX));
-                                                                                const newY = Math.max(10, Math.min(90, startVideoY + deltaY));
-
-                                                                                setSections(prev => prev.map(s => {
-                                                                                    if (s.id === section.id) {
-                                                                                        const currentConfig = s.config ? (typeof s.config === 'string' ? JSON.parse(s.config) : s.config) : {};
-                                                                                        return {
-                                                                                            ...s,
-                                                                                            config: JSON.stringify({
-                                                                                                ...currentConfig,
-                                                                                                video: { ...currentConfig.video, x: newX, y: newY }
-                                                                                            })
-                                                                                        };
-                                                                                    }
-                                                                                    return s;
-                                                                                }));
-                                                                            };
-
-                                                                            const handleMouseUp = () => {
-                                                                                document.removeEventListener('mousemove', handleMouseMove);
-                                                                                document.removeEventListener('mouseup', handleMouseUp);
-                                                                            };
-
-                                                                            document.addEventListener('mousemove', handleMouseMove);
-                                                                            document.addEventListener('mouseup', handleMouseUp);
-                                                                        }}
+                                                                        onClick={(e) => e.stopPropagation()}
                                                                     >
-                                                                        <div className="relative rounded-lg overflow-hidden shadow-2xl ring-2 ring-indigo-500/50">
+                                                                        {/* ドラッグ用のハンドル（枠部分） */}
+                                                                        <div
+                                                                            className="absolute -inset-2 cursor-move z-0"
+                                                                            onMouseDown={(e) => {
+                                                                                e.stopPropagation();
+                                                                                e.preventDefault();
+                                                                                const rect = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+                                                                                if (!rect) return;
+                                                                                const startX = e.clientX;
+                                                                                const startY = e.clientY;
+                                                                                const startVideoX = video.x || 50;
+                                                                                const startVideoY = video.y || 50;
+
+                                                                                const handleMouseMove = (moveEvent: MouseEvent) => {
+                                                                                    const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
+                                                                                    const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
+                                                                                    const newX = Math.max(10, Math.min(90, startVideoX + deltaX));
+                                                                                    const newY = Math.max(10, Math.min(90, startVideoY + deltaY));
+
+                                                                                    setSections(prev => prev.map(s => {
+                                                                                        if (s.id === section.id) {
+                                                                                            const currentConfig = s.config ? (typeof s.config === 'string' ? JSON.parse(s.config) : s.config) : {};
+                                                                                            return {
+                                                                                                ...s,
+                                                                                                config: JSON.stringify({
+                                                                                                    ...currentConfig,
+                                                                                                    video: { ...currentConfig.video, x: newX, y: newY }
+                                                                                                })
+                                                                                            };
+                                                                                        }
+                                                                                        return s;
+                                                                                    }));
+                                                                                };
+
+                                                                                const handleMouseUp = () => {
+                                                                                    document.removeEventListener('mousemove', handleMouseMove);
+                                                                                    document.removeEventListener('mouseup', handleMouseUp);
+                                                                                };
+
+                                                                                document.addEventListener('mousemove', handleMouseMove);
+                                                                                document.addEventListener('mouseup', handleMouseUp);
+                                                                            }}
+                                                                        />
+                                                                        <div className="relative rounded-lg overflow-hidden shadow-2xl ring-2 ring-indigo-500/50 z-10">
                                                                             {isYouTube ? (
                                                                                 <iframe
                                                                                     src={`${video.url}?autoplay=0`}
-                                                                                    className="w-full aspect-video pointer-events-none"
+                                                                                    className="w-full aspect-video"
                                                                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                                                                 />
                                                                             ) : (
                                                                                 <video
                                                                                     src={video.url}
                                                                                     controls
-                                                                                    className="w-full pointer-events-auto"
+                                                                                    className="w-full"
                                                                                     autoPlay={video.autoplay}
                                                                                     loop={video.loop}
                                                                                     muted={video.muted}
-                                                                                    onMouseDown={(e) => e.stopPropagation()}
                                                                                 />
                                                                             )}
-                                                                            {/* リサイズハンドル */}
-                                                                            <div
-                                                                                className="resize-handle absolute -left-1 -top-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100"
-                                                                                onMouseDown={(e) => handleResize(e, 'top-left')}
-                                                                            />
-                                                                            <div
-                                                                                className="resize-handle absolute -right-1 -top-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-ne-resize opacity-0 group-hover:opacity-100"
-                                                                                onMouseDown={(e) => handleResize(e, 'top-right')}
-                                                                            />
-                                                                            <div
-                                                                                className="resize-handle absolute -left-1 -bottom-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-sw-resize opacity-0 group-hover:opacity-100"
-                                                                                onMouseDown={(e) => handleResize(e, 'bottom-left')}
-                                                                            />
-                                                                            <div
-                                                                                className="resize-handle absolute -right-1 -bottom-1 w-3 h-3 bg-white border-2 border-indigo-500 rounded-full cursor-se-resize opacity-0 group-hover:opacity-100"
-                                                                                onMouseDown={(e) => handleResize(e, 'bottom-right')}
-                                                                            />
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setSections(prev => prev.map(s => {
-                                                                                        if (s.id === section.id) {
-                                                                                            const currentConfig = s.config ? (typeof s.config === 'string' ? JSON.parse(s.config) : s.config) : {};
-                                                                                            delete currentConfig.video;
-                                                                                            return { ...s, config: JSON.stringify(currentConfig) };
-                                                                                        }
-                                                                                        return s;
-                                                                                    }));
-                                                                                    toast.success('動画を削除しました');
-                                                                                }}
-                                                                                className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg transition-colors opacity-0 group-hover:opacity-100"
-                                                                            >
-                                                                                <X className="h-3 w-3" />
-                                                                            </button>
                                                                         </div>
+                                                                        {/* リサイズハンドル */}
+                                                                        <div
+                                                                            className="resize-handle absolute -left-2 -top-2 w-4 h-4 bg-white border-2 border-indigo-500 rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 z-20"
+                                                                            onMouseDown={(e) => handleResize(e, 'top-left')}
+                                                                        />
+                                                                        <div
+                                                                            className="resize-handle absolute -right-2 -top-2 w-4 h-4 bg-white border-2 border-indigo-500 rounded-full cursor-ne-resize opacity-0 group-hover:opacity-100 z-20"
+                                                                            onMouseDown={(e) => handleResize(e, 'top-right')}
+                                                                        />
+                                                                        <div
+                                                                            className="resize-handle absolute -left-2 -bottom-2 w-4 h-4 bg-white border-2 border-indigo-500 rounded-full cursor-sw-resize opacity-0 group-hover:opacity-100 z-20"
+                                                                            onMouseDown={(e) => handleResize(e, 'bottom-left')}
+                                                                        />
+                                                                        <div
+                                                                            className="resize-handle absolute -right-2 -bottom-2 w-4 h-4 bg-white border-2 border-indigo-500 rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 z-20"
+                                                                            onMouseDown={(e) => handleResize(e, 'bottom-right')}
+                                                                        />
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setSections(prev => prev.map(s => {
+                                                                                    if (s.id === section.id) {
+                                                                                        const currentConfig = s.config ? (typeof s.config === 'string' ? JSON.parse(s.config) : s.config) : {};
+                                                                                        delete currentConfig.video;
+                                                                                        return { ...s, config: JSON.stringify(currentConfig) };
+                                                                                    }
+                                                                                    return s;
+                                                                                }));
+                                                                                toast.success('動画を削除しました');
+                                                                            }}
+                                                                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg transition-colors opacity-0 group-hover:opacity-100 z-20"
+                                                                        >
+                                                                            <X className="h-3 w-3" />
+                                                                        </button>
                                                                     </div>
                                                                 );
                                                             }
