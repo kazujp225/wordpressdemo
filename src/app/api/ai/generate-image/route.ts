@@ -3,9 +3,12 @@ import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
-import { logGeneration, createTimer } from '@/lib/generation-logger';
-import { checkImageGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { createTimer } from '@/lib/generation-logger';
+import { checkImageGenerationLimit } from '@/lib/usage';
 import { estimateImageCost } from '@/lib/ai-costs';
+import { deductCreditAtomic, refundCredit } from '@/lib/credits';
+import { checkAllRateLimits, createOrGetGenerationRun, updateGenerationRunStatus } from '@/lib/rate-limit';
+import { v4 as uuidv4 } from 'uuid';
 
 // LPデザイナーとしてのシステムプロンプト
 const LP_DESIGNER_SYSTEM_PROMPT = `あなたはプロフェッショナルなLPデザイナーです。
@@ -51,32 +54,56 @@ export async function POST(request: NextRequest) {
     let imagePrompt = '';
     const modelUsed = 'gemini-3-pro-image-preview';
 
-    // ユーザー認証を確認してAPIキーを取得
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // リクエストIDを生成（冪等性キー）
+    // クライアントから送られてきた場合はそれを使用、なければ生成
+    let requestId: string;
+    let creditDeducted = false;
+    let skipCreditConsumption = false;
+
+    // ユーザー認証を確認
+    const supabaseClient = await createClient();
+    const { data: { user } } = await supabaseClient.auth.getUser();
 
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // クレジット残高チェック
-    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1);
+    // リクエストボディを先に読む
+    let body: any;
+    try {
+        body = await request.json();
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    // requestIdはクライアントから送られてくるか、サーバーで生成
+    requestId = body.request_id || uuidv4();
+
+    // レート制限チェック（同時実行数 + リクエスト/分）
+    const rateLimitResult = await checkAllRateLimits(user.id, '/api/ai/generate-image');
+    if (!rateLimitResult.allowed) {
+        return NextResponse.json({
+            error: 'RATE_LIMIT_EXCEEDED',
+            message: rateLimitResult.reason,
+            retryAfterMs: rateLimitResult.retryAfterMs,
+        }, { status: 429 });
+    }
+
+    // クレジット残高チェック（先にチェックのみ）
+    const limitCheck = await checkImageGenerationLimit(user.id, modelUsed, 1);
     if (!limitCheck.allowed) {
-        // FreeプランでAPIキー未設定の場合
         if (limitCheck.needApiKey) {
             return NextResponse.json({
                 error: 'API_KEY_REQUIRED',
                 message: limitCheck.reason,
             }, { status: 402 });
         }
-        // サブスク未契約の場合
         if (limitCheck.needSubscription) {
             return NextResponse.json({
                 error: 'SUBSCRIPTION_REQUIRED',
                 message: limitCheck.reason,
             }, { status: 402 });
         }
-        // クレジット不足の場合
         return NextResponse.json({
             error: 'INSUFFICIENT_CREDIT',
             message: limitCheck.reason,
@@ -88,13 +115,110 @@ export async function POST(request: NextRequest) {
         }, { status: 402 });
     }
 
-    // クレジット消費をスキップするかどうか
-    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
+    skipCreditConsumption = limitCheck.skipCreditConsumption || false;
+    const estimatedCost = estimateImageCost(modelUsed, 1);
+
+    // ★ 先払い方式: API呼び出し前にクレジットを原子的に減算
+    if (!skipCreditConsumption) {
+        const deductResult = await deductCreditAtomic(
+            user.id,
+            estimatedCost,
+            requestId,
+            `API使用: ${modelUsed} (generate-image)`
+        );
+
+        if (!deductResult.success) {
+            // 重複リクエストの場合
+            if (deductResult.alreadyProcessed) {
+                console.log(`[GENERATE-IMAGE] Duplicate request detected: ${requestId}`);
+                // 既存のGenerationRunを探して結果を返す
+                const existingRun = await prisma.generationRun.findUnique({
+                    where: { requestId },
+                    select: { status: true, outputResult: true, errorMessage: true },
+                });
+                if (existingRun) {
+                    if (existingRun.status === 'succeeded' && existingRun.outputResult) {
+                        return NextResponse.json({
+                            ...JSON.parse(existingRun.outputResult),
+                            request_id: requestId,
+                            cached: true,
+                        });
+                    } else if (existingRun.status === 'processing') {
+                        return NextResponse.json({
+                            error: 'REQUEST_IN_PROGRESS',
+                            message: 'このリクエストは処理中です',
+                            request_id: requestId,
+                        }, { status: 409 });
+                    }
+                }
+                return NextResponse.json({
+                    error: 'DUPLICATE_REQUEST',
+                    message: 'このリクエストは既に処理されています',
+                    request_id: requestId,
+                }, { status: 409 });
+            }
+
+            return NextResponse.json({
+                error: 'INSUFFICIENT_CREDIT',
+                message: deductResult.error || 'クレジット残高が不足しています',
+                credits: {
+                    currentBalance: deductResult.balanceAfter,
+                    estimatedCost: estimatedCost,
+                },
+                needPurchase: true,
+            }, { status: 402 });
+        }
+
+        creditDeducted = true;
+        console.log(`[GENERATE-IMAGE] Credit deducted: $${estimatedCost}, requestId: ${requestId}`);
+    }
+
+    // GenerationRunをprocessing状態で作成
+    const { run: generationRun, isExisting } = await createOrGetGenerationRun(
+        user.id,
+        requestId,
+        {
+            type: 'image',
+            endpoint: '/api/ai/generate-image',
+            model: modelUsed,
+            inputPrompt: body.prompt || '',
+            imageCount: 1,
+            estimatedCost,
+        }
+    );
+
+    // 既存のリクエストで完了済みの場合
+    if (isExisting) {
+        if (generationRun.status === 'succeeded' && generationRun.outputResult) {
+            return NextResponse.json({
+                ...JSON.parse(generationRun.outputResult),
+                request_id: requestId,
+                cached: true,
+            });
+        } else if (generationRun.status === 'processing') {
+            return NextResponse.json({
+                error: 'REQUEST_IN_PROGRESS',
+                message: 'このリクエストは処理中です',
+                request_id: requestId,
+            }, { status: 409 });
+        } else if (generationRun.status === 'failed') {
+            return NextResponse.json({
+                error: 'PREVIOUS_REQUEST_FAILED',
+                message: generationRun.errorMessage || '前回のリクエストが失敗しました',
+                request_id: requestId,
+            }, { status: 500 });
+        }
+    }
 
     try {
-        const { prompt, taste, brandInfo, aspectRatio = '9:16', designDefinition } = await request.json();
+        const { prompt, taste, brandInfo, aspectRatio = '9:16', designDefinition } = body;
 
         if (!prompt) {
+            // クレジットを返金してエラー
+            if (creditDeducted && !skipCreditConsumption) {
+                await refundCredit(user.id, estimatedCost, requestId, 'プロンプト未指定');
+            }
+            await updateGenerationRunStatus(requestId, 'failed', { errorMessage: 'Prompt is required' });
             return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
         }
 
@@ -102,6 +226,10 @@ export async function POST(request: NextRequest) {
 
         const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id);
         if (!GOOGLE_API_KEY) {
+            if (creditDeducted && !skipCreditConsumption) {
+                await refundCredit(user.id, estimatedCost, requestId, 'APIキー未設定');
+            }
+            await updateGenerationRunStatus(requestId, 'failed', { errorMessage: 'API key not configured' });
             return NextResponse.json({ error: 'Google API key is not configured. 設定画面でAPIキーを設定してください。' }, { status: 500 });
         }
 
@@ -154,7 +282,7 @@ Generate the image to EXACTLY match this visual style and color palette.
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                console.log(`[IMAGE-GEN] Attempt ${attempt}/${maxRetries}...`);
+                console.log(`[GENERATE-IMAGE] Attempt ${attempt}/${maxRetries}...`);
                 response = await fetch(
                     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
                     {
@@ -179,19 +307,19 @@ Generate the image to EXACTLY match this visual style and color palette.
                 );
 
                 if (response.ok) {
-                    console.log(`[IMAGE-GEN] Success on attempt ${attempt}`);
+                    console.log(`[GENERATE-IMAGE] Success on attempt ${attempt}`);
                     break;
                 }
 
                 // 503/429エラーの場合はリトライ
                 if (response.status === 503 || response.status === 429) {
                     const errorText = await response.text();
-                    console.error(`[IMAGE-GEN] Attempt ${attempt} failed with ${response.status}:`, errorText);
+                    console.error(`[GENERATE-IMAGE] Attempt ${attempt} failed with ${response.status}:`, errorText);
                     lastError = new Error(`画像生成に失敗しました: ${response.status}`);
 
                     if (attempt < maxRetries) {
                         const waitTime = Math.pow(2, attempt) * 1000;
-                        console.log(`[IMAGE-GEN] Retrying in ${waitTime}ms...`);
+                        console.log(`[GENERATE-IMAGE] Retrying in ${waitTime}ms...`);
                         await new Promise(resolve => setTimeout(resolve, waitTime));
                         response = null;
                         continue;
@@ -200,23 +328,10 @@ Generate the image to EXACTLY match this visual style and color palette.
                     // その他のエラーは即座に失敗
                     const errorText = await response.text();
                     console.error('Image generation failed:', errorText);
-
-                    await logGeneration({
-                        userId: user.id,
-                        type: 'image',
-                        endpoint: '/api/ai/generate-image',
-                        model: modelUsed,
-                        inputPrompt: imagePrompt,
-                        imageCount: 1,
-                        status: 'failed',
-                        errorMessage: `${response.status} - ${errorText.substring(0, 200)}`,
-                        startTime
-                    });
-
                     throw new Error(`画像生成に失敗しました: ${response.status} - ${errorText}`);
                 }
             } catch (fetchError: any) {
-                console.error(`[IMAGE-GEN] Attempt ${attempt} fetch error:`, fetchError.message);
+                console.error(`[GENERATE-IMAGE] Attempt ${attempt} fetch error:`, fetchError.message);
                 lastError = fetchError;
                 if (attempt < maxRetries) {
                     const waitTime = Math.pow(2, attempt) * 1000;
@@ -227,65 +342,60 @@ Generate the image to EXACTLY match this visual style and color palette.
         }
 
         if (!response || !response.ok) {
-            await logGeneration({
-                userId: user.id,
-                type: 'image',
-                endpoint: '/api/ai/generate-image',
-                model: modelUsed,
-                inputPrompt: imagePrompt,
-                imageCount: 1,
-                status: 'failed',
-                errorMessage: lastError?.message || 'Unknown error after retries',
-                startTime
-            });
             throw lastError || new Error('画像生成に失敗しました');
         }
 
         const data = await response.json();
         const result = await processImageResponse(data, arConfig, user.id);
+        const durationMs = Date.now() - startTime;
 
-        // ログ記録（成功）
-        const logResult = await logGeneration({
-            userId: user.id,
-            type: 'image',
-            endpoint: '/api/ai/generate-image',
-            model: modelUsed,
-            inputPrompt: imagePrompt,
-            imageCount: 1,
-            status: 'succeeded',
-            startTime
+        // GenerationRunを成功状態に更新
+        await updateGenerationRunStatus(requestId, 'succeeded', {
+            outputResult: JSON.stringify(result),
+            durationMs,
         });
 
-        // クレジット消費（自分のAPIキー使用時はスキップ）
-        if (logResult && !skipCreditConsumption) {
-            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
-                model: modelUsed,
-                imageCount: 1,
-            });
-        }
+        console.log(`[GENERATE-IMAGE] Success, requestId: ${requestId}`);
 
-        return result;
+        return NextResponse.json({
+            ...result,
+            request_id: requestId,
+            credits_charged: skipCreditConsumption ? 0 : estimatedCost,
+        });
 
     } catch (error: any) {
         console.error('Image Generation Error:', error);
+        const durationMs = Date.now() - startTime;
 
-        // ログ記録（エラー）
-        await logGeneration({
-            userId: user.id,
-            type: 'image',
-            endpoint: '/api/ai/generate-image',
-            model: modelUsed,
-            inputPrompt: imagePrompt || 'Error before prompt',
-            status: 'failed',
+        // ★ API失敗時はクレジットを返金
+        if (creditDeducted && !skipCreditConsumption) {
+            await refundCredit(
+                user.id,
+                estimatedCost,
+                requestId,
+                `API失敗: ${error.message}`
+            );
+            console.log(`[GENERATE-IMAGE] Credit refunded due to error, requestId: ${requestId}`);
+        }
+
+        // GenerationRunを失敗状態に更新
+        await updateGenerationRunStatus(requestId, 'failed', {
             errorMessage: error.message,
-            startTime
+            durationMs,
         });
 
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({
+            error: error.message || 'Internal Server Error',
+            request_id: requestId,
+        }, { status: 500 });
     }
 }
 
-async function processImageResponse(data: any, arConfig: { width: number; height: number; prompt: string }, userId: string | null) {
+async function processImageResponse(
+    data: any,
+    arConfig: { width: number; height: number; prompt: string },
+    userId: string | null
+): Promise<any> {
     const parts = data.candidates?.[0]?.content?.parts || [];
     let base64Image: string | null = null;
 
@@ -336,5 +446,5 @@ async function processImageResponse(data: any, arConfig: { width: number; height
         },
     });
 
-    return NextResponse.json(media);
+    return media;
 }

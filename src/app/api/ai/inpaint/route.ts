@@ -8,6 +8,7 @@ import { estimateImageCost } from '@/lib/ai-costs';
 import { checkImageGenerationLimit } from '@/lib/usage';
 import { deductCreditAtomic, refundCredit } from '@/lib/credits';
 import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
 
 interface MaskArea {
     x: number;      // 選択範囲の左上X（0-1の比率）
@@ -66,6 +67,57 @@ function toValidImageSize(size: string | undefined | null): GeminiImageSize {
     // その他の不正な値は4Kにフォールバック
     console.warn(`[INPAINT] Invalid outputSize "${size}", falling back to 4K`);
     return '4K';
+}
+
+// Gemini APIの入力画像サイズ制限（ピクセル）
+// 大きすぎる画像は400エラーになるため、適切なサイズにリサイズする
+const MAX_INPUT_DIMENSION = 2048; // 最大辺のサイズ（Geminiの推奨上限）
+
+// 画像をリサイズする関数（必要な場合のみ）
+async function resizeImageIfNeeded(
+    base64Data: string,
+    mimeType: string
+): Promise<{ base64Data: string; mimeType: string; resized: boolean; originalSize?: { width: number; height: number }; newSize?: { width: number; height: number } }> {
+    try {
+        const buffer = Buffer.from(base64Data, 'base64');
+        const metadata = await sharp(buffer).metadata();
+
+        const width = metadata.width || 0;
+        const height = metadata.height || 0;
+
+        // 最大サイズ以下なら何もしない
+        if (width <= MAX_INPUT_DIMENSION && height <= MAX_INPUT_DIMENSION) {
+            return { base64Data, mimeType, resized: false };
+        }
+
+        // アスペクト比を維持してリサイズ
+        const scale = Math.min(MAX_INPUT_DIMENSION / width, MAX_INPUT_DIMENSION / height);
+        const newWidth = Math.round(width * scale);
+        const newHeight = Math.round(height * scale);
+
+        console.log(`[INPAINT] Resizing input image: ${width}x${height} → ${newWidth}x${newHeight}`);
+
+        const resizedBuffer = await sharp(buffer)
+            .resize(newWidth, newHeight, {
+                fit: 'inside',
+                withoutEnlargement: true,
+                kernel: sharp.kernel.lanczos3
+            })
+            .png({ quality: 95 })
+            .toBuffer();
+
+        return {
+            base64Data: resizedBuffer.toString('base64'),
+            mimeType: 'image/png', // リサイズ後はPNGに統一
+            resized: true,
+            originalSize: { width, height },
+            newSize: { width: newWidth, height: newHeight }
+        };
+    } catch (error) {
+        console.error('[INPAINT] Failed to resize image:', error);
+        // リサイズに失敗した場合は元の画像をそのまま返す
+        return { base64Data, mimeType, resized: false };
+    }
 }
 
 interface InpaintRequest {
@@ -210,6 +262,14 @@ export async function POST(request: NextRequest) {
             mimeType = imageResponse.headers.get('content-type') || 'image/png';
         } else {
             return NextResponse.json({ error: '画像を指定してください' }, { status: 400 });
+        }
+
+        // 入力画像が大きすぎる場合はリサイズ（Gemini API制限対策）
+        const resizeResult = await resizeImageIfNeeded(base64Data, mimeType);
+        base64Data = resizeResult.base64Data;
+        mimeType = resizeResult.mimeType;
+        if (resizeResult.resized) {
+            console.log(`[INPAINT] Input image resized: ${resizeResult.originalSize?.width}x${resizeResult.originalSize?.height} → ${resizeResult.newSize?.width}x${resizeResult.newSize?.height}`);
         }
 
         // 複数の選択範囲を説明に変換

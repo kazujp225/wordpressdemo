@@ -69,8 +69,9 @@ model MediaImage {
 }
 
 model GenerationRun {
-  id            Int      @id @default(autoincrement())
-  createdAt     DateTime @default(now())
+  id            Int       @id @default(autoincrement())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   userId        String?
   type          String
   endpoint      String?
@@ -81,15 +82,17 @@ model GenerationRun {
   outputTokens  Int?
   imageCount    Int?
   estimatedCost Float?
-  status        String   @default("succeeded")
+  status        String    @default("processing") // processing | succeeded | failed
   errorMessage  String?
   durationMs    Int?
+  requestId     String?   @unique // 冪等性キー（重複実行防止）
 
   @@index([userId])
   @@index([createdAt])
   @@index([type])
   @@index([userId, createdAt])
   @@index([userId, status])
+  @@index([requestId])
 }
 
 model GlobalConfig {
