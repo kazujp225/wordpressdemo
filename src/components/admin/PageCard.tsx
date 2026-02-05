@@ -1,11 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { Copy, FileText, Star, Trash } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Copy, FileText, Star, Trash, Play, Pause } from 'lucide-react';
 import clsx from 'clsx';
 import type { PageListItem } from '@/types';
 import { useApiMutation } from '@/hooks';
+
+function isVideoFile(path: string | undefined): boolean {
+    if (!path) return false;
+    const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
+    return videoExtensions.some(ext => path.toLowerCase().endsWith(ext));
+}
 
 function formatDate(dateString: string): string {
     const date = new Date(dateString);
@@ -56,20 +62,49 @@ export function PageCard({ page, onDelete, onToggleFavorite }: PageCardProps) {
     };
 
     const thumbnailPath = page.sections?.[0]?.image?.filePath;
+    const isVideo = isVideoFile(thumbnailPath);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+
+    const handleVideoToggle = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (videoRef.current) {
+            if (isPlaying) {
+                videoRef.current.pause();
+            } else {
+                videoRef.current.play();
+            }
+            setIsPlaying(!isPlaying);
+        }
+    };
 
     return (
         <div className="group overflow-hidden rounded-lg border border-border bg-background transition-all hover:border-primary/50">
             <div className="aspect-[16/10] overflow-hidden border-b border-border bg-surface-50 relative">
-                <Link
-                    href={`/admin/pages/${page.id}`}
-                    className="absolute inset-0 flex items-center justify-center bg-foreground/5 transition-colors group-hover:bg-foreground/10 z-10"
-                >
-                    <div className="opacity-0 transition-opacity group-hover:opacity-100 flex gap-2">
-                        <span className="rounded-md bg-background px-4 py-2 text-xs font-bold text-foreground shadow-sm">
-                            <span>Edit Page</span>
-                        </span>
-                    </div>
-                </Link>
+                {/* 動画以外の場合のみ全体クリックでリンク遷移 */}
+                {!isVideo && (
+                    <Link
+                        href={`/admin/pages/${page.id}`}
+                        className="absolute inset-0 flex items-center justify-center bg-foreground/5 transition-colors group-hover:bg-foreground/10 z-10"
+                    >
+                        <div className="opacity-0 transition-opacity group-hover:opacity-100 flex gap-2">
+                            <span className="rounded-md bg-background px-4 py-2 text-xs font-bold text-foreground shadow-sm">
+                                <span>Edit Page</span>
+                            </span>
+                        </div>
+                    </Link>
+                )}
+                {/* 動画の場合は編集ボタンを別途表示 */}
+                {isVideo && (
+                    <Link
+                        href={`/admin/pages/${page.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute bottom-2 right-2 z-20 rounded-md bg-background px-3 py-1.5 text-xs font-bold text-foreground shadow-sm hover:bg-primary hover:text-white transition-colors"
+                    >
+                        編集
+                    </Link>
+                )}
                 <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-20">
                     <button
                         onClick={(e) => {
@@ -102,12 +137,39 @@ export function PageCard({ page, onDelete, onToggleFavorite }: PageCardProps) {
                     </span>
                 </div>
                 {thumbnailPath ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                        src={thumbnailPath}
-                        alt={page.title}
-                        className="h-full w-full object-cover object-top"
-                    />
+                    isVideo ? (
+                        <>
+                            <video
+                                ref={videoRef}
+                                src={thumbnailPath}
+                                className="h-full w-full object-cover object-top"
+                                loop
+                                muted
+                                playsInline
+                                onEnded={() => setIsPlaying(false)}
+                            />
+                            {/* 動画再生/停止ボタン */}
+                            <button
+                                onClick={handleVideoToggle}
+                                className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors z-10"
+                            >
+                                <div className="rounded-full bg-white/90 p-4 shadow-lg hover:bg-white transition-colors">
+                                    {isPlaying ? (
+                                        <Pause className="h-8 w-8 text-foreground" />
+                                    ) : (
+                                        <Play className="h-8 w-8 text-foreground ml-1" />
+                                    )}
+                                </div>
+                            </button>
+                        </>
+                    ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={thumbnailPath}
+                            alt={page.title}
+                            className="h-full w-full object-cover object-top"
+                        />
+                    )
                 ) : (
                     <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
                         <FileText className="h-12 w-12" />
