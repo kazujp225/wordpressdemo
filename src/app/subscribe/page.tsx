@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Loader2, Check, Zap, Building2, Crown, LogOut, FlaskConical } from 'lucide-react';
+import { ArrowRight, Loader2, Check, Zap, Building2, Crown, LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { PLANS } from '@/lib/plans';
 
-type PaidPlanType = 'pro' | 'business' | 'enterprise' | 'test';
+type PaidPlanType = 'pro' | 'business' | 'enterprise';
 
 const PAID_PLANS: { id: PaidPlanType; icon: React.ReactNode; popular?: boolean }[] = [
-  { id: 'test', icon: <FlaskConical className="h-5 w-5" /> },
   { id: 'pro', icon: <Zap className="h-5 w-5" /> },
   { id: 'business', icon: <Building2 className="h-5 w-5" />, popular: true },
   { id: 'enterprise', icon: <Crown className="h-5 w-5" /> },
@@ -103,7 +102,7 @@ export default function SubscribePage() {
 
         {/* Plan Selection */}
         <div className="mb-8">
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             {PAID_PLANS.map(({ id, icon, popular }) => {
               const plan = PLANS[id];
               const isSelected = selectedPlan === id;
