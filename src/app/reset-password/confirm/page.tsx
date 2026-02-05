@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Lock, Check, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -16,12 +16,31 @@ function ResetPasswordConfirmContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const hasChecked = useRef(false);
 
   useEffect(() => {
-    // URLからトークンを確認してセッションを確立
+    // 二重実行を防止
+    if (hasChecked.current) return;
+    hasChecked.current = true;
+
     const checkSession = async () => {
+      console.log('Checking session...');
+      console.log('URL hash:', window.location.hash);
+      console.log('URL search:', window.location.search);
+
+      // Supabaseの認証状態変更をリッスン
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+
+        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+          setSessionValid(true);
+          setChecking(false);
+        }
+      });
+
       // まず既存セッションを確認
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session?.user?.email);
 
       if (session) {
         setSessionValid(true);
@@ -30,59 +49,69 @@ function ResetPasswordConfirmContent() {
       }
 
       // URLのハッシュフラグメントからトークンを検出（Supabase PKCEフロー）
+      // Supabase JS clientは自動的にハッシュを処理してセッションを確立する
       const hash = window.location.hash;
-      if (hash) {
-        // #access_token=...&type=recovery などの形式
-        const params = new URLSearchParams(hash.substring(1));
-        const accessToken = params.get('access_token');
-        const type = params.get('type');
+      if (hash && hash.includes('type=recovery')) {
+        console.log('Found recovery token in hash, waiting for Supabase to process...');
 
-        if (accessToken && type === 'recovery') {
-          // Supabaseがハッシュを自動処理するのを待つ
-          const { data: { session: newSession } } = await supabase.auth.getSession();
-          if (newSession) {
-            setSessionValid(true);
-            setChecking(false);
-            return;
-          }
+        // Supabaseがハッシュを処理するまで待機
+        // クライアントが自動的にハッシュを読み取りセッションを確立する
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const { data: { session: newSession } } = await supabase.auth.getSession();
+        console.log('Session after hash processing:', newSession?.user?.email);
+
+        if (newSession) {
+          setSessionValid(true);
+          setChecking(false);
+          // ハッシュをURLから削除（見た目のクリーンアップ）
+          window.history.replaceState(null, '', window.location.pathname);
+          return;
         }
       }
 
-      // URLにtokenがある場合（パスワードリセットリンクから）
+      // URLにcodeがある場合（PKCEフロー - code exchange）
+      const code = searchParams.get('code');
+      if (code) {
+        console.log('Found code parameter, exchanging for session...');
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        console.log('Code exchange result:', data?.session?.user?.email, error);
+
+        if (!error && data.session) {
+          setSessionValid(true);
+          setChecking(false);
+          return;
+        }
+      }
+
+      // URLにtokenがある場合（token_hash方式）
       const token = searchParams.get('token');
       const type = searchParams.get('type');
 
       if (token && type === 'recovery') {
-        // トークンを使ってセッションを確立
-        const { error } = await supabase.auth.verifyOtp({
+        console.log('Found token parameter, verifying OTP...');
+        const { data, error } = await supabase.auth.verifyOtp({
           token_hash: token,
           type: 'recovery',
         });
+        console.log('OTP verification result:', data?.session?.user?.email, error);
 
-        if (!error) {
+        if (!error && data.session) {
           setSessionValid(true);
-        }
-        setChecking(false);
-        return;
-      }
-
-      // URLにcodeがある場合（PKCEフロー）
-      const code = searchParams.get('code');
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
-          setSessionValid(true);
+          setChecking(false);
+          return;
         }
       }
 
-      // 少し待ってから再度セッションを確認（Supabaseの自動処理を待つ）
-      setTimeout(async () => {
-        const { data: { session: delayedSession } } = await supabase.auth.getSession();
-        if (delayedSession) {
-          setSessionValid(true);
-        }
-        setChecking(false);
-      }, 1000);
+      // 最終確認 - 少し待ってからもう一度セッションをチェック
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const { data: { session: finalSession } } = await supabase.auth.getSession();
+      console.log('Final session check:', finalSession?.user?.email);
+
+      if (finalSession) {
+        setSessionValid(true);
+      }
+      setChecking(false);
     };
 
     checkSession();
