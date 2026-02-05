@@ -77,6 +77,8 @@ interface InpaintRequest {
     referenceDesign?: DesignDefinition; // 参考デザイン定義（オプション）
     referenceImageBase64?: string; // 参考デザイン画像（Base64、オプション）
     outputSize?: OutputImageSize; // 出力画像サイズ（デフォルト: 4K）
+    originalWidth?: number;  // 元画像の幅（アスペクト比維持用）
+    originalHeight?: number; // 元画像の高さ（アスペクト比維持用）
 }
 
 interface InpaintHistoryData {
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { imageUrl, imageBase64, mask, masks, prompt, referenceDesign, referenceImageBase64, outputSize }: InpaintRequest = await request.json();
+        const { imageUrl, imageBase64, mask, masks, prompt, referenceDesign, referenceImageBase64, outputSize, originalWidth, originalHeight }: InpaintRequest = await request.json();
 
         if (!prompt) {
             return NextResponse.json({ error: '修正指示(prompt)を入力してください' }, { status: 400 });
@@ -174,6 +176,13 @@ export async function POST(request: NextRequest) {
         // 出力サイズを安全に変換（無効な値は4Kにフォールバック）
         const validImageSize = toValidImageSize(outputSize);
         console.log(`[INPAINT] Output size: requested="${outputSize}", using="${validImageSize}"`);
+
+        // 元画像のサイズ情報をログ出力
+        if (originalWidth && originalHeight) {
+            const aspectRatio = originalWidth / originalHeight;
+            const orientation = aspectRatio > 1 ? '横長' : aspectRatio < 1 ? '縦長' : '正方形';
+            console.log(`[INPAINT] Original image: ${originalWidth}x${originalHeight} (${orientation}, aspect ratio: ${aspectRatio.toFixed(2)})`);
+        }
 
         // 複数選択か単一選択か判定
         const allMasks: MaskArea[] = masks && masks.length > 0 ? masks : (mask ? [mask] : []);
@@ -257,9 +266,27 @@ export async function POST(request: NextRequest) {
         // テキスト追加系の指示かどうかを判定
         const isTextAddition = /(?:入れ|追加|書い|変更|テキスト|文字|タイトル|見出し)/i.test(prompt);
 
+        // 元画像のサイズ・アスペクト比情報を生成
+        let imageSizeSection = '';
+        if (originalWidth && originalHeight) {
+            const aspectRatio = originalWidth / originalHeight;
+            const orientation = aspectRatio > 1 ? '横長（landscape）' : aspectRatio < 1 ? '縦長（portrait）' : '正方形（square）';
+            imageSizeSection = `
+【🚨 最重要: 画像サイズ・アスペクト比の厳守 - CRITICAL SIZE REQUIREMENT】
+元画像のサイズ: ${originalWidth}px × ${originalHeight}px
+アスペクト比: ${aspectRatio.toFixed(3)} (${orientation})
+
+⚠️ 絶対厳守事項:
+- 出力画像は必ず元画像と同じアスペクト比（${aspectRatio.toFixed(3)}）を維持すること
+- ${aspectRatio < 1 ? '縦長の画像を横長に変換することは絶対禁止' : aspectRatio > 1 ? '横長の画像を縦長に変換することは絶対禁止' : '正方形のアスペクト比を変更することは禁止'}
+- 画像の向き（${orientation}）を変更しないこと
+- 元画像の縦横比を崩さないこと
+`;
+        }
+
         // インペインティング用プロンプト - 日本語LP最適化版
         inpaintPrompt = `あなたは日本語LPデザイン専門の画像編集エキスパートです。提供された画像を編集して、新しい画像を生成してください。
-
+${imageSizeSection}
 【修正指示】
 ${prompt}
 
@@ -272,6 +299,7 @@ ${designStyleSection}
 3. ${(referenceDesign || referenceImageBase64) ? '参考デザインスタイルの色味、雰囲気、トーンを反映してください' : '元の画像のスタイル、フォント、色使いをできる限り維持してください'}
 4. 修正箇所以外は変更しないでください
 5. 画像全体を出力してください（説明文は不要です）
+6. 元画像と同じサイズ・アスペクト比で出力してください（絶対厳守）
 ${isTextAddition ? `
 【🇯🇵 日本語テキスト追加時の厳守事項】
 - 絶対に白い背景や白い余白を追加しないでください
@@ -287,7 +315,7 @@ ${isTextAddition ? `
 - 小さいエリアの場合: テキストを少し大きく・太くして読みやすさを確保
 ` : ''}
 
-Generate the complete edited image with pixel-perfect quality now.`;
+Generate the complete edited image with EXACTLY the same aspect ratio (${originalWidth && originalHeight ? (originalWidth / originalHeight).toFixed(3) : 'same as input'}) and pixel-perfect quality now.`;
 
         // リクエストのpartsを構築（編集対象画像 + 参考画像（任意） + プロンプト）
         const requestParts: any[] = [

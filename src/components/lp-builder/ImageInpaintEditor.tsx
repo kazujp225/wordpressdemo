@@ -1139,11 +1139,13 @@ export function ImageInpaintEditor({
                 resizedReferenceImage = await resizeImageForUpload(referenceImage, 1024);
             }
 
-            // インペイント処理関数
+            // インペイント処理関数（元画像のサイズ情報を含む）
             const processInpaint = async (
                 targetImageUrl: string,
                 targetMasks: { x: number; y: number; width: number; height: number }[],
-                label: string
+                label: string,
+                originalWidth: number,
+                originalHeight: number
             ): Promise<{ url: string; costInfo?: any }> => {
                 const response = await fetch('/api/ai/inpaint', {
                     method: 'POST',
@@ -1155,7 +1157,9 @@ export function ImageInpaintEditor({
                         prompt: generatedPrompt,
                         referenceDesign: referenceDesign || undefined,
                         referenceImageBase64: resizedReferenceImage,
-                        outputSize: outputSize
+                        outputSize: outputSize,
+                        originalWidth: originalWidth,
+                        originalHeight: originalHeight
                     })
                 });
 
@@ -1183,7 +1187,7 @@ export function ImageInpaintEditor({
                     height: sel.height / image.height
                 }));
                 promises.push(
-                    processInpaint(imageUrl, desktopMasks, 'デスクトップ')
+                    processInpaint(imageUrl, desktopMasks, 'デスクトップ', image.width, image.height)
                         .then(result => ({ type: 'desktop' as const, ...result }))
                 );
             }
@@ -1196,7 +1200,7 @@ export function ImageInpaintEditor({
                     height: sel.height / mobileImage.height
                 }));
                 promises.push(
-                    processInpaint(mobileImageUrl, mobileMasks, 'モバイル')
+                    processInpaint(mobileImageUrl, mobileMasks, 'モバイル', mobileImage.width, mobileImage.height)
                         .then(result => ({ type: 'mobile' as const, ...result }))
                 );
             }
@@ -1896,39 +1900,6 @@ export function ImageInpaintEditor({
                                         </p>
                                     </div>
                                 )}
-
-                                {/* Output Image Size Selection */}
-                                <div className="mb-4">
-                                    <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-2">
-                                        出力サイズ
-                                    </label>
-                                    <div className="grid grid-cols-3 gap-1.5">
-                                        {([
-                                            { value: '1K' as const, label: '1K', desc: '1024px', recommended: false },
-                                            { value: '2K' as const, label: '2K', desc: '2048px', recommended: false },
-                                            { value: '4K' as const, label: '4K', desc: '4096px', recommended: true },
-                                        ] as const).map(({ value, label, desc, recommended }) => (
-                                            <button
-                                                key={value}
-                                                onClick={() => setOutputSize(value)}
-                                                className={`px-2 py-2 rounded-md text-xs font-medium transition-all border relative ${
-                                                    outputSize === value
-                                                        ? 'bg-primary text-primary-foreground border-primary'
-                                                        : 'bg-surface-50 text-muted-foreground border-border hover:border-primary/50 hover:bg-surface-100'
-                                                }`}
-                                            >
-                                                {recommended && outputSize !== value && (
-                                                    <span className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[8px] px-1 rounded">推奨</span>
-                                                )}
-                                                <div className="font-bold">{label}</div>
-                                                <div className="text-[9px] opacity-70">{desc}</div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <p className="text-[10px] text-muted-foreground mt-1.5">
-                                        4Kは高画質で日本語テキストも鮮明に生成されます
-                                    </p>
-                                </div>
 
                                 <div className="space-y-3 pt-6 border-t border-border">
                                     <button
