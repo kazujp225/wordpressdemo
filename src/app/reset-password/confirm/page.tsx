@@ -18,24 +18,44 @@ function ResetPasswordConfirmContent() {
   const supabase = createClient();
 
   useEffect(() => {
-    // URLからトークンを確認
+    // URLからトークンを確認してセッションを確立
     const checkSession = async () => {
+      // まず既存セッションを確認
       const { data: { session } } = await supabase.auth.getSession();
 
-      // リセットリンクからアクセスした場合、セッションが存在する
       if (session) {
         setSessionValid(true);
-      } else {
-        // URLにcode/tokenがあるか確認（Supabaseのリダイレクト）
-        const code = searchParams.get('code');
-        if (code) {
-          // コードを使ってセッションを確立
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (!error) {
-            setSessionValid(true);
-          }
+        setChecking(false);
+        return;
+      }
+
+      // URLにtokenがある場合（パスワードリセットリンクから）
+      const token = searchParams.get('token');
+      const type = searchParams.get('type');
+
+      if (token && type === 'recovery') {
+        // トークンを使ってセッションを確立
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: token,
+          type: 'recovery',
+        });
+
+        if (!error) {
+          setSessionValid(true);
+        }
+        setChecking(false);
+        return;
+      }
+
+      // URLにcodeがある場合（PKCEフロー）
+      const code = searchParams.get('code');
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) {
+          setSessionValid(true);
         }
       }
+
       setChecking(false);
     };
 
