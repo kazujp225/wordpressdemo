@@ -5,7 +5,7 @@
  * 例: ¥5,000 = 50,000クレジット
  */
 
-export type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
+export type PlanType = 'free' | 'pro' | 'business' | 'enterprise' | 'test';
 
 export interface PlanLimits {
   // 最大ページ数
@@ -177,6 +177,35 @@ export const PLANS: Record<PlanType, Plan> = {
       'Business全機能',
       '動画生成',
       '優先サポート',
+    ],
+  },
+};
+
+  // テストプラン（決済テスト用 - 1円）
+  test: {
+    id: 'test',
+    name: 'Test',
+    description: '決済テスト用（1円）',
+    priceJpy: 1,
+    includedTokens: 100, // テスト用
+    includedCreditUsd: 0.01, // 後方互換性
+    stripePriceId: process.env.STRIPE_PRICE_TEST || 'price_1SxKNF1udVtuc743dXNoXzYO',
+    priceDisplay: '¥1/月',
+    colorClass: 'text-red-600',
+    limits: {
+      maxPages: 1,
+      maxStorageMB: 100,
+      canUpscale4K: false,
+      canRestyle: false,
+      canExport: true,
+      canGenerateVideo: false,
+      canSetApiKey: false,
+      prioritySupport: false,
+    },
+    features: [
+      '決済テスト用',
+      '1ページのみ',
+      '100クレジット',
     ],
   },
 };
