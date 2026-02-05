@@ -110,6 +110,10 @@ export function ImageInpaintEditor({
     const [slotBefore, setSlotBefore] = useState('');
     const [slotAfter, setSlotAfter] = useState('');
 
+    // 出力画像サイズ選択用state（Gemini APIがサポートする値のみ）
+    type OutputImageSize = '1K' | '2K' | '4K';
+    const [outputSize, setOutputSize] = useState<OutputImageSize>('4K');
+
     // 編集タイプごとのプリセット
     const editTypeConfig: Record<EditType, { label: string; Icon: React.ComponentType<{ className?: string }>; beforePlaceholder: string; afterPlaceholder: string; examples: string[] }> = {
         color: {
@@ -1150,7 +1154,8 @@ export function ImageInpaintEditor({
                         mask: targetMasks[0],
                         prompt: generatedPrompt,
                         referenceDesign: referenceDesign || undefined,
-                        referenceImageBase64: resizedReferenceImage
+                        referenceImageBase64: resizedReferenceImage,
+                        outputSize: outputSize
                     })
                 });
 
@@ -1891,6 +1896,39 @@ export function ImageInpaintEditor({
                                         </p>
                                     </div>
                                 )}
+
+                                {/* Output Image Size Selection */}
+                                <div className="mb-4">
+                                    <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-2">
+                                        出力サイズ
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {([
+                                            { value: '1K' as const, label: '1K', desc: '1024px', recommended: false },
+                                            { value: '2K' as const, label: '2K', desc: '2048px', recommended: false },
+                                            { value: '4K' as const, label: '4K', desc: '4096px', recommended: true },
+                                        ] as const).map(({ value, label, desc, recommended }) => (
+                                            <button
+                                                key={value}
+                                                onClick={() => setOutputSize(value)}
+                                                className={`px-2 py-2 rounded-md text-xs font-medium transition-all border relative ${
+                                                    outputSize === value
+                                                        ? 'bg-primary text-primary-foreground border-primary'
+                                                        : 'bg-surface-50 text-muted-foreground border-border hover:border-primary/50 hover:bg-surface-100'
+                                                }`}
+                                            >
+                                                {recommended && outputSize !== value && (
+                                                    <span className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[8px] px-1 rounded">推奨</span>
+                                                )}
+                                                <div className="font-bold">{label}</div>
+                                                <div className="text-[9px] opacity-70">{desc}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                                        4Kは高画質で日本語テキストも鮮明に生成されます
+                                    </p>
+                                </div>
 
                                 <div className="space-y-3 pt-6 border-t border-border">
                                     <button

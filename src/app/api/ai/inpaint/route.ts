@@ -36,6 +36,38 @@ interface DesignDefinition {
     description: string;
 }
 
+// 出力画像サイズの型定義（Gemini APIがサポートする値のみ）
+// 参考: https://ai.google.dev/gemini-api/docs/image-generation
+// - 1K: 最大 1024×1024px（デフォルト）
+// - 2K: 最大 2048×2048px
+// - 4K: 最大 4096×4096px
+const VALID_IMAGE_SIZES = ['1K', '2K', '4K'] as const;
+type GeminiImageSize = typeof VALID_IMAGE_SIZES[number];
+
+// フロントエンドから受け取る可能性のある値（originalは4Kにフォールバック）
+type OutputImageSize = GeminiImageSize | 'original';
+
+// 安全なサイズ変換関数: 無効な値が来ても必ず有効な値を返す
+function toValidImageSize(size: string | undefined | null): GeminiImageSize {
+    if (!size) return '4K'; // デフォルトは4K（高画質）
+
+    const upperSize = size.toUpperCase();
+
+    // 完全一致チェック
+    if (VALID_IMAGE_SIZES.includes(upperSize as GeminiImageSize)) {
+        return upperSize as GeminiImageSize;
+    }
+
+    // 'original'は4Kにフォールバック（元サイズ維持はAPIでサポートされていない）
+    if (upperSize === 'ORIGINAL') {
+        return '4K';
+    }
+
+    // その他の不正な値は4Kにフォールバック
+    console.warn(`[INPAINT] Invalid outputSize "${size}", falling back to 4K`);
+    return '4K';
+}
+
 interface InpaintRequest {
     imageUrl?: string;
     imageBase64?: string;
@@ -44,6 +76,7 @@ interface InpaintRequest {
     prompt: string;         // 修正指示
     referenceDesign?: DesignDefinition; // 参考デザイン定義（オプション）
     referenceImageBase64?: string; // 参考デザイン画像（Base64、オプション）
+    outputSize?: OutputImageSize; // 出力画像サイズ（デフォルト: 4K）
 }
 
 interface InpaintHistoryData {
@@ -132,11 +165,15 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { imageUrl, imageBase64, mask, masks, prompt, referenceDesign, referenceImageBase64 }: InpaintRequest = await request.json();
+        const { imageUrl, imageBase64, mask, masks, prompt, referenceDesign, referenceImageBase64, outputSize }: InpaintRequest = await request.json();
 
         if (!prompt) {
             return NextResponse.json({ error: '修正指示(prompt)を入力してください' }, { status: 400 });
         }
+
+        // 出力サイズを安全に変換（無効な値は4Kにフォールバック）
+        const validImageSize = toValidImageSize(outputSize);
+        console.log(`[INPAINT] Output size: requested="${outputSize}", using="${validImageSize}"`);
 
         // 複数選択か単一選択か判定
         const allMasks: MaskArea[] = masks && masks.length > 0 ? masks : (mask ? [mask] : []);
@@ -301,9 +338,9 @@ Generate the complete edited image with pixel-perfect quality now.`;
                             generationConfig: {
                                 responseModalities: ["IMAGE", "TEXT"],
                                 temperature: 0.6,  // 日本語テキスト精度向上のため低めに設定
-                                // 最高解像度出力
+                                // 出力解像度（バリデーション済みの値を使用）
                                 imageConfig: {
-                                    imageSize: "4K"  // 日本語文字の鮮明度向上
+                                    imageSize: validImageSize  // 1K, 2K, 4K のいずれか（必ず有効な値）
                                 }
                             },
                             toolConfig: {
