@@ -29,6 +29,25 @@ function ResetPasswordConfirmContent() {
         return;
       }
 
+      // URLのハッシュフラグメントからトークンを検出（Supabase PKCEフロー）
+      const hash = window.location.hash;
+      if (hash) {
+        // #access_token=...&type=recovery などの形式
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token');
+        const type = params.get('type');
+
+        if (accessToken && type === 'recovery') {
+          // Supabaseがハッシュを自動処理するのを待つ
+          const { data: { session: newSession } } = await supabase.auth.getSession();
+          if (newSession) {
+            setSessionValid(true);
+            setChecking(false);
+            return;
+          }
+        }
+      }
+
       // URLにtokenがある場合（パスワードリセットリンクから）
       const token = searchParams.get('token');
       const type = searchParams.get('type');
@@ -56,7 +75,14 @@ function ResetPasswordConfirmContent() {
         }
       }
 
-      setChecking(false);
+      // 少し待ってから再度セッションを確認（Supabaseの自動処理を待つ）
+      setTimeout(async () => {
+        const { data: { session: delayedSession } } = await supabase.auth.getSession();
+        if (delayedSession) {
+          setSessionValid(true);
+        }
+        setChecking(false);
+      }, 1000);
     };
 
     checkSession();

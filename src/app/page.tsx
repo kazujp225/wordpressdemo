@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Loader2, Mail, Lock, Check, Zap, Building2, Crown, FlaskConical } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -24,6 +24,30 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  // パスワードリセットのトークンを検出してリダイレクト
+  useEffect(() => {
+    const handleRecoveryToken = async () => {
+      // URLのハッシュフラグメントからトークンを検出
+      const hash = window.location.hash;
+      if (hash && hash.includes('type=recovery')) {
+        // リカバリートークンがある場合、パスワード変更ページにリダイレクト
+        router.push(`/reset-password/confirm${hash}`);
+        return;
+      }
+
+      // Supabaseの認証イベントをリッスン
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          router.push('/reset-password/confirm');
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    };
+
+    handleRecoveryToken();
+  }, [router, supabase.auth]);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
