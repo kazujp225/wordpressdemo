@@ -66,6 +66,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@types/uuid": "^10.0.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.16",
     "prisma": "^5.22.0",

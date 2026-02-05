@@ -276,12 +276,14 @@ model CreditTransaction {
   outputTokens    Int?
   imageCount      Int?
   stripePaymentId String?  @unique // Stripe決済ID（購入時）
+  requestId       String?  @unique // リクエストID（重複防止用）
   createdAt       DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
   @@index([type])
   @@index([userId, type, createdAt])
+  @@index([requestId])
 }
 
 // クレジットパッケージ（購入可能な単位）

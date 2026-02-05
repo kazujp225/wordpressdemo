@@ -90,6 +90,141 @@ export class InsufficientCreditError extends Error {
   }
 }
 
+// 重複リクエストエラー
+export class DuplicateRequestError extends Error {
+  constructor(public requestId: string) {
+    super(`Duplicate request: ${requestId}`);
+    this.name = 'DuplicateRequestError';
+  }
+}
+
+/**
+ * 原子的な先払いクレジット減算（最適フロー）
+ * 1クエリで残高チェック＋減算を行い、レースコンディションを防ぐ
+ *
+ * @returns 減算成功時は残高、失敗時はnull
+ */
+export async function deductCreditAtomic(
+  userId: string,
+  costUsd: number,
+  requestId: string,
+  description: string
+): Promise<{ success: boolean; balanceAfter?: number; error?: string; alreadyProcessed?: boolean }> {
+  try {
+    // 重複リクエストチェック
+    const existingRequest = await prisma.creditTransaction.findFirst({
+      where: { requestId },
+    });
+
+    if (existingRequest) {
+      console.log(`[Credit] Duplicate request detected: ${requestId}`);
+      return { success: true, alreadyProcessed: true, balanceAfter: Number(existingRequest.balanceAfter) };
+    }
+
+    // 原子的な減算: 残高 >= コストの場合のみ更新
+    // PostgreSQLの行ロックにより同時実行を防ぐ
+    const result = await prisma.$executeRaw`
+      UPDATE "CreditBalance"
+      SET "balanceUsd" = "balanceUsd" - ${costUsd}::decimal,
+          "updatedAt" = NOW()
+      WHERE "userId" = ${userId}
+        AND "balanceUsd" >= ${costUsd}::decimal
+    `;
+
+    if (result === 0) {
+      // 更新件数0 = 残高不足
+      const balance = await prisma.creditBalance.findUnique({
+        where: { userId },
+        select: { balanceUsd: true }
+      });
+      return {
+        success: false,
+        error: 'クレジット残高が不足しています',
+        balanceAfter: Number(balance?.balanceUsd || 0)
+      };
+    }
+
+    // 更新後の残高を取得
+    const updatedBalance = await prisma.creditBalance.findUnique({
+      where: { userId },
+      select: { balanceUsd: true }
+    });
+
+    // 取引履歴を記録（requestIdで重複防止）
+    await prisma.creditTransaction.create({
+      data: {
+        userId,
+        type: 'api_usage',
+        amountUsd: new Decimal(-costUsd),
+        balanceAfter: updatedBalance?.balanceUsd || new Decimal(0),
+        description,
+        requestId,
+      },
+    });
+
+    console.log(`[Credit] Deducted $${costUsd} from user ${userId}, requestId: ${requestId}`);
+    return { success: true, balanceAfter: Number(updatedBalance?.balanceUsd || 0) };
+
+  } catch (error: any) {
+    // ユニーク制約違反（requestIdの重複）
+    if (error.code === 'P2002') {
+      console.log(`[Credit] Duplicate request (constraint): ${requestId}`);
+      return { success: true, alreadyProcessed: true };
+    }
+    console.error(`[Credit] Deduct error:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * API失敗時のクレジット返金
+ */
+export async function refundCredit(
+  userId: string,
+  costUsd: number,
+  requestId: string,
+  reason: string
+): Promise<void> {
+  try {
+    // 既に返金済みかチェック
+    const existingRefund = await prisma.creditTransaction.findFirst({
+      where: {
+        requestId: `refund_${requestId}`,
+      },
+    });
+
+    if (existingRefund) {
+      console.log(`[Credit] Refund already processed for requestId: ${requestId}`);
+      return;
+    }
+
+    // 返金処理
+    const balance = await prisma.creditBalance.update({
+      where: { userId },
+      data: {
+        balanceUsd: { increment: costUsd },
+      },
+    });
+
+    // 返金履歴を記録
+    await prisma.creditTransaction.create({
+      data: {
+        userId,
+        type: 'refund',
+        amountUsd: new Decimal(costUsd),
+        balanceAfter: balance.balanceUsd,
+        description: `返金: ${reason}`,
+        requestId: `refund_${requestId}`,
+      },
+    });
+
+    console.log(`[Credit] Refunded $${costUsd} to user ${userId}, reason: ${reason}`);
+  } catch (error) {
+    console.error(`[Credit] Refund error:`, error);
+    // 返金エラーはログに記録するが、例外は投げない（ユーザー体験を優先）
+  }
+}
+
 /**
  * API使用後のクレジット消費
  * トランザクション内で残高を再確認し、レースコンディションを防ぐ

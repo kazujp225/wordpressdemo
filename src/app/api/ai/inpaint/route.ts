@@ -5,7 +5,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { estimateImageCost } from '@/lib/ai-costs';
-import { checkImageGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkImageGenerationLimit } from '@/lib/usage';
+import { deductCreditAtomic, refundCredit } from '@/lib/credits';
+import { v4 as uuidv4 } from 'uuid';
 
 interface MaskArea {
     x: number;      // 選択範囲の左上X（0-1の比率）
@@ -53,6 +55,9 @@ interface InpaintHistoryData {
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
     let inpaintPrompt = '';
+    const requestId = uuidv4(); // 重複防止用のリクエストID
+    let creditDeducted = false;
+    let skipCreditConsumption = false;
 
     // ユーザー認証
     const supabase = await createClient();
@@ -62,7 +67,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // クレジット残高チェック
+    // クレジット残高チェック（先にチェックのみ）
     const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1);
     if (!limitCheck.allowed) {
         if (limitCheck.needApiKey) {
@@ -88,7 +93,43 @@ export async function POST(request: NextRequest) {
         }, { status: 402 });
     }
 
-    const skipCreditConsumption = limitCheck.skipCreditConsumption || false;
+    skipCreditConsumption = limitCheck.skipCreditConsumption || false;
+    const estimatedCost = estimateImageCost('gemini-3-pro-image-preview', 1);
+
+    // ★ 先払い方式: API呼び出し前にクレジットを原子的に減算
+    if (!skipCreditConsumption) {
+        const deductResult = await deductCreditAtomic(
+            user.id,
+            estimatedCost,
+            requestId,
+            'API使用: gemini-3-pro-image-preview (inpaint)'
+        );
+
+        if (!deductResult.success) {
+            return NextResponse.json({
+                error: 'INSUFFICIENT_CREDIT',
+                message: deductResult.error || 'クレジット残高が不足しています',
+                credits: {
+                    currentBalance: deductResult.balanceAfter,
+                    estimatedCost: estimatedCost,
+                },
+                needPurchase: true,
+            }, { status: 402 });
+        }
+
+        // 重複リクエストの場合は既存結果を返す（冪等性）
+        if (deductResult.alreadyProcessed) {
+            console.log(`[INPAINT] Duplicate request detected: ${requestId}`);
+            return NextResponse.json({
+                error: 'DUPLICATE_REQUEST',
+                message: 'このリクエストは既に処理されています',
+                requestId,
+            }, { status: 409 });
+        }
+
+        creditDeducted = true;
+        console.log(`[INPAINT] Credit deducted: $${estimatedCost}, requestId: ${requestId}`);
+    }
 
     try {
         const { imageUrl, imageBase64, mask, masks, prompt, referenceDesign, referenceImageBase64 }: InpaintRequest = await request.json();
@@ -316,7 +357,6 @@ Generate the complete edited image with pixel-perfect quality now.`;
 
         const data = await response.json();
         const modelUsed = 'gemini-3-pro-image-preview';
-        const estimatedCost = estimateImageCost(modelUsed, 1);
         const durationMs = Date.now() - startTime;
 
         // 履歴用データを準備
@@ -334,7 +374,7 @@ Generate the complete edited image with pixel-perfect quality now.`;
         );
 
         // ログ記録（成功）
-        const logResult = await logGeneration({
+        await logGeneration({
             userId: user.id,
             type: 'inpaint',
             endpoint: '/api/ai/inpaint',
@@ -345,18 +385,24 @@ Generate the complete edited image with pixel-perfect quality now.`;
             startTime
         });
 
-        // クレジット消費（自分のAPIキー使用時はスキップ）
-        if (logResult && !skipCreditConsumption) {
-            await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
-                model: modelUsed,
-                imageCount: 1,
-            });
-        }
+        // クレジットは先払い済みなので、成功時は何もしない
+        console.log(`[INPAINT] Success, requestId: ${requestId}`);
 
         return result;
 
     } catch (error: any) {
         console.error('Inpaint Error:', error);
+
+        // ★ API失敗時はクレジットを返金
+        if (creditDeducted && !skipCreditConsumption) {
+            await refundCredit(
+                user.id,
+                estimatedCost,
+                requestId,
+                `API失敗: ${error.message}`
+            );
+            console.log(`[INPAINT] Credit refunded due to error, requestId: ${requestId}`);
+        }
 
         // ログ記録（エラー）
         await logGeneration({
