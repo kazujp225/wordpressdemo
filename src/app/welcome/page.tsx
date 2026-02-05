@@ -10,6 +10,7 @@ interface WelcomeData {
   email: string;
   planName: string;
   isNewUser: boolean;
+  tempPassword: string | null;
 }
 
 function WelcomeContent() {
@@ -310,23 +311,31 @@ function WelcomeContent() {
           </p>
         </div>
 
-        {/* Email Sent Card */}
+        {/* Account Info Card */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-8">
-          <div className="bg-blue-50 px-6 py-6 text-center">
-            <Mail className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-            <h2 className="font-bold text-xl text-blue-800 mb-2">
-              パスワード設定メールを送信しました
+          <div className="bg-green-50 px-6 py-6 text-center">
+            <Lock className="h-12 w-12 text-green-600 mx-auto mb-4" />
+            <h2 className="font-bold text-xl text-green-800 mb-2">
+              アカウントが作成されました
             </h2>
-            <p className="text-blue-700">
-              <span className="font-mono font-bold">{data?.email}</span>
-            </p>
           </div>
 
-          <div className="px-6 py-5">
-            <p className="text-gray-600 leading-relaxed">
-              上記のメールアドレス宛に、パスワード設定用のリンクを送信しました。
-              メールをご確認の上、パスワードを設定してください。
-            </p>
+          <div className="px-6 py-5 space-y-4">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">ログインID（メールアドレス）</p>
+              <p className="font-mono font-bold text-lg text-gray-900 bg-gray-50 px-3 py-2 rounded">
+                {data?.email}
+              </p>
+            </div>
+
+            {data?.tempPassword && (
+              <div>
+                <p className="text-sm text-gray-500 mb-1">初期パスワード</p>
+                <p className="font-mono font-bold text-lg text-gray-900 bg-gray-50 px-3 py-2 rounded select-all">
+                  {data.tempPassword}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -335,10 +344,11 @@ function WelcomeContent() {
           <div className="flex gap-3">
             <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-amber-800">メールが届かない場合</p>
+              <p className="font-bold text-amber-800">パスワードについて</p>
               <p className="text-sm text-amber-700 mt-1">
-                迷惑メールフォルダをご確認ください。<br />
-                数分経ってもメールが届かない場合は、サポートまでお問い合わせください。
+                この画面に表示されているパスワードをメモしてください。<br />
+                ログイン後、設定画面からパスワードを変更できます。<br />
+                パスワードを忘れた場合は、ログイン画面の「パスワードを忘れた方」から再設定できます。
               </p>
             </div>
           </div>
@@ -354,7 +364,7 @@ function WelcomeContent() {
         </button>
 
         <p className="text-center text-sm text-muted-foreground mt-4">
-          メールのリンクからパスワードを設定後、ログインできます
+          上記のメールアドレスとパスワードでログインしてください
         </p>
       </main>
     </div>

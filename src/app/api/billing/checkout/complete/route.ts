@@ -15,7 +15,7 @@ function getStripe(): Stripe {
 
 /**
  * GET: Checkout Session完了後の情報取得
- * session_idからユーザー情報を取得（パスワードはメールで送信されるため含まない）
+ * session_idからユーザー情報と自動生成パスワードを取得
  */
 export async function GET(request: NextRequest) {
   const sessionId = request.nextUrl.searchParams.get('session_id');
@@ -50,10 +50,14 @@ export async function GET(request: NextRequest) {
     const planId = sessionMetadata.planId || 'pro';
     const plan = PLANS[planId as keyof typeof PLANS];
 
+    // Customerメタデータから自動生成パスワードを取得
+    const tempPassword = customer?.metadata?.tempPassword || null;
+
     return NextResponse.json({
       email,
       planName: plan?.name || planId,
       isNewUser: true,
+      tempPassword, // 自動生成パスワード（Welcome画面で表示）
     });
   } catch (error: unknown) {
     console.error('Failed to get checkout session:', error);
