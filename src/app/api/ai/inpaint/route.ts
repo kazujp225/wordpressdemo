@@ -366,11 +366,22 @@ export async function POST(request: NextRequest) {
 
         // インペインティング用プロンプト - シンプル版（400エラーデバッグ用）
         // 長いプロンプトが問題の可能性があるため、まずシンプルにテスト
+        // 元画像のアスペクト比を計算
+        const aspectRatio = originalWidth && originalHeight ? (originalWidth / originalHeight) : 1;
+        const isPortrait = aspectRatio < 1;
+        const orientationText = isPortrait ? 'PORTRAIT (vertical/tall)' : (aspectRatio > 1 ? 'LANDSCAPE (horizontal/wide)' : 'SQUARE');
+
         inpaintPrompt = `Edit this image. ${prompt}
 
 Target area: ${areasDescription}
 
-Keep the same aspect ratio and style.`;
+CRITICAL OUTPUT REQUIREMENTS:
+- Original image size: ${originalWidth || 'unknown'}x${originalHeight || 'unknown'} pixels
+- Aspect ratio: ${aspectRatio.toFixed(3)} (${orientationText})
+- You MUST output an image with the EXACT SAME aspect ratio (${aspectRatio.toFixed(3)})
+- ${isPortrait ? 'This is a PORTRAIT/VERTICAL image - output MUST be taller than wide' : 'This is a LANDSCAPE/HORIZONTAL image - output MUST be wider than tall'}
+- DO NOT change the orientation or crop the image
+- Keep the same style and composition`;
 
         // ★ Nano Banana Pro (Gemini 3 Pro Image) - 最新モデル
         // 複数画像でのスタイル転送をサポート
@@ -411,10 +422,17 @@ Edit instructions: ${prompt}
 
 Target area: ${areasDescription}
 
+CRITICAL OUTPUT REQUIREMENTS:
+- Original TARGET image size: ${originalWidth || 'unknown'}x${originalHeight || 'unknown'} pixels
+- Aspect ratio: ${aspectRatio.toFixed(3)} (${orientationText})
+- You MUST output an image with the EXACT SAME aspect ratio as the TARGET image (${aspectRatio.toFixed(3)})
+- ${isPortrait ? 'The TARGET is a PORTRAIT/VERTICAL image - output MUST be taller than wide' : 'The TARGET is a LANDSCAPE/HORIZONTAL image - output MUST be wider than tall'}
+- DO NOT change the orientation or crop the image
+
 Important:
 - Keep the layout and composition of the first image
 - Apply the color palette, visual style, and mood from the second image
-- Output the edited version of the first image`;
+- Output the edited version of the first image with SAME dimensions/aspect ratio`;
         }
 
         // 3. プロンプト
