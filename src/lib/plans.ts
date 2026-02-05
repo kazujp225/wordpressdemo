@@ -179,8 +179,6 @@ export const PLANS: Record<PlanType, Plan> = {
       '優先サポート',
     ],
   },
-};
-
   // テストプラン（決済テスト用 - 1円）
   test: {
     id: 'test',
