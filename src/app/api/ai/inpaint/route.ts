@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { estimateImageCost } from '@/lib/ai-costs';
+import { fetchWithRetry } from '@/lib/gemini-retry';
 import { checkImageGenerationLimit } from '@/lib/usage';
 import { deductCreditAtomic, refundCredit } from '@/lib/credits';
 import { v4 as uuidv4 } from 'uuid';
@@ -71,7 +72,7 @@ function toValidImageSize(size: string | undefined | null): GeminiImageSize {
 
 // Gemini APIの入力画像サイズ制限（ピクセル）
 // 大きすぎる画像は400エラーになるため、適切なサイズにリサイズする
-const MAX_INPUT_DIMENSION = 2048; // 最大辺のサイズ（Geminiの推奨上限）
+const MAX_INPUT_DIMENSION = 1024; // 最大辺のサイズ（400エラー対策で小さく）
 
 // 画像をリサイズする関数（必要な場合のみ）
 async function resizeImageIfNeeded(
@@ -251,6 +252,11 @@ export async function POST(request: NextRequest) {
         let mimeType = 'image/png';
 
         if (imageBase64) {
+            // Data URLからmimeTypeを抽出
+            const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
+            if (mimeMatch) {
+                mimeType = mimeMatch[1];
+            }
             base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
         } else if (imageUrl) {
             const imageResponse = await fetch(imageUrl);
@@ -264,12 +270,26 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: '画像を指定してください' }, { status: 400 });
         }
 
+        // ★ 重要: Base64データの先頭からmimeTypeを正確に検出（Content-Typeヘッダーが間違っている場合の対策）
+        if (base64Data.startsWith('/9j/')) {
+            mimeType = 'image/jpeg';
+        } else if (base64Data.startsWith('iVBORw0KGgo')) {
+            mimeType = 'image/png';
+        } else if (base64Data.startsWith('R0lGOD')) {
+            mimeType = 'image/gif';
+        } else if (base64Data.startsWith('UklGR')) {
+            mimeType = 'image/webp';
+        }
+        console.log(`[INPAINT] Final mimeType: ${mimeType} (base64 preview: ${base64Data.substring(0, 20)}...)`)
+
         // 入力画像が大きすぎる場合はリサイズ（Gemini API制限対策）
         const resizeResult = await resizeImageIfNeeded(base64Data, mimeType);
         base64Data = resizeResult.base64Data;
         mimeType = resizeResult.mimeType;
         if (resizeResult.resized) {
             console.log(`[INPAINT] Input image resized: ${resizeResult.originalSize?.width}x${resizeResult.originalSize?.height} → ${resizeResult.newSize?.width}x${resizeResult.newSize?.height}`);
+        } else {
+            console.log(`[INPAINT] Image size OK, no resize needed`);
         }
 
         // 複数の選択範囲を説明に変換
@@ -344,131 +364,93 @@ export async function POST(request: NextRequest) {
 `;
         }
 
-        // インペインティング用プロンプト - 日本語LP最適化版
-        inpaintPrompt = `あなたは日本語LPデザイン専門の画像編集エキスパートです。提供された画像を編集して、新しい画像を生成してください。
-${imageSizeSection}
-【修正指示】
-${prompt}
+        // インペインティング用プロンプト - シンプル版（400エラーデバッグ用）
+        // 長いプロンプトが問題の可能性があるため、まずシンプルにテスト
+        inpaintPrompt = `Edit this image. ${prompt}
 
-【対象エリア】
-${areasDescription}
-${designStyleSection}
-【重要なルール】
-1. 指定されたエリア内の要素のみを修正してください
-2. 文字・テキストの変更が指示されている場合は、一文字ずつ正確にその文字列に置き換えてください
-3. ${(referenceDesign || referenceImageBase64) ? '参考デザインスタイルの色味、雰囲気、トーンを反映してください' : '元の画像のスタイル、フォント、色使いをできる限り維持してください'}
-4. 修正箇所以外は変更しないでください
-5. 画像全体を出力してください（説明文は不要です）
-6. 元画像と同じサイズ・アスペクト比で出力してください（絶対厳守）
-${isTextAddition ? `
-【🇯🇵 日本語テキスト追加時の厳守事項】
-- 絶対に白い背景や白い余白を追加しないでください
-- テキストは選択エリアの既存の背景色・画像の上に直接描画してください
-- ひらがな、カタカナ、漢字は一文字ずつ正確に描画（類似文字への置換禁止）
-- ゴシック体（サンセリフ）で太めの線、文字間は均等配置
-- 背景に対して十分なコントラストを確保（背景が明るい場合は暗い文字、逆も同様）
-- 文字のエッジは鮮明に、アンチエイリアスは最小限
+Target area: ${areasDescription}
 
-【⚠️ 文字サイズ重要ルール - TEXT SIZE RULE】
-- 元のテキストより10-20%大きめに生成すること（小さい文字は崩れやすい）
-- 最小フォントサイズ: 各文字は20ピクセル以上の高さを確保
-- 小さいエリアの場合: テキストを少し大きく・太くして読みやすさを確保
-` : ''}
+Keep the same aspect ratio and style.`;
 
-Generate the complete edited image with EXACTLY the same aspect ratio (${originalWidth && originalHeight ? (originalWidth / originalHeight).toFixed(3) : 'same as input'}) and pixel-perfect quality now.`;
+        // ★ Nano Banana Pro (Gemini 3 Pro Image) - 最新モデル
+        // 複数画像でのスタイル転送をサポート
+        const MODEL_ID = 'gemini-3-pro-image-preview';
 
-        // リクエストのpartsを構築（編集対象画像 + 参考画像（任意） + プロンプト）
-        const requestParts: any[] = [
-            {
-                inlineData: {
-                    mimeType: mimeType,
-                    data: base64Data
-                }
-            }
-        ];
+        // リクエストのpartsを構築
+        const requestParts: any[] = [];
 
-        // 参考デザイン画像がある場合は追加
+        // 1. 編集対象画像
+        requestParts.push({
+            inlineData: { mimeType: 'image/png', data: base64Data }
+        });
+
+        // 2. 参考デザイン画像がある場合は追加（スタイル転送用）
         if (referenceImageBase64) {
-            // Base64データURLから実データを抽出
             const refBase64 = referenceImageBase64.replace(/^data:image\/\w+;base64,/, '');
-            const refMimeMatch = referenceImageBase64.match(/^data:(image\/\w+);base64,/);
-            const refMimeType = refMimeMatch ? refMimeMatch[1] : 'image/png';
+            // mimeType検出
+            let refMimeType = 'image/png';
+            if (refBase64.startsWith('/9j/')) {
+                refMimeType = 'image/jpeg';
+            } else if (refBase64.startsWith('iVBORw0KGgo')) {
+                refMimeType = 'image/png';
+            }
 
             requestParts.push({
-                inlineData: {
-                    mimeType: refMimeType,
-                    data: refBase64
-                }
+                inlineData: { mimeType: refMimeType, data: refBase64 }
             });
+            console.log(`[INPAINT] Reference image added for style transfer: ${refMimeType}, length: ${refBase64.length}`);
+
+            // プロンプトを調整（2枚目が参考画像であることを明示）
+            inpaintPrompt = `I have two images:
+1. The first image is the TARGET image that needs to be edited.
+2. The second image is the STYLE REFERENCE image.
+
+Please edit the TARGET image (first image) while applying the visual style, colors, and aesthetic from the REFERENCE image (second image).
+
+Edit instructions: ${prompt}
+
+Target area: ${areasDescription}
+
+Important:
+- Keep the layout and composition of the first image
+- Apply the color palette, visual style, and mood from the second image
+- Output the edited version of the first image`;
         }
 
-        // プロンプトを追加
+        // 3. プロンプト
         requestParts.push({ text: inpaintPrompt });
 
-        // Gemini 3.0 Pro（最新画像生成モデル）を使用
-        // リトライ機能付き（503エラー対策）
-        const maxRetries = 3;
-        let response: Response | null = null;
-        let lastError: Error | null = null;
+        console.log(`[INPAINT] Using model: ${MODEL_ID}`);
+        console.log(`[INPAINT] Parts count: ${requestParts.length} (${referenceImageBase64 ? 'with reference' : 'no reference'})`);
+        console.log(`[INPAINT] Prompt: ${inpaintPrompt.substring(0, 200)}...`);
 
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`[INPAINT] Attempt ${attempt}/${maxRetries}...`);
-                response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: requestParts
-                            }],
-                            generationConfig: {
-                                responseModalities: ["IMAGE", "TEXT"],
-                                temperature: 0.6  // 日本語テキスト精度向上のため低めに設定
-                            }
-                        })
-                    }
-                );
-
-                if (response.ok) {
-                    console.log(`[INPAINT] Success on attempt ${attempt}`);
-                    break;
+        let response: Response;
+        try {
+            response = await fetchWithRetry(
+                `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${GOOGLE_API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: requestParts
+                        }],
+                        generationConfig: {
+                            responseModalities: ["IMAGE", "TEXT"],
+                            temperature: 0.4
+                        }
+                    })
                 }
-
-                // 503/429エラーの場合はリトライ
-                if (response.status === 503 || response.status === 429) {
-                    const errorText = await response.text();
-                    console.error(`[INPAINT] Attempt ${attempt} failed with ${response.status}:`, errorText);
-                    lastError = new Error(`インペインティングに失敗しました: ${response.status}`);
-
-                    if (attempt < maxRetries) {
-                        // 指数バックオフで待機（2秒、4秒、8秒）
-                        const waitTime = Math.pow(2, attempt) * 1000;
-                        console.log(`[INPAINT] Retrying in ${waitTime}ms...`);
-                        await new Promise(resolve => setTimeout(resolve, waitTime));
-                        response = null;
-                        continue;
-                    }
-                } else {
-                    // その他のエラーは即座に失敗
-                    const errorText = await response.text();
-                    console.error('Gemini Flash API error:', errorText);
-                    throw new Error(`インペインティングに失敗しました: ${response.status}`);
-                }
-            } catch (fetchError: any) {
-                console.error(`[INPAINT] Attempt ${attempt} fetch error:`, fetchError.message);
-                lastError = fetchError;
-                if (attempt < maxRetries) {
-                    const waitTime = Math.pow(2, attempt) * 1000;
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
-                    continue;
-                }
-            }
+            );
+        } catch (fetchError: any) {
+            console.error('[INPAINT] API call failed:', fetchError.message);
+            throw fetchError;
         }
 
-        if (!response || !response.ok) {
-            throw lastError || new Error('インペインティングに失敗しました');
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[INPAINT] API error response:', errorText);
+            throw new Error(`インペインティングに失敗しました: ${response.status}`);
         }
 
         const data = await response.json();
