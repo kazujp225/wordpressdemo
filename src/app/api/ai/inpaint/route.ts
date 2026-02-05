@@ -425,16 +425,7 @@ Generate the complete edited image with EXACTLY the same aspect ratio (${origina
                             }],
                             generationConfig: {
                                 responseModalities: ["IMAGE", "TEXT"],
-                                temperature: 0.6,  // 日本語テキスト精度向上のため低めに設定
-                                // 出力解像度（バリデーション済みの値を使用）
-                                imageConfig: {
-                                    imageSize: validImageSize  // 1K, 2K, 4K のいずれか（必ず有効な値）
-                                }
-                            },
-                            toolConfig: {
-                                functionCallingConfig: {
-                                    mode: "NONE"
-                                }
+                                temperature: 0.6  // 日本語テキスト精度向上のため低めに設定
                             }
                         })
                     }
