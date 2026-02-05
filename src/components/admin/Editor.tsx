@@ -2805,11 +2805,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                             document.addEventListener('mouseup', handleMouseUp);
                                                                         }}
                                                                     >
-                                                                        <div
-                                                                            className="relative rounded-lg overflow-hidden shadow-2xl ring-2 ring-indigo-500/50"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            onPointerDown={(e) => e.stopPropagation()}
-                                                                        >
+                                                                        <div className="relative rounded-lg overflow-hidden shadow-2xl ring-2 ring-indigo-500/50">
                                                                             {isYouTube ? (
                                                                                 <iframe
                                                                                     src={`${video.url}?autoplay=0`}
@@ -2820,11 +2816,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                                 <video
                                                                                     src={video.url}
                                                                                     controls
-                                                                                    className="w-full"
+                                                                                    className="w-full pointer-events-auto"
                                                                                     autoPlay={video.autoplay}
                                                                                     loop={video.loop}
                                                                                     muted={video.muted}
-                                                                                    onClick={(e) => e.stopPropagation()}
                                                                                     onMouseDown={(e) => e.stopPropagation()}
                                                                                 />
                                                                             )}
@@ -2873,7 +2868,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                     className="absolute inset-0 z-30 bg-black/60 flex items-center justify-center group"
                                                                     onClick={(e) => e.stopPropagation()}
                                                                     onMouseDown={(e) => e.stopPropagation()}
-                                                                    onPointerDown={(e) => e.stopPropagation()}
                                                                 >
                                                                     {isYouTube ? (
                                                                         <iframe
@@ -2890,8 +2884,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                             autoPlay={video.autoplay}
                                                                             loop={video.loop}
                                                                             muted={video.muted}
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            onMouseDown={(e) => e.stopPropagation()}
                                                                         />
                                                                     )}
                                                                     <button
