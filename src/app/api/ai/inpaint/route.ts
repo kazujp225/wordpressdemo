@@ -396,7 +396,8 @@ CRITICAL OUTPUT REQUIREMENTS:
         });
 
         // 2. 参考デザイン画像がある場合は追加（スタイル転送用）
-        if (referenceImageBase64) {
+        // ★ 一時的に無効化: 2画像で400エラーが出るため調査中
+        if (referenceImageBase64 && false) {
             const refBase64 = referenceImageBase64.replace(/^data:image\/\w+;base64,/, '');
             // mimeType検出
             let refMimeType = 'image/png';
