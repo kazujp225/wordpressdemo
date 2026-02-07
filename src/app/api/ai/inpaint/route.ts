@@ -371,17 +371,8 @@ export async function POST(request: NextRequest) {
         const isPortrait = aspectRatio < 1;
         const orientationText = isPortrait ? 'PORTRAIT (vertical/tall)' : (aspectRatio > 1 ? 'LANDSCAPE (horizontal/wide)' : 'SQUARE');
 
-        inpaintPrompt = `Edit this image. ${prompt}
-
-Target area: ${areasDescription}
-
-CRITICAL OUTPUT REQUIREMENTS:
-- Original image size: ${originalWidth || 'unknown'}x${originalHeight || 'unknown'} pixels
-- Aspect ratio: ${aspectRatio.toFixed(3)} (${orientationText})
-- You MUST output an image with the EXACT SAME aspect ratio (${aspectRatio.toFixed(3)})
-- ${isPortrait ? 'This is a PORTRAIT/VERTICAL image - output MUST be taller than wide' : 'This is a LANDSCAPE/HORIZONTAL image - output MUST be wider than tall'}
-- DO NOT change the orientation or crop the image
-- Keep the same style and composition`;
+        // ★ 超シンプルなプロンプト（400エラー調査用）
+        inpaintPrompt = `Edit this image: ${prompt}`;
 
         // ★ Nano Banana Pro (Gemini 3 Pro Image) - 最新モデル
         // 複数画像でのスタイル転送をサポート
@@ -396,45 +387,23 @@ CRITICAL OUTPUT REQUIREMENTS:
         });
 
         // 2. 参考デザイン画像がある場合は追加（スタイル転送用）
-        // ★ 一時的に無効化: 2画像で400エラーが出るため調査中
-        if (referenceImageBase64 && false) {
+        // ★ 一時的に無効化: 400エラー調査中
+        // TODO: 調査完了後に有効化
+        /*
+        if (referenceImageBase64) {
             const refBase64 = referenceImageBase64.replace(/^data:image\/\w+;base64,/, '');
-            // mimeType検出
             let refMimeType = 'image/png';
             if (refBase64.startsWith('/9j/')) {
                 refMimeType = 'image/jpeg';
             } else if (refBase64.startsWith('iVBORw0KGgo')) {
                 refMimeType = 'image/png';
             }
-
             requestParts.push({
                 inlineData: { mimeType: refMimeType, data: refBase64 }
             });
-            console.log(`[INPAINT] Reference image added for style transfer: ${refMimeType}, length: ${refBase64.length}`);
-
-            // プロンプトを調整（2枚目が参考画像であることを明示）
-            inpaintPrompt = `I have two images:
-1. The first image is the TARGET image that needs to be edited.
-2. The second image is the STYLE REFERENCE image.
-
-Please edit the TARGET image (first image) while applying the visual style, colors, and aesthetic from the REFERENCE image (second image).
-
-Edit instructions: ${prompt}
-
-Target area: ${areasDescription}
-
-CRITICAL OUTPUT REQUIREMENTS:
-- Original TARGET image size: ${originalWidth || 'unknown'}x${originalHeight || 'unknown'} pixels
-- Aspect ratio: ${aspectRatio.toFixed(3)} (${orientationText})
-- You MUST output an image with the EXACT SAME aspect ratio as the TARGET image (${aspectRatio.toFixed(3)})
-- ${isPortrait ? 'The TARGET is a PORTRAIT/VERTICAL image - output MUST be taller than wide' : 'The TARGET is a LANDSCAPE/HORIZONTAL image - output MUST be wider than tall'}
-- DO NOT change the orientation or crop the image
-
-Important:
-- Keep the layout and composition of the first image
-- Apply the color palette, visual style, and mood from the second image
-- Output the edited version of the first image with SAME dimensions/aspect ratio`;
+            console.log(`[INPAINT] Reference image added: ${refMimeType}, length: ${refBase64.length}`);
         }
+        */
 
         // 3. プロンプト
         requestParts.push({ text: inpaintPrompt });
