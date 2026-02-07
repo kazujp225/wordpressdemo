@@ -1,9 +1,79 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Video, Upload, Link2, Youtube, PlayCircle, Check, AlertCircle, Sparkles, Loader2, DollarSign } from 'lucide-react';
+import { X, Video, Upload, Link2, Youtube, PlayCircle, Check, AlertCircle, Sparkles, Loader2, DollarSign, GripVertical } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+
+// ドラッグ可能なセクションアイテム
+function SortableSectionItem({
+    section,
+    idx,
+    isSelected,
+    onSelect,
+}: {
+    section: Section;
+    idx: number;
+    isSelected: boolean;
+    onSelect: () => void;
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: String(section.id) });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 1000 : 'auto',
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style as React.CSSProperties}
+            className={clsx(
+                "relative rounded-lg overflow-hidden border-2 transition-all group",
+                isSelected
+                    ? "border-gray-900 ring-2 ring-gray-200"
+                    : "border-gray-200 hover:border-gray-300"
+            )}
+        >
+            {/* ドラッグハンドル */}
+            <div
+                {...attributes}
+                {...listeners}
+                className="absolute top-1 left-1 z-10 cursor-grab active:cursor-grabbing bg-white/90 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                title="ドラッグして並び替え"
+            >
+                <GripVertical className="h-3 w-3 text-gray-500" />
+            </div>
+            <button
+                onClick={onSelect}
+                className="w-full h-full"
+            >
+                <img
+                    src={section.image?.filePath}
+                    alt={`Section ${idx + 1}`}
+                    className="w-full h-16 object-cover"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
+                    <span className="text-[10px] text-white truncate">
+                        {section.role || `Section ${idx + 1}`}
+                    </span>
+                </div>
+            </button>
+        </div>
+    );
+}
 
 interface Section {
     id: string | number;
@@ -16,6 +86,7 @@ interface VideoInsertModalProps {
     onClose: () => void;
     sections: Section[];
     onInsert: (sectionId: string, videoData: VideoData) => Promise<void>;
+    onReorderSections?: (reorderedSections: Section[]) => void;
 }
 
 interface VideoData {
@@ -50,7 +121,26 @@ export default function VideoInsertModal({
     onClose,
     sections,
     onInsert,
+    onReorderSections,
 }: VideoInsertModalProps) {
+    // dnd-kit sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    // ドラッグ終了時の処理
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (active.id !== over?.id && onReorderSections) {
+            const oldIndex = sections.findIndex(s => String(s.id) === active.id);
+            const newIndex = sections.findIndex(s => String(s.id) === over?.id);
+            const reordered = arrayMove(sections, oldIndex, newIndex);
+            onReorderSections(reordered);
+        }
+    };
     const [selectedSection, setSelectedSection] = useState<string | null>(null);
     const [videoSource, setVideoSource] = useState<'youtube' | 'upload' | 'embed' | 'ai-generate'>('youtube');
     const [videoUrl, setVideoUrl] = useState('');
@@ -284,31 +374,29 @@ export default function VideoInsertModal({
                     {/* セクション選択 */}
                     <div className="mb-6">
                         <h3 className="text-sm font-bold text-gray-900 mb-3">動画を挿入するセクション</h3>
-                        <div className="grid grid-cols-4 gap-2">
-                            {sections.filter(s => s.image).map((section, idx) => (
-                                <button
-                                    key={section.id}
-                                    onClick={() => setSelectedSection(String(section.id))}
-                                    className={clsx(
-                                        "relative rounded-lg overflow-hidden border-2 transition-all",
-                                        selectedSection === String(section.id)
-                                            ? "border-gray-900 ring-2 ring-gray-200"
-                                            : "border-gray-200 hover:border-gray-300"
-                                    )}
-                                >
-                                    <img
-                                        src={section.image?.filePath}
-                                        alt={`Section ${idx + 1}`}
-                                        className="w-full h-16 object-cover"
-                                    />
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
-                                        <span className="text-[10px] text-white truncate">
-                                            {section.role || `Section ${idx + 1}`}
-                                        </span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
+                        <p className="text-xs text-gray-500 mb-2">ドラッグ＆ドロップで並び替えできます</p>
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={sections.filter(s => s.image).map(s => String(s.id))}
+                                strategy={rectSortingStrategy}
+                            >
+                                <div className="grid grid-cols-4 gap-2">
+                                    {sections.filter(s => s.image).map((section, idx) => (
+                                        <SortableSectionItem
+                                            key={section.id}
+                                            section={section}
+                                            idx={idx}
+                                            isSelected={selectedSection === String(section.id)}
+                                            onSelect={() => setSelectedSection(String(section.id))}
+                                        />
+                                    ))}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
                     </div>
 
                     {/* 動画ソース選択 */}

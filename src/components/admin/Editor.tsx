@@ -6336,6 +6336,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                     return data;
                 }}
+                onReorderSections={(reorderedSections) => {
+                    // セクションの順序を更新
+                    setSections(reorderedSections.map((s, idx) => ({ ...s, order: idx })));
+                    toast.success('セクションの順序を更新しました');
+                }}
             />
 
             {/* チュートリアルモーダル */}
