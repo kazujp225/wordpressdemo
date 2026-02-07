@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Loader2, Wand2, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, Plus, DollarSign, Clock, Check, History, Link, MousePointer, ImagePlus, Palette, Sparkles, Monitor, Smartphone, Scissors, Type, Paintbrush, Box, Image as ImageIcon, PenTool, MessageSquare } from 'lucide-react';
+import { X, Loader2, Wand2, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, Plus, DollarSign, Clock, Check, History, Link, MousePointer, ImagePlus, Palette, Sparkles, Monitor, Smartphone, Scissors, Type, Paintbrush, Box, Image as ImageIcon, PenTool, MessageSquare, AlertTriangle } from 'lucide-react';
 import { InpaintHistoryPanel } from './InpaintHistoryPanel';
 import { TextFixModule } from './TextFixModule';
 import type { ClickableArea, FormFieldConfig, ViewportType } from '@/types';
 import { usdToTokens, formatTokens } from '@/lib/plans';
+
+// インペイントの推定コスト（USD）
+const INPAINT_COST_USD = 0.134;
 
 // デザイン定義の型
 interface DesignDefinition {
@@ -179,6 +182,29 @@ export function ImageInpaintEditor({
     const [costInfo, setCostInfo] = useState<{ model: string; estimatedCost: number; durationMs: number } | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+
+    // クレジット残高チェック
+    const [creditBalance, setCreditBalance] = useState<number | null>(null);
+    const [isLoadingCredit, setIsLoadingCredit] = useState(true);
+    const hasInsufficientCredit = creditBalance !== null && creditBalance < INPAINT_COST_USD;
+
+    // クレジット残高を取得
+    useEffect(() => {
+        const fetchCreditBalance = async () => {
+            try {
+                const response = await fetch('/api/user/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    setCreditBalance(data.creditBalanceUsd || 0);
+                }
+            } catch (error) {
+                console.error('Failed to fetch credit balance:', error);
+            } finally {
+                setIsLoadingCredit(false);
+            }
+        };
+        fetchCreditBalance();
+    }, []);
 
     // カット機能用state
     const [cutStartY, setCutStartY] = useState<number | null>(null);
@@ -1901,13 +1927,36 @@ export function ImageInpaintEditor({
                                     </div>
                                 )}
 
+                                {/* クレジット不足警告 */}
+                                {hasInsufficientCredit && (
+                                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                                        <p className="text-xs text-amber-700 font-bold flex items-center gap-2">
+                                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                                            クレジット不足です（残高: {formatTokens(usdToTokens(creditBalance || 0))} / 必要: {formatTokens(usdToTokens(INPAINT_COST_USD))}）
+                                        </p>
+                                        <a href="/admin/settings" className="text-xs text-amber-600 underline mt-1 block">
+                                            クレジットを購入する →
+                                        </a>
+                                    </div>
+                                )}
+
                                 <div className="space-y-3 pt-6 border-t border-border">
                                     <button
                                         onClick={handleInpaint}
-                                        disabled={isLoading || isAnalyzingDesign || (selections.length === 0 && mobileSelections.length === 0) || !generatePromptFromSlots().trim()}
+                                        disabled={isLoading || isAnalyzingDesign || isLoadingCredit || hasInsufficientCredit || (selections.length === 0 && mobileSelections.length === 0) || !generatePromptFromSlots().trim()}
                                         className="w-full py-3 px-4 bg-primary text-primary-foreground font-bold text-sm rounded-md hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                                     >
-                                        {isLoading ? (
+                                        {isLoadingCredit ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                残高確認中...
+                                            </>
+                                        ) : hasInsufficientCredit ? (
+                                            <>
+                                                <AlertTriangle className="w-4 h-4" />
+                                                クレジット不足
+                                            </>
+                                        ) : isLoading ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 animate-spin" />
                                                 {isDualMode && selections.length > 0 && mobileSelections.length > 0
