@@ -72,7 +72,7 @@ export async function updateSession(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
     // 認証不要のパブリックルート
-    const publicRoutes = ['/', '/auth/callback', '/terms', '/privacy', '/welcome', '/banned', '/subscribe'];
+    const publicRoutes = ['/', '/auth/callback', '/terms', '/privacy', '/welcome', '/banned'];
     const isPublicRoute = publicRoutes.includes(pathname)
         || pathname.startsWith('/p/')
         || pathname.startsWith('/api/auth/')

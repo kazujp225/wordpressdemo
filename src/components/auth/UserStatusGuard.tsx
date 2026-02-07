@@ -20,7 +20,8 @@ interface UserStatusGuardProps {
  * BAN/planチェックを行うガードコンポーネント
  *
  * - BANされている場合: /banned へリダイレクト
- * - サブスク必須でサブスクがない場合: /subscribe へリダイレクト
+ *
+ * ※ サブスクチェックは削除（外部決済→アカウント作成のフローに変更）
  *
  * Edge Runtimeでservice_roleを使わないために、
  * クライアント側でAPIを呼び出してチェックする設計
@@ -56,11 +57,8 @@ export function UserStatusGuard({ children, requireSubscription = true }: UserSt
                     return;
                 }
 
-                // サブスクチェック（requireSubscriptionがtrueの場合のみ）
-                if (requireSubscription && !data.hasActiveSubscription) {
-                    router.push('/subscribe');
-                    return;
-                }
+                // サブスクチェックは削除（外部決済→アカウント作成のフローに変更）
+                // 全ユーザーがアクセス可能
 
                 setLoading(false);
             } catch (err: any) {
