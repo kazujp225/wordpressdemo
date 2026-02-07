@@ -53,7 +53,7 @@ export default function LPBuilderIntroPage() {
       {/* Minimal Header */}
       <header className="fixed top-0 w-full z-50 bg-[#f8f8f8]/80 backdrop-blur-md px-6 md:px-12 h-20 flex items-center justify-between border-b border-black/5">
         <div className="text-lg font-bold tracking-tight font-manrope">
-          AI画像編集くん
+          OTASUKE LP
         </div>
         <nav className="hidden md:flex items-center space-x-8 text-sm font-medium text-gray-500">
           <Link
@@ -198,7 +198,7 @@ export default function LPBuilderIntroPage() {
       <footer className="py-12 border-t border-black/5 bg-white">
         <div className="max-w-[1400px] mx-auto px-6 md:px-12 flex justify-between items-end">
           <div>
-            <div className="text-sm font-bold tracking-tight mb-2">AI画像編集くん</div>
+            <div className="text-sm font-bold tracking-tight mb-2">OTASUKE LP</div>
             <p className="text-xs text-gray-400">© 2025 All rights reserved.</p>
           </div>
           <div className="text-[10px] font-mono text-gray-300 uppercase tracking-widest">

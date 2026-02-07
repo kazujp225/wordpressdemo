@@ -25,7 +25,7 @@ const tutorialSteps: TutorialStep[] = [
         id: 'start',
         icon: <Sparkles className="h-6 w-6" />,
         iconBg: 'from-violet-500 to-purple-600',
-        title: 'LP Builderへようこそ',
+        title: 'OTASUKE LPへようこそ',
         description: '画像をアップロードするだけで\nそのままWebページとして公開できます。\n基本的な使い方を説明します。',
         visual: (
             <div className="relative">

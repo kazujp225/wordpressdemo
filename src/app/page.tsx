@@ -83,7 +83,7 @@ export default function LoginPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 bg-primary rounded-sm" />
-            <span className="text-xl font-bold tracking-tight">AI画像編集くん</span>
+            <span className="text-xl font-bold tracking-tight">OTASUKE LP</span>
           </div>
         </div>
       </header>
@@ -173,7 +173,7 @@ export default function LoginPage() {
       <footer className="border-t border-gray-100 mt-16">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <p className="text-sm text-center text-muted-foreground">
-            © 2024 AI画像編集くん All rights reserved.
+            © 2024 OTASUKE LP All rights reserved.
           </p>
         </div>
       </footer>

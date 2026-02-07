@@ -115,7 +115,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                             height={24}
                             className="h-6 w-6 object-contain"
                         />
-                        <span className="text-lg font-bold tracking-tight text-foreground">AI画像編集くん</span>
+                        <span className="text-lg font-bold tracking-tight text-foreground">OTASUKE LP</span>
                     </div>
                     {/* モバイル用閉じるボタン */}
                     {onClose && (

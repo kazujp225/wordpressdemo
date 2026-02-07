@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 bg-primary rounded-sm" />
-            <span className="text-xl font-bold tracking-tight">AI画像編集くん</span>
+            <span className="text-xl font-bold tracking-tight">OTASUKE LP</span>
           </div>
         </div>
       </header>

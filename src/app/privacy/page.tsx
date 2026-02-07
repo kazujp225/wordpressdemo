@@ -14,7 +14,7 @@ export default function PrivacyPage() {
                         <span className="text-sm font-medium">戻る</span>
                     </Link>
                     <Link href="/" className="text-xl font-black tracking-tighter">
-                        AI画像編集くん
+                        OTASUKE LP
                     </Link>
                 </div>
             </header>
@@ -28,7 +28,7 @@ export default function PrivacyPage() {
                     <section className="mb-10">
                         <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">1. はじめに</h2>
                         <p className="text-gray-700 leading-relaxed">
-                            株式会社ZETTAI（以下「当社」といいます）は、AI画像編集くん（以下「本サービス」といいます）を通じて取得する個人情報の重要性を認識し、その保護を徹底するため、以下のとおりプライバシーポリシー（以下「本ポリシー」といいます）を定めます。
+                            株式会社ZETTAI（以下「当社」といいます）は、OTASUKE LP（以下「本サービス」といいます）を通じて取得する個人情報の重要性を認識し、その保護を徹底するため、以下のとおりプライバシーポリシー（以下「本ポリシー」といいます）を定めます。
                         </p>
                     </section>
 

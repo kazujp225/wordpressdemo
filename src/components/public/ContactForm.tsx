@@ -89,7 +89,7 @@ export function ContactForm({ pageSlug }: ContactFormProps) {
                             value={company}
                             onChange={(e) => setCompany(e.target.value)}
                             className="w-full bg-transparent border-b border-gray-200 py-3 text-lg font-jp focus:outline-none focus:border-black transition-colors rounded-none placeholder:text-gray-200"
-                            placeholder="株式会社AI画像編集くん"
+                            placeholder="株式会社OTASUKE LP"
                         />
                     </div>
                     <div className="group">
