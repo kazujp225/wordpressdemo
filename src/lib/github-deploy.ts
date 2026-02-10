@@ -32,7 +32,7 @@ export async function createDeployRepo(
     headers,
     body: JSON.stringify({
       name: repoName,
-      description: 'Static site deployed from OTASUKE LP',
+      description: 'Static site deployed from オタスケ',
       private: false,
       auto_init: true,
     }),
@@ -124,7 +124,7 @@ export async function createDeployRepo(
       method: 'POST',
       headers,
       body: JSON.stringify({
-        message: 'Deploy static site from OTASUKE LP',
+        message: 'Deploy static site from オタスケ',
         tree: treeData.sha,
         parents: [latestCommitSha],
       }),

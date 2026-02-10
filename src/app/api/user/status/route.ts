@@ -18,15 +18,21 @@ export async function GET() {
     }
 
     try {
-        // Node.js Runtime (Prisma使用可能) でUserSettingsを取得
-        const settings = await prisma.userSettings.findUnique({
-            where: { userId: user.id },
-            select: {
-                isBanned: true,
-                banReason: true,
-                plan: true,
-            },
-        });
+        // Node.js Runtime (Prisma使用可能) でUserSettingsとクレジット残高を取得
+        const [settings, creditBalance] = await Promise.all([
+            prisma.userSettings.findUnique({
+                where: { userId: user.id },
+                select: {
+                    isBanned: true,
+                    banReason: true,
+                    plan: true,
+                },
+            }),
+            prisma.creditBalance.findUnique({
+                where: { userId: user.id },
+                select: { balanceUsd: true },
+            }),
+        ]);
 
         const isBanned = settings?.isBanned === true;
         const plan = settings?.plan || 'free';
@@ -38,6 +44,7 @@ export async function GET() {
             banReason: isBanned ? settings?.banReason : null,
             plan,
             hasActiveSubscription,
+            creditBalanceUsd: creditBalance?.balanceUsd ? Number(creditBalance.balanceUsd) : 0,
         });
     } catch (error: any) {
         console.error('Failed to get user status:', error);

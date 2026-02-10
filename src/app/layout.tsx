@@ -15,7 +15,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "OTASUKE LP",
+  title: "オタスケ",
   description: "AIで画像を簡単編集",
 };
 
