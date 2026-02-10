@@ -191,7 +191,7 @@ export default function PagePreviewPage() {
                                 parsedConfig = typeof section.config === 'string'
                                     ? JSON.parse(section.config as string)
                                     : section.config;
-                                // オタスケからの保存形式: properties.clickableAreas または clickableAreas
+                                // オタスケ LPからの保存形式: properties.clickableAreas または clickableAreas
                                 clickableAreas = parsedConfig.properties?.clickableAreas || parsedConfig.clickableAreas || [];
                             }
                         } catch (e) {

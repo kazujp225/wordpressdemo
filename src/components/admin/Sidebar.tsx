@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap } from 'lucide-react';
+import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
@@ -17,6 +17,7 @@ const navItems = [
     { name: 'メディア', href: '/admin/media', icon: Images, prefetchUrl: '/api/media', adminOnly: false },
     { name: 'API利用状況', href: '/admin/api-usage', icon: BarChart3, prefetchUrl: '/api/admin/stats?days=30', adminOnly: false },
     { name: '履歴', href: '/admin/import-history', icon: History, prefetchUrl: null, adminOnly: false },
+    { name: '説明動画', href: '/admin/tutorials', icon: PlayCircle, prefetchUrl: null, adminOnly: false },
     { name: '設定', href: '/admin/settings', icon: Settings, prefetchUrl: '/api/admin/settings', adminOnly: false },
     { name: 'ユーザー管理', href: '/admin/users', icon: Shield, prefetchUrl: null, adminOnly: true },
 ] as const;
@@ -115,7 +116,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                             height={24}
                             className="h-6 w-6 object-contain"
                         />
-                        <span className="text-lg font-bold tracking-tight text-primary">オタスケ</span>
+                        <span className="text-lg font-bold tracking-tight text-primary">オタスケ LP</span>
                     </div>
                     {/* モバイル用閉じるボタン */}
                     {onClose && (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Check, X, RefreshCw, Shield, Clock, Mail, Zap, Database, FileText, Crown, Ban, AlertTriangle, CreditCard, Plus, Coins } from 'lucide-react';
+import { Check, X, RefreshCw, Shield, Clock, Mail, Zap, Database, FileText, Crown, Ban, AlertTriangle, CreditCard, Plus, Coins, Key, Eye, EyeOff, Copy } from 'lucide-react';
 
 // プラン定義（src/lib/plans.ts と同期）
 const PLANS = {
@@ -64,6 +64,9 @@ export default function UsersPage() {
     const [expandedUser, setExpandedUser] = useState<string | null>(null);
     const [creditInfoMap, setCreditInfoMap] = useState<Map<string, CreditInfo>>(new Map());
     const [tokenAmount, setTokenAmount] = useState<string>('10000');
+    const [passwordInput, setPasswordInput] = useState<string>('');
+    const [showPassword, setShowPassword] = useState<boolean>(false);
+    const [settingPassword, setSettingPassword] = useState<string | null>(null);
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -219,6 +222,54 @@ export default function UsersPage() {
         } finally {
             setProcessing(null);
         }
+    };
+
+    // パスワード設定
+    const handleSetPassword = async (userId: string, password: string) => {
+        if (!password || password.length < 6) {
+            alert('パスワードは6文字以上で入力してください');
+            return;
+        }
+
+        const confirmed = window.confirm(`このユーザーのパスワードを「${password}」に設定しますか？`);
+        if (!confirmed) return;
+
+        try {
+            setSettingPassword(userId);
+            const res = await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, password }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to set password');
+            }
+
+            alert(`パスワードを設定しました: ${password}`);
+            setPasswordInput('');
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setSettingPassword(null);
+        }
+    };
+
+    // ランダムパスワード生成
+    const generateRandomPassword = () => {
+        const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let password = '';
+        for (let i = 0; i < 10; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        setPasswordInput(password);
+    };
+
+    // クリップボードにコピー
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        alert('コピーしました');
     };
 
     // ユーザー展開時にクレジット情報を取得
@@ -657,6 +708,75 @@ export default function UsersPage() {
                                                         ))}
                                                     </div>
                                                 )}
+                                            </div>
+                                        </div>
+
+                                        {/* Password Management (Admin Only) */}
+                                        <div className="mt-6 pt-4 border-t">
+                                            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                                                <Key className="w-4 h-4 text-blue-500" />
+                                                パスワード管理（テスト用）
+                                            </h4>
+                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                <p className="text-xs text-blue-700 mb-3">
+                                                    ※ セキュリティ上、パスワードはハッシュ化されて保存されているため閲覧できません。<br />
+                                                    代わりに、新しいパスワードを設定してテストに使用できます。
+                                                </p>
+                                                <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+                                                    <div className="flex-1">
+                                                        <label className="text-xs text-gray-600 mb-1 block">新しいパスワード（6文字以上）</label>
+                                                        <div className="relative">
+                                                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                            <input
+                                                                type={showPassword ? 'text' : 'password'}
+                                                                value={passwordInput}
+                                                                onChange={(e) => setPasswordInput(e.target.value)}
+                                                                className="w-full pl-9 pr-20 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px] bg-white"
+                                                                placeholder="新しいパスワード"
+                                                            />
+                                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowPassword(!showPassword)}
+                                                                    className="p-1.5 text-gray-400 hover:text-gray-600"
+                                                                    title={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+                                                                >
+                                                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                                </button>
+                                                                {passwordInput && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => copyToClipboard(passwordInput)}
+                                                                        className="p-1.5 text-gray-400 hover:text-gray-600"
+                                                                        title="コピー"
+                                                                    >
+                                                                        <Copy className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={generateRandomPassword}
+                                                            className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors min-h-[36px] whitespace-nowrap"
+                                                        >
+                                                            ランダム生成
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleSetPassword(user.id, passwordInput)}
+                                                            disabled={settingPassword === user.id || !passwordInput || passwordInput.length < 6}
+                                                            className="px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center gap-2 transition-colors min-h-[44px] whitespace-nowrap"
+                                                        >
+                                                            {settingPassword === user.id ? (
+                                                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                                            ) : (
+                                                                <Key className="w-4 h-4" />
+                                                            )}
+                                                            設定
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 

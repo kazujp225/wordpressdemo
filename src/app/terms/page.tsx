@@ -14,7 +14,7 @@ export default function TermsPage() {
                         <span className="text-sm font-medium">戻る</span>
                     </Link>
                     <Link href="/" className="text-xl font-black tracking-tighter">
-                        オタスケ
+                        オタスケ LP
                     </Link>
                 </div>
             </header>
@@ -28,7 +28,7 @@ export default function TermsPage() {
                     <section className="mb-10">
                         <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">第1条（総則）</h2>
                         <ol className="list-decimal list-inside space-y-3 text-gray-700 leading-relaxed">
-                            <li>本利用規約（以下「本規約」といいます）は、株式会社ZETTAI（以下「当社」といいます）が提供するオタスケ（以下「本サービス」といいます）の利用条件を定めるものです。</li>
+                            <li>本利用規約（以下「本規約」といいます）は、株式会社ZETTAI（以下「当社」といいます）が提供するオタスケ LP（以下「本サービス」といいます）の利用条件を定めるものです。</li>
                             <li>本サービスを利用するすべての方（以下「利用者」といいます）は、本規約に同意したものとみなされます。</li>
                             <li>本規約に同意いただけない場合、本サービスを利用することはできません。</li>
                         </ol>

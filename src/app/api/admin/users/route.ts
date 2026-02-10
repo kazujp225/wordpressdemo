@@ -137,3 +137,50 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+// POST: 管理者によるパスワード設定（テスト用途）
+export async function POST(request: NextRequest) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 管理者チェック
+    const admin = await isAdmin(user.id);
+    if (!admin) {
+        return NextResponse.json({ error: 'Forbidden: Admin only' }, { status: 403 });
+    }
+
+    try {
+        const { userId, password } = await request.json();
+
+        if (!userId || !password) {
+            return NextResponse.json({ error: 'userId and password are required' }, { status: 400 });
+        }
+
+        if (password.length < 6) {
+            return NextResponse.json({ error: 'パスワードは6文字以上である必要があります' }, { status: 400 });
+        }
+
+        // Supabase Admin APIでパスワードを更新
+        const supabaseAdmin = createSupabaseAdmin(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+            password: password,
+        });
+
+        if (error) {
+            throw error;
+        }
+
+        return NextResponse.json({ success: true, userId });
+    } catch (error: any) {
+        console.error('Failed to set user password:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}

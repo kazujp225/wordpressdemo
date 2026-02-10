@@ -324,7 +324,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                         ? JSON.parse(section.config)
                                         : section.config;
                                     config = { ...config, ...parsed };
-                                    // オタスケからの保存形式: properties.clickableAreas または clickableAreas
+                                    // オタスケ LPからの保存形式: properties.clickableAreas または clickableAreas
                                     if (parsed.properties?.clickableAreas) {
                                         config.clickableAreas = parsed.properties.clickableAreas;
                                     } else if (parsed.clickableAreas) {

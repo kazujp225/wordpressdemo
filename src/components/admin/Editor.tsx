@@ -4281,19 +4281,44 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     </div>
                                     <div className="flex-1">
                                         <label className="block text-xs font-medium text-gray-600 mb-1">リンク先</label>
-                                        <select
-                                            value={headerConfig.ctaLink || ''}
-                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
-                                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white"
-                                        >
-                                            <option value="">選択...</option>
-                                            {sections.map((section: any) => (
-                                                <option key={section.id} value={`#${section.role}`}>
-                                                    #{section.role}
-                                                </option>
-                                            ))}
-                                            <option value="#contact">#contact</option>
-                                        </select>
+                                        {(() => {
+                                            const ctaVal = headerConfig.ctaLink || '';
+                                            const sectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
+                                            const isCustom = ctaVal !== '' && !sectionOptions.includes(ctaVal);
+                                            return (
+                                                <>
+                                                    <select
+                                                        value={isCustom ? '__custom__' : ctaVal}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                ...prev,
+                                                                ctaLink: val === '__custom__' ? 'https://' : val
+                                                            }));
+                                                        }}
+                                                        className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white"
+                                                    >
+                                                        <option value="">選択...</option>
+                                                        {sections.map((section: any) => (
+                                                            <option key={section.id} value={`#${section.role}`}>
+                                                                #{section.role}
+                                                            </option>
+                                                        ))}
+                                                        <option value="#contact">#contact</option>
+                                                        <option value="__custom__">カスタムURL</option>
+                                                    </select>
+                                                    {isCustom && (
+                                                        <input
+                                                            type="text"
+                                                            value={ctaVal}
+                                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
+                                                            placeholder="https://example.com"
+                                                            className="w-full mt-1 px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                                        />
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                                 {/* ナビゲーション - アコーディオン */}
@@ -4320,27 +4345,55 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                     placeholder="ラベル"
                                                     className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
                                                 />
-                                                <select
-                                                    value={item.href}
-                                                    onChange={(e) => {
-                                                        const newHref = e.target.value;
-                                                        setHeaderConfig((prev: typeof headerConfig) => ({
-                                                            ...prev,
-                                                            navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                i === index ? { ...navItem, href: newHref } : navItem
-                                                            )
-                                                        }));
-                                                    }}
-                                                    className="w-28 px-1.5 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30 bg-white"
-                                                >
-                                                    <option value="">リンク...</option>
-                                                    {sections.map((section: any) => (
-                                                        <option key={section.id} value={`#${section.role}`}>
-                                                            #{section.role}
-                                                        </option>
-                                                    ))}
-                                                    <option value="#contact">#contact</option>
-                                                </select>
+                                                {(() => {
+                                                    const navVal = item.href || '';
+                                                    const navSectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
+                                                    const navIsCustom = navVal !== '' && !navSectionOptions.includes(navVal);
+                                                    return (
+                                                        <div className="flex flex-col">
+                                                            <select
+                                                                value={navIsCustom ? '__custom__' : navVal}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    const newHref = val === '__custom__' ? 'https://' : val;
+                                                                    setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                        ...prev,
+                                                                        navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                            i === index ? { ...navItem, href: newHref } : navItem
+                                                                        )
+                                                                    }));
+                                                                }}
+                                                                className="w-28 px-1.5 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30 bg-white"
+                                                            >
+                                                                <option value="">リンク...</option>
+                                                                {sections.map((section: any) => (
+                                                                    <option key={section.id} value={`#${section.role}`}>
+                                                                        #{section.role}
+                                                                    </option>
+                                                                ))}
+                                                                <option value="#contact">#contact</option>
+                                                                <option value="__custom__">カスタムURL</option>
+                                                            </select>
+                                                            {navIsCustom && (
+                                                                <input
+                                                                    type="text"
+                                                                    value={navVal}
+                                                                    onChange={(e) => {
+                                                                        const newHref = e.target.value;
+                                                                        setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                            ...prev,
+                                                                            navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                                i === index ? { ...navItem, href: newHref } : navItem
+                                                                            )
+                                                                        }));
+                                                                    }}
+                                                                    placeholder="https://example.com"
+                                                                    className="w-28 mt-1 px-1.5 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                                 <button
                                                     onClick={() => {
                                                         setHeaderConfig((prev: typeof headerConfig) => ({
