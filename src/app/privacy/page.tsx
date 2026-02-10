@@ -63,6 +63,9 @@ export default function PrivacyPage() {
                             <li>アップロードされた画像</li>
                             <li>生成されたコンテンツ</li>
                             <li>サービス利用状況（生成回数、使用機能等）</li>
+                            <li>利用者が登録したサードパーティAPIキー（Google、GitHub、Render等）※暗号化して保存</li>
+                            <li>クレジット残高および取引履歴（付与・消費・購入記録）</li>
+                            <li>API実行ログ（使用モデル、トークン数、コスト推定値等）</li>
                         </ul>
                     </section>
 
@@ -100,10 +103,12 @@ export default function PrivacyPage() {
 
                         <h3 className="text-lg font-bold mt-6 mb-3">5.1 AI・機械学習サービス</h3>
                         <ul className="list-disc list-inside space-y-2 text-gray-700 leading-relaxed">
-                            <li>Google Cloud Platform（Gemini API等）</li>
-                            <li>その他のAIサービスプロバイダー</li>
+                            <li>Google Gemini API（画像生成、テキスト生成、OCR等） — 送信データ：プロンプト、画像</li>
+                            <li>Anthropic Claude API（HTML生成、SEO最適化等） — 送信データ：プロンプト、テキスト</li>
                         </ul>
-                        <p className="text-gray-600 text-sm mt-2">※ これらのサービスに送信されるデータ（プロンプト、画像等）は、各サービス提供者のプライバシーポリシーに従って処理されます。</p>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
+                            <p className="text-amber-800 text-sm"><strong>重要：</strong>上記AIサービスに送信されたデータは、各サービス提供者のプライバシーポリシーに従って処理されます。機密情報や個人情報を含むプロンプトの入力はお控えください。AIサービス提供者によるモデル改善への利用の可能性があります。</p>
+                        </div>
 
                         <h3 className="text-lg font-bold mt-6 mb-3">5.2 インフラ・ホスティング</h3>
                         <ul className="list-disc list-inside space-y-2 text-gray-700 leading-relaxed">
@@ -177,8 +182,17 @@ export default function PrivacyPage() {
 
                     <section className="mb-10">
                         <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">11. 海外への情報移転</h2>
-                        <p className="text-gray-700 leading-relaxed">
-                            当社が利用する外部サービス（クラウドサービス、AI API等）のサーバーは、日本国外に所在する場合があります。この場合、利用者の情報は、当該国・地域の法令に従って処理される可能性があります。当社は、海外への情報移転にあたり、適切な安全管理措置を講じます。
+                        <p className="text-gray-700 leading-relaxed mb-4">
+                            当社のシステムインフラは以下の海外ロケーションに配置されており、利用者の情報が日本国外で処理される場合があります。
+                        </p>
+                        <ul className="list-disc list-inside space-y-2 text-gray-700 leading-relaxed">
+                            <li><strong>データベース・認証基盤</strong>：Supabase（Amazon Web Services） — ユーザーアカウント、プロジェクトデータ</li>
+                            <li><strong>AI処理</strong>：Google Gemini API / Anthropic Claude API — プロンプト、画像、テキスト</li>
+                            <li><strong>決済処理</strong>：Stripe（米国） — 決済トランザクション情報</li>
+                            <li><strong>ホスティング</strong>：Render — Webアプリケーション配信</li>
+                        </ul>
+                        <p className="text-gray-700 leading-relaxed mt-4">
+                            当社は、海外への情報移転にあたり、適切な安全管理措置を講じます。これらの国・地域には日本と異なるデータ保護法が適用される場合があります。
                         </p>
                     </section>
 

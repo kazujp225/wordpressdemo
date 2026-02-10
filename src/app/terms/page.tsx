@@ -79,6 +79,18 @@ export default function TermsPage() {
                             <li>利用料金は、当社が別途定める料金表に従うものとし、当社は料金を変更する場合、事前に利用者に通知するものとします。</li>
                             <li>支払済みの利用料金は、理由の如何を問わず返金いたしません。</li>
                             <li>利用者が利用料金の支払いを遅延した場合、年14.6%の割合による遅延損害金を支払うものとします。</li>
+                            <li>本サービスでは、API利用量に応じて消費される「クレジット」制度を採用しています。クレジットには以下の種類があります。
+                                <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+                                    <li>月間付与クレジット：有料プランの契約に基づき、毎月付与されるクレジット</li>
+                                    <li>追加購入クレジット：利用者が別途購入するクレジット</li>
+                                    <li>サービスクレジット：当社が任意に付与するクレジット（キャンペーン等）</li>
+                                </ul>
+                            </li>
+                            <li>クレジットの種類にかかわらず、すべてのクレジットは同一の残高として管理され、API利用時に消費されます。消費の際、クレジットの種類による優先順位の区別はありません。</li>
+                            <li>月間付与クレジットの未使用分は翌月以降に繰り越されます。ただし、当社は繰り越しの上限や有効期限を設定する場合があり、その場合は事前に通知いたします。</li>
+                            <li><strong>購入済みクレジットおよび付与済みクレジットの返金・換金はいたしません。</strong>プランの解約・ダウングレード時においても、残存するクレジットの返金は行いません。</li>
+                            <li>利用者が自己のAPIキーを登録して本サービスを利用する場合、当該APIの利用に係る費用は利用者の負担とし、当社はこれについて一切の責任を負いません。</li>
+                            <li>プランの変更（アップグレード・ダウングレード）時、既存のクレジット残高はそのまま引き継がれます。</li>
                         </ol>
                     </section>
 
@@ -218,7 +230,40 @@ export default function TermsPage() {
                     </section>
 
                     <section className="mb-10">
-                        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">第17条（準拠法および管轄裁判所）</h2>
+                        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">第17条（サブスクリプションの自動更新・解約）</h2>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                            <p className="text-amber-800 font-bold text-sm">重要：有料プランは自動更新契約です</p>
+                        </div>
+                        <ol className="list-decimal list-inside space-y-3 text-gray-700 leading-relaxed">
+                            <li>本サービスの有料プラン（Pro、Business、Enterprise）は、月単位の自動更新契約です。契約日から1ヶ月ごとに自動的に更新され、所定の月額料金が課金されます。</li>
+                            <li>自動更新時には、該当プランに定められたクレジットが自動的に付与されます。</li>
+                            <li>利用者は、管理画面の「設定」またはStripeカスタマーポータルから、いつでもサブスクリプションの解約（キャンセル）を申請できます。</li>
+                            <li>解約を申請した場合、当該請求期間の終了日をもってサブスクリプションは終了します。請求期間中は引き続きサービスを利用できます。</li>
+                            <li>解約後、残存するクレジット残高の返金はいたしません。</li>
+                            <li>解約後も、同じメールアドレスで再度プランに申し込むことが可能です。</li>
+                        </ol>
+                    </section>
+
+                    <section className="mb-10">
+                        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">第18条（アカウント削除・退会）</h2>
+                        <ol className="list-decimal list-inside space-y-3 text-gray-700 leading-relaxed">
+                            <li>利用者は、当社所定の方法によりいつでも退会を申請できます。</li>
+                            <li>退会時には、以下のデータが削除されます。
+                                <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+                                    <li>アカウント情報（認証情報、メールアドレス等）</li>
+                                    <li>ユーザー設定（APIキー、プロフィール等）</li>
+                                    <li>作成したページおよびメディアデータ</li>
+                                    <li>クレジット残高（返金なく消滅）</li>
+                                </ul>
+                            </li>
+                            <li>API利用ログは統計処理後に匿名化して保存する場合があります。Stripe決済履歴は法令に基づき保持されます。</li>
+                            <li>退会前に、作成済みのコンテンツについては利用者の責任においてバックアップしてください。</li>
+                            <li>有料プラン契約中の退会の場合、サブスクリプションも同時に解約されます。日割り返金はいたしません。</li>
+                        </ol>
+                    </section>
+
+                    <section className="mb-10">
+                        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">第19条（準拠法および管轄裁判所）</h2>
                         <ol className="list-decimal list-inside space-y-3 text-gray-700 leading-relaxed">
                             <li>本規約は、日本法に準拠し、日本法に従って解釈されるものとします。</li>
                             <li>本規約に関する一切の紛争については、東京地方裁判所を第一審の専属的合意管轄裁判所とします。</li>
@@ -226,7 +271,7 @@ export default function TermsPage() {
                     </section>
 
                     <section className="mb-10">
-                        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">第18条（お問い合わせ）</h2>
+                        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-200">第20条（お問い合わせ）</h2>
                         <p className="text-gray-700 leading-relaxed">
                             本規約に関するお問い合わせは、以下の連絡先までお願いいたします。
                         </p>

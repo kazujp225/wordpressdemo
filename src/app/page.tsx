@@ -171,8 +171,8 @@ export default function LoginPage() {
 
       {/* Footer */}
       <footer className="border-t border-gray-100 mt-16">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <p className="text-sm text-center text-muted-foreground">
+        <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col items-center gap-2">
+          <p className="text-sm text-muted-foreground">
             © 2024 オタスケ LP All rights reserved.
           </p>
         </div>
