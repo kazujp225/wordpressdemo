@@ -1,9 +1,14 @@
 "use client";
 
-import { PlayCircle, ExternalLink } from 'lucide-react';
+import { PlayCircle } from 'lucide-react';
 
-// TODO: 実際のYouTubeチャンネルURLに差し替え
-const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@otasuke-lp";
+const TUTORIAL_VIDEOS = [
+    {
+        id: 'tknr6vbsNOM',
+        title: 'LP作成ツール説明動画',
+        description: 'オタスケ LPの基本的な使い方を解説しています。',
+    },
+];
 
 export default function TutorialsPage() {
     return (
@@ -18,26 +23,24 @@ export default function TutorialsPage() {
                 </p>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-                <div className="mx-auto w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
-                    <PlayCircle className="h-8 w-8 text-red-500" />
-                </div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    YouTubeチャンネルで動画を視聴
-                </h2>
-                <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
-                    基本的な操作方法から応用テクニックまで、限定公開の説明動画をご用意しています。
-                </p>
-                <a
-                    href={YOUTUBE_CHANNEL_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
-                >
-                    <PlayCircle className="h-5 w-5" />
-                    動画を見る
-                    <ExternalLink className="h-4 w-4" />
-                </a>
+            <div className="space-y-6">
+                {TUTORIAL_VIDEOS.map((video) => (
+                    <div key={video.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="aspect-video">
+                            <iframe
+                                src={`https://www.youtube.com/embed/${video.id}`}
+                                title={video.title}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                className="w-full h-full"
+                            />
+                        </div>
+                        <div className="p-5">
+                            <h2 className="text-lg font-semibold text-gray-900">{video.title}</h2>
+                            <p className="mt-1 text-sm text-gray-500">{video.description}</p>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
