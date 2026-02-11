@@ -168,7 +168,8 @@ export type GenerationType =
     | 'ocr'
     | 'text-fix'
     | 'claude-generate'
-    | 'claude-edit-code';
+    | 'claude-edit-code'
+    | 'banner-generate';
 
 export interface GenerationRun {
     id: number;

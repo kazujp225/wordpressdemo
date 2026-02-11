@@ -63,9 +63,33 @@ model MediaImage {
   createdAt       DateTime      @default(now())
   desktopSections PageSection[] @relation("DesktopImage")
   mobileSections  PageSection[] @relation("MobileImage")
+  banners         Banner[]      @relation("BannerImage")
 
   @@index([userId])
   @@index([sourceUrl])
+}
+
+model Banner {
+  id                Int        @id @default(autoincrement())
+  userId            String
+  title             String
+  platform          String     // google-display, facebook, instagram, line, x, youtube, custom
+  width             Int
+  height            Int
+  presetName        String?    // プリセット名（例: "Leaderboard 728x90"）
+  prompt            String?    @db.Text
+  productInfo       String?    @db.Text
+  imageId           Int?
+  image             MediaImage? @relation("BannerImage", fields: [imageId], references: [id])
+  referenceImageUrl String?
+  status            String     @default("draft") // draft, generated, saved
+  metadata          String?    @db.Text // JSON: 追加メタ情報
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([platform])
+  @@index([userId, updatedAt])
 }
 
 model GenerationRun {

@@ -34,7 +34,8 @@ export type GenerationType =
   | 'seo-llmo-combined'
   | 'suggest-benefits'
   | 'extract-background-color'
-  | 'outpaint';
+  | 'outpaint'
+  | 'banner-generate';
 
 export interface LogGenerationParams {
   userId?: string | null;

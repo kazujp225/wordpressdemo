@@ -69,6 +69,14 @@ export function useAdminSettings() {
     });
 }
 
+// バナー一覧フック
+export function useBanners() {
+    return useSWR('/api/banners', fetcher, {
+        ...swrConfig,
+        revalidateOnMount: true,
+    });
+}
+
 // プリフェッチ関数（Sidebar用）
 export async function prefetchAdminData() {
     const urls = [
