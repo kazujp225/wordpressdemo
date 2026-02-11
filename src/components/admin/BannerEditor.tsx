@@ -168,7 +168,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     const [imageHistory, setImageHistory] = useState<string[]>([]);
 
     // ── Variations State ─────────────────────────
-    const [variationSegments, setVariationSegments] = useState<string[]>(['', '']);
+    const [variationCount, setVariationCount] = useState(4);
     const [variationResults, setVariationResults] = useState<VariationResult[]>([]);
     const [selectedVariationIndex, setSelectedVariationIndex] = useState<number | null>(null);
     const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
@@ -177,10 +177,6 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     const variationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const variationResultsRef = useRef<HTMLDivElement>(null);
     const [hoveredVariationIndex, setHoveredVariationIndex] = useState<number | null>(null);
-
-    // ── Derived Variation Count ──────────────────
-    const activeSegments = variationSegments.filter(s => s.trim());
-    const variationCount = activeSegments.length;
 
     // ── Credit Balance ───────────────────────────
     const [creditBalance, setCreditBalance] = useState<number | null>(null);
@@ -242,7 +238,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
 
     // ── Load Canvas Image ────────────────────────
     useEffect(() => {
-        if (!generatedImageUrl || editorMode !== 'edit') return;
+        if (!generatedImageUrl || (editorMode !== 'edit' && editorMode !== 'variations')) return;
 
         const img = new window.Image();
         img.crossOrigin = 'anonymous';
@@ -793,15 +789,24 @@ export function BannerEditor({ banner }: BannerEditorProps) {
             toast.error('元画像が必要です。先に画像を生成またはアップロードしてください');
             return;
         }
-        const segments = variationSegments.filter(s => s.trim());
-        if (segments.length < 2) {
-            toast.error('2つ以上のセグメントを入力してください');
+        if (!prompt.trim()) {
+            toast.error('修正指示を入力してください');
             return;
         }
 
-        const initialResults: VariationResult[] = segments.map(s => ({
+        // Build masks from selections (normalized 0-1 ratios)
+        const masks = canvasImage && selections.length > 0
+            ? selections.map(s => ({
+                x: s.x / canvasImage.width,
+                y: s.y / canvasImage.height,
+                width: s.width / canvasImage.width,
+                height: s.height / canvasImage.height,
+            }))
+            : [];
+
+        const initialResults: VariationResult[] = Array.from({ length: variationCount }, (_, i) => ({
             status: 'loading' as const,
-            angle: s.trim(),
+            angle: `バリエーション ${i + 1}`,
         }));
 
         setVariationResults(initialResults);
@@ -809,75 +814,80 @@ export function BannerEditor({ banner }: BannerEditorProps) {
         setIsGeneratingVariations(true);
         setVariationsCompletedCount(0);
 
-        const promises = segments.map(async (seg, index) => {
-            const segmentLabel = seg.trim();
-            try {
-                const res = await fetch('/api/ai/generate-banner', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        prompt: prompt || '',
-                        productInfo,
-                        referenceImageUrl: generatedImageUrl,
-                        width,
-                        height,
-                        platform,
-                        segment: segmentLabel,
-                    }),
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    setVariationResults(prev => {
-                        const next = [...prev];
-                        next[index] = {
-                            status: 'error',
-                            angle: segmentLabel,
-                            error: data.message || data.error || '生成に失敗しました',
-                        };
-                        return next;
-                    });
-                } else if (data.success && data.media) {
-                    setVariationResults(prev => {
-                        const next = [...prev];
-                        next[index] = {
-                            status: 'success',
-                            imageUrl: data.media.filePath,
-                            imageId: data.media.id,
-                            angle: segmentLabel,
-                        };
-                        return next;
-                    });
-                } else {
-                    setVariationResults(prev => {
-                        const next = [...prev];
-                        next[index] = {
-                            status: 'error',
-                            angle: segmentLabel,
-                            error: data.message || '画像を生成できませんでした',
-                        };
-                        return next;
-                    });
-                }
-            } catch {
-                setVariationResults(prev => {
-                    const next = [...prev];
-                    next[index] = {
-                        status: 'error',
-                        angle: segmentLabel,
-                        error: '通信エラーが発生しました',
+        const promises = Array.from({ length: variationCount }, (_, index) => {
+            const label = `バリエーション ${index + 1}`;
+            return (async () => {
+                try {
+                    const body: Record<string, unknown> = {
+                        imageUrl: generatedImageUrl,
+                        prompt: prompt.trim(),
+                        originalWidth: canvasImage?.width || width,
+                        originalHeight: canvasImage?.height || height,
                     };
-                    return next;
-                });
-            } finally {
-                setVariationsCompletedCount(prev => prev + 1);
-            }
+                    if (masks.length > 0) {
+                        body.masks = masks;
+                        body.mask = masks[0];
+                    }
+
+                    const res = await fetch('/api/ai/inpaint', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                    });
+
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        setVariationResults(prev => {
+                            const next = [...prev];
+                            next[index] = {
+                                status: 'error',
+                                angle: label,
+                                error: data.message || data.error || '生成に失敗しました',
+                            };
+                            return next;
+                        });
+                    } else if (data.success && data.media) {
+                        setVariationResults(prev => {
+                            const next = [...prev];
+                            next[index] = {
+                                status: 'success',
+                                imageUrl: data.media.filePath,
+                                imageId: data.media.id,
+                                angle: label,
+                            };
+                            return next;
+                        });
+                    } else {
+                        setVariationResults(prev => {
+                            const next = [...prev];
+                            next[index] = {
+                                status: 'error',
+                                angle: label,
+                                error: data.message || '画像を生成できませんでした',
+                            };
+                            return next;
+                        });
+                    }
+                } catch {
+                    setVariationResults(prev => {
+                        const next = [...prev];
+                        next[index] = {
+                            status: 'error',
+                            angle: label,
+                            error: '通信エラーが発生しました',
+                        };
+                        return next;
+                    });
+                } finally {
+                    setVariationsCompletedCount(prev => prev + 1);
+                }
+            })();
         });
 
         await Promise.allSettled(promises);
         setIsGeneratingVariations(false);
-    }, [generatedImageUrl, variationSegments, prompt, productInfo, width, height, platform]);
+    }, [generatedImageUrl, prompt, canvasImage, selections, width, height, variationCount]);
 
     // ── Adopt Variation ──────────────────────────
     const handleAdoptVariation = useCallback(() => {
@@ -894,27 +904,39 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     const handleRetryVariation = useCallback(async (index: number) => {
         const result = variationResults[index];
         if (!result || !generatedImageUrl) return;
-        const segmentLabel = result.angle;
+        const label = result.angle;
 
         setVariationResults(prev => {
             const next = [...prev];
-            next[index] = { status: 'loading', angle: segmentLabel };
+            next[index] = { status: 'loading', angle: label };
             return next;
         });
 
+        const masks = canvasImage && selections.length > 0
+            ? selections.map(s => ({
+                x: s.x / canvasImage.width,
+                y: s.y / canvasImage.height,
+                width: s.width / canvasImage.width,
+                height: s.height / canvasImage.height,
+            }))
+            : [];
+
         try {
-            const res = await fetch('/api/ai/generate-banner', {
+            const body: Record<string, unknown> = {
+                imageUrl: generatedImageUrl,
+                prompt: prompt.trim(),
+                originalWidth: canvasImage?.width || width,
+                originalHeight: canvasImage?.height || height,
+            };
+            if (masks.length > 0) {
+                body.masks = masks;
+                body.mask = masks[0];
+            }
+
+            const res = await fetch('/api/ai/inpaint', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: prompt || '',
-                    productInfo,
-                    referenceImageUrl: generatedImageUrl,
-                    width,
-                    height,
-                    platform,
-                    segment: segmentLabel,
-                }),
+                body: JSON.stringify(body),
             });
 
             const data = await res.json();
@@ -924,7 +946,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                     const next = [...prev];
                     next[index] = {
                         status: 'error',
-                        angle: segmentLabel,
+                        angle: label,
                         error: data.message || data.error || '生成に失敗しました',
                     };
                     return next;
@@ -936,7 +958,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                         status: 'success',
                         imageUrl: data.media.filePath,
                         imageId: data.media.id,
-                        angle: segmentLabel,
+                        angle: label,
                     };
                     return next;
                 });
@@ -945,7 +967,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                     const next = [...prev];
                     next[index] = {
                         status: 'error',
-                        angle: segmentLabel,
+                        angle: label,
                         error: data.message || '画像を生成できませんでした',
                     };
                     return next;
@@ -956,13 +978,13 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                 const next = [...prev];
                 next[index] = {
                     status: 'error',
-                    angle: segmentLabel,
+                    angle: label,
                     error: '通信エラーが発生しました',
                 };
                 return next;
             });
         }
-    }, [variationResults, generatedImageUrl, prompt, productInfo, width, height, platform]);
+    }, [variationResults, generatedImageUrl, prompt, canvasImage, selections, width, height]);
 
     // ── Render ────────────────────────────────────
     return (
@@ -1137,7 +1159,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             </div>
                         )
                     ) : editorMode === 'variations' ? (
-                        // Variations grid
+                        // Variations: canvas for selection (no results) or grid (with results)
                         variationResults.length > 0 ? (
                             <div className="w-full flex flex-col">
                                 <div
@@ -1330,29 +1352,101 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                 </div>
                             </div>
                         ) : (
-                            // Empty state for variations
-                            <div className="flex flex-col items-center justify-center p-10 text-center max-w-sm">
-                                <div className="relative mb-5">
-                                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 flex items-center justify-center">
-                                        <LayoutGrid className="h-9 w-9 text-indigo-400" />
+                            // Canvas for region selection (before generation)
+                            generatedImageUrl ? (
+                                <div className="w-full h-full flex flex-col">
+                                    <div
+                                        ref={containerRef}
+                                        className="relative flex-1 bg-surface-100 rounded-lg overflow-hidden"
+                                    >
+                                        <div
+                                            className="absolute inset-0 opacity-[0.03]"
+                                            style={{
+                                                backgroundImage: 'linear-gradient(45deg, #000 25%, transparent 25%), linear-gradient(-45deg, #000 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #000 75%), linear-gradient(-45deg, transparent 75%, #000 75%)',
+                                                backgroundSize: '20px 20px',
+                                                backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+                                            }}
+                                        />
+                                        <canvas
+                                            ref={canvasRef}
+                                            className={`w-full h-full relative z-10 ${
+                                                tool === 'select' ? 'cursor-crosshair' : 'cursor-grab'
+                                            }`}
+                                            onMouseDown={handleCanvasMouseDown}
+                                            onMouseMove={handleCanvasMouseMove}
+                                            onMouseUp={handleCanvasMouseUp}
+                                            onMouseLeave={handleCanvasMouseUp}
+                                        />
                                     </div>
-                                    {/* Decorative dots */}
-                                    <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-indigo-200 animate-pulse" />
-                                    <div className="absolute -bottom-1 -left-1 w-2 h-2 rounded-full bg-violet-200 animate-pulse" style={{ animationDelay: '0.5s' }} />
+                                    {/* Canvas toolbar */}
+                                    <div className="flex items-center justify-center gap-2 mt-3">
+                                        <button
+                                            onClick={handleZoomIn}
+                                            className="p-2 rounded-md bg-surface-100 text-muted-foreground hover:bg-surface-200 hover:text-foreground transition-colors"
+                                            title="ズームイン"
+                                        >
+                                            <ZoomIn className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            onClick={handleZoomOut}
+                                            className="p-2 rounded-md bg-surface-100 text-muted-foreground hover:bg-surface-200 hover:text-foreground transition-colors"
+                                            title="ズームアウト"
+                                        >
+                                            <ZoomOut className="h-4 w-4" />
+                                        </button>
+                                        <div className="w-px h-5 bg-border mx-1" />
+                                        <button
+                                            onClick={() => setTool('select')}
+                                            className={clsx(
+                                                'p-2 rounded-md transition-colors',
+                                                tool === 'select'
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'bg-surface-100 text-muted-foreground hover:bg-surface-200 hover:text-foreground'
+                                            )}
+                                            title="選択ツール"
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setTool('pan')}
+                                            className={clsx(
+                                                'p-2 rounded-md transition-colors',
+                                                tool === 'pan'
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'bg-surface-100 text-muted-foreground hover:bg-surface-200 hover:text-foreground'
+                                            )}
+                                            title="パンツール"
+                                        >
+                                            <Hand className="h-4 w-4" />
+                                        </button>
+                                        <div className="w-px h-5 bg-border mx-1" />
+                                        <p className="text-xs text-muted-foreground font-mono">
+                                            {canvasImage ? `${canvasImage.width} × ${canvasImage.height} px` : `${width} × ${height} px`}
+                                        </p>
+                                        {selections.length > 0 && (
+                                            <>
+                                                <div className="w-px h-5 bg-border mx-1" />
+                                                <span className="text-xs text-indigo-600 font-bold">
+                                                    {selections.length}箇所選択中
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                                <p className="text-sm font-bold text-foreground">セグメント別バリエーション</p>
-                                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                                    {generatedImageUrl
-                                        ? <>元画像をベースに、セグメント（ターゲット層）ごとの<br />バリエーションを一括生成できます</>
-                                        : <>先に画像を生成またはアップロードしてから<br />セグメント別のバリエーションを作成できます</>
-                                    }
-                                </p>
-                                <div className="flex items-center gap-1 mt-4 text-[10px] text-muted-foreground/60">
-                                    <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-                                    右パネルでセグメントを設定して生成
-                                    <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                            ) : (
+                                // No image empty state
+                                <div className="flex flex-col items-center justify-center p-10 text-center max-w-sm">
+                                    <div className="relative mb-5">
+                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 flex items-center justify-center">
+                                            <ImageIcon className="h-9 w-9 text-indigo-400" />
+                                        </div>
+                                    </div>
+                                    <p className="text-sm font-bold text-foreground">元画像が必要です</p>
+                                    <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                                        先に「新規生成」または「画像編集」タブで<br />画像を作成してください
+                                    </p>
                                 </div>
-                            </div>
+                            )
                         )
                     ) : (
                         // Generate mode preview (existing)
@@ -1648,141 +1742,131 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                     ) : editorMode === 'variations' ? (
                         // ── Variations Mode Controls ──
                         <>
-                            {/* Reference Image Preview */}
-                            <div className="rounded-lg border border-border overflow-hidden">
-                                <div className="px-3 py-2.5 bg-surface-50 border-b border-border">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Reference Image</p>
-                                </div>
-                                {generatedImageUrl ? (
-                                    <div className="p-3 flex items-center gap-3">
-                                        <div className="w-14 h-14 rounded-lg overflow-hidden border border-border bg-white shrink-0 shadow-sm">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={generatedImageUrl} alt="Reference" className="w-full h-full object-contain" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-xs font-bold text-foreground truncate">{title || 'バナー画像'}</p>
-                                            <p className="text-[10px] text-muted-foreground mt-0.5">{width} × {height}px</p>
-                                            <p className="text-[10px] text-emerald-600 font-medium mt-0.5">この画像をベースに生成</p>
-                                        </div>
+                            {/* Selected Regions */}
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
+                                    選択範囲
+                                </label>
+                                {selections.length > 0 ? (
+                                    <div className="space-y-1.5">
+                                        {selections.map((sel, idx) => (
+                                            <div
+                                                key={sel.id}
+                                                className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-surface-50 border border-border"
+                                            >
+                                                <div className={clsx('w-3 h-3 rounded-full shrink-0', SELECTION_BG_COLORS[idx % SELECTION_BG_COLORS.length])} />
+                                                <span className="text-xs text-foreground font-medium flex-1">
+                                                    領域 {idx + 1}
+                                                    <span className="text-muted-foreground ml-1.5 font-mono text-[10px]">
+                                                        {Math.round(sel.width)}×{Math.round(sel.height)}
+                                                    </span>
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeSelection(sel.id)}
+                                                    className="p-1 text-muted-foreground hover:text-red-500 rounded transition-colors"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={clearAllSelections}
+                                            className="text-[11px] font-bold text-muted-foreground hover:text-red-500 transition-colors"
+                                        >
+                                            すべてクリア
+                                        </button>
                                     </div>
                                 ) : (
-                                    <div className="p-4 text-center">
-                                        <ImageIcon className="h-6 w-6 text-muted-foreground/40 mx-auto mb-1.5" />
-                                        <p className="text-xs text-muted-foreground">元画像がありません</p>
-                                        <p className="text-[10px] text-muted-foreground/70 mt-0.5">先に画像を生成またはアップロードしてください</p>
+                                    <div className="px-3 py-4 rounded-lg border border-dashed border-border text-center">
+                                        <p className="text-xs text-muted-foreground">
+                                            {generatedImageUrl
+                                                ? '左の画像上でドラッグして範囲を選択（任意）'
+                                                : '元画像がありません'}
+                                        </p>
+                                        <p className="text-[10px] text-muted-foreground/60 mt-1">
+                                            選択なしの場合は画像全体が対象
+                                        </p>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Segments Input */}
+                            {/* Variation Count */}
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
-                                    Segments
+                                    Variation Count
                                 </label>
-                                <div className="space-y-2">
-                                    {variationSegments.map((seg, idx) => (
-                                        <div key={idx} className="flex items-center gap-2">
-                                            <span className="text-[10px] font-bold text-muted-foreground w-4 text-right shrink-0">{idx + 1}.</span>
-                                            <input
-                                                type="text"
-                                                value={seg}
-                                                onChange={(e) => {
-                                                    setVariationSegments(prev => prev.map((s, i) => i === idx ? e.target.value : s));
-                                                }}
-                                                disabled={isGeneratingVariations}
-                                                placeholder="例: 20代女性、ビジネスマン..."
-                                                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
-                                            />
-                                            {variationSegments.length > 2 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setVariationSegments(prev => prev.filter((_, i) => i !== idx))}
-                                                    disabled={isGeneratingVariations}
-                                                    className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-md transition-all disabled:opacity-50 shrink-0"
-                                                >
-                                                    <X className="h-3.5 w-3.5" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {variationSegments.length < 6 && (
+                                <div className={clsx(
+                                    'flex gap-1.5 bg-surface-100 p-1 rounded-lg border border-border transition-opacity',
+                                    isGeneratingVariations && 'opacity-50 pointer-events-none'
+                                )}>
+                                    {[2, 3, 4, 5, 6].map((n) => (
                                         <button
-                                            type="button"
-                                            onClick={() => setVariationSegments(prev => [...prev, ''])}
+                                            key={n}
+                                            onClick={() => setVariationCount(n)}
                                             disabled={isGeneratingVariations}
-                                            className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-500 transition-colors disabled:opacity-50 ml-6"
+                                            className={clsx(
+                                                'flex-1 rounded-md py-2 text-xs font-bold transition-all duration-200',
+                                                variationCount === n
+                                                    ? 'bg-background text-foreground shadow-sm'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            )}
                                         >
-                                            <Plus className="h-3.5 w-3.5" />
-                                            セグメントを追加
+                                            {n}枚
                                         </button>
-                                    )}
+                                    ))}
                                 </div>
                             </div>
 
                             {/* Estimated Cost */}
-                            {variationCount >= 2 && (
-                                <div className="rounded-lg border border-border overflow-hidden">
-                                    <div className="p-3 bg-gradient-to-r from-surface-50 to-indigo-50/30">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">推定コスト</p>
-                                            <span className="text-[10px] text-muted-foreground font-mono">
-                                                {variationCount}枚 x {formatTokens(usdToTokens(INPAINT_COST_USD))}
-                                            </span>
-                                        </div>
-                                        <p className="text-lg font-black text-foreground mt-1 tracking-tight">
-                                            {formatTokens(usdToTokens(variationCount * INPAINT_COST_USD))}
-                                            <span className="text-xs font-normal text-muted-foreground ml-1.5">
-                                                クレジット
-                                            </span>
-                                        </p>
-                                        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                                            ${(variationCount * INPAINT_COST_USD).toFixed(3)} USD
-                                        </p>
+                            <div className="rounded-lg border border-border overflow-hidden">
+                                <div className="p-3 bg-gradient-to-r from-surface-50 to-indigo-50/30">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">推定コスト</p>
+                                        <span className="text-[10px] text-muted-foreground font-mono">
+                                            {variationCount}枚 x {formatTokens(usdToTokens(INPAINT_COST_USD))}
+                                        </span>
                                     </div>
-                                    {creditBalance !== null && (
-                                        <div className="px-3 py-2 bg-surface-50 border-t border-border">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className="text-[10px] text-muted-foreground">残高</span>
-                                                <span className={clsx(
-                                                    'text-[10px] font-bold',
-                                                    hasInsufficientCredit ? 'text-red-500' : 'text-emerald-600'
-                                                )}>
-                                                    {formatTokens(usdToTokens(creditBalance))}
-                                                </span>
-                                            </div>
-                                            <div className="w-full bg-surface-200 rounded-full h-1">
-                                                <div
-                                                    className={clsx(
-                                                        'h-full rounded-full transition-all duration-500',
-                                                        hasInsufficientCredit ? 'bg-red-400' : 'bg-emerald-500'
-                                                    )}
-                                                    style={{ width: `${Math.min(100, ((creditBalance - requiredCreditUsd) / creditBalance) * 100)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
+                                    <p className="text-lg font-black text-foreground mt-1 tracking-tight">
+                                        {formatTokens(usdToTokens(variationCount * INPAINT_COST_USD))}
+                                        <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                                            クレジット
+                                        </span>
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                                        ${(variationCount * INPAINT_COST_USD).toFixed(3)} USD
+                                    </p>
                                 </div>
-                            )}
+                                {creditBalance !== null && (
+                                    <div className="px-3 py-2 bg-surface-50 border-t border-border">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-[10px] text-muted-foreground">残高</span>
+                                            <span className={clsx(
+                                                'text-[10px] font-bold',
+                                                hasInsufficientCredit ? 'text-red-500' : 'text-emerald-600'
+                                            )}>
+                                                {formatTokens(usdToTokens(creditBalance))}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-surface-200 rounded-full h-1">
+                                            <div
+                                                className={clsx(
+                                                    'h-full rounded-full transition-all duration-500',
+                                                    hasInsufficientCredit ? 'bg-red-400' : 'bg-emerald-500'
+                                                )}
+                                                style={{ width: `${Math.min(100, ((creditBalance - requiredCreditUsd) / creditBalance) * 100)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Divider */}
                             <div className="flex items-center gap-3">
                                 <div className="h-px flex-1 bg-border" />
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Content</span>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">修正内容</span>
                                 <div className="h-px flex-1 bg-border" />
-                            </div>
-
-                            {/* Product Info */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    Product Info
-                                </label>
-                                <textarea
-                                    value={productInfo}
-                                    onChange={(e) => setProductInfo(e.target.value)}
-                                    placeholder="商材・サービスの説明（任意）..."
-                                    rows={3}
-                                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                                />
                             </div>
 
                             {/* Modification Instructions */}
@@ -1793,14 +1877,14 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                 <textarea
                                     value={prompt}
                                     onChange={(e) => setPrompt(e.target.value)}
-                                    placeholder="各セグメント共通の修正指示（任意）..."
-                                    rows={3}
+                                    placeholder="例: CTAボタンを目立たせて、背景を暖色系に..."
+                                    rows={4}
                                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                 />
                             </div>
 
                             {/* Credit Warning */}
-                            {hasInsufficientCredit && variationCount >= 2 && (
+                            {hasInsufficientCredit && (
                                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                                     <p className="text-xs text-amber-700 font-bold flex items-center gap-2">
                                         <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1823,22 +1907,22 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                     disabled={
                                         isGeneratingVariations ||
                                         isLoadingCredit ||
-                                        (variationCount >= 2 && hasInsufficientCredit) ||
+                                        hasInsufficientCredit ||
                                         !generatedImageUrl ||
-                                        variationCount < 2
+                                        !prompt.trim()
                                     }
                                     className={clsx(
                                         'w-full rounded-lg py-3.5 text-sm font-bold text-white transition-all duration-200 flex items-center justify-center gap-2 shadow-sm relative overflow-hidden',
                                         isGeneratingVariations
                                             ? 'bg-indigo-600'
-                                            : !generatedImageUrl || variationCount < 2 || hasInsufficientCredit
+                                            : !generatedImageUrl || !prompt.trim() || hasInsufficientCredit
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 hover:shadow-md hover:shadow-indigo-500/25 active:scale-[0.98]',
                                         'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100'
                                     )}
                                 >
                                     {/* Inline progress bar behind text */}
-                                    {isGeneratingVariations && variationCount > 0 && (
+                                    {isGeneratingVariations && (
                                         <div
                                             className="absolute inset-0 bg-indigo-500/30 transition-all duration-700 ease-out"
                                             style={{ width: `${(variationsCompletedCount / variationCount) * 100}%` }}
@@ -1854,11 +1938,6 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                             <>
                                                 <ImageIcon className="h-4 w-4" />
                                                 元画像が必要です
-                                            </>
-                                        ) : variationCount < 2 ? (
-                                            <>
-                                                <AlertTriangle className="h-4 w-4" />
-                                                2つ以上のセグメントが必要
                                             </>
                                         ) : hasInsufficientCredit ? (
                                             <>
@@ -1876,12 +1955,23 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                         ) : (
                                             <>
                                                 <Sparkles className="h-4 w-4" />
-                                                セグメント別生成 ({variationCount}枚)
+                                                バリエーション生成 ({variationCount}枚)
                                             </>
                                         )}
                                     </span>
                                 </button>
                             </div>
+
+                            {/* Back to selection button (when results exist) */}
+                            {variationResults.length > 0 && !isGeneratingVariations && (
+                                <button
+                                    type="button"
+                                    onClick={() => setVariationResults([])}
+                                    className="w-full text-xs font-bold text-muted-foreground hover:text-foreground transition-colors py-2"
+                                >
+                                    ← 選択画面に戻る
+                                </button>
+                            )}
 
                             {/* Results summary & Adopt */}
                             {variationResults.length > 0 && (
