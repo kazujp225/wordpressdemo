@@ -7,7 +7,7 @@ import {
     ZoomIn, ZoomOut, Hand, Trash2, Plus, Wand2, Sparkles,
     Paintbrush, Type, Box, Image as ImageIcon, PenTool, MessageSquare,
     UserPlus, AlertTriangle, Copy, Check, RefreshCw, LayoutGrid,
-    Eye,
+    Eye, ChevronDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -15,6 +15,8 @@ import toast from 'react-hot-toast';
 import { BANNER_PLATFORMS, type BannerSizePreset } from '@/lib/banner-presets';
 import type { Banner, BannerPlatform } from '@/types/banner';
 import { usdToTokens, formatTokens } from '@/lib/plans';
+import { useUserSettings } from '@/lib/hooks/useAdminData';
+import { UpgradeBanner } from './UpgradeBanner';
 
 // ── Types ──────────────────────────────────────────
 interface BannerEditorProps {
@@ -138,6 +140,11 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
+    // ── Higgsfield UI dropdown state ──────────────
+    const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
+    const [showSizeDropdown, setShowSizeDropdown] = useState(false);
+    const [showSegmentInput, setShowSegmentInput] = useState(false);
+
     // ── Mode State ───────────────────────────────
     const hasExistingImage = !!(banner?.image?.filePath);
     const [editorMode, setEditorMode] = useState<EditorMode>(hasExistingImage ? 'edit' : 'generate');
@@ -178,6 +185,10 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     const variationResultsRef = useRef<HTMLDivElement>(null);
     const [hoveredVariationIndex, setHoveredVariationIndex] = useState<number | null>(null);
 
+    // ── Plan Check ─────────────────────────────
+    const { data: userSettings } = useUserSettings();
+    const isFreePlan = userSettings?.plan === 'free';
+
     // ── Credit Balance ───────────────────────────
     const [creditBalance, setCreditBalance] = useState<number | null>(null);
     const [isLoadingCredit, setIsLoadingCredit] = useState(true);
@@ -206,6 +217,21 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     // Sync refs
     useEffect(() => { currentSelectionRef.current = currentSelection; }, [currentSelection]);
     useEffect(() => { isSelectingRef.current = isSelecting; }, [isSelecting]);
+
+    // ── Close dropdowns on outside click ─────────
+    useEffect(() => {
+        if (!showPlatformDropdown && !showSizeDropdown && !showSegmentInput) return;
+        const handler = (e: MouseEvent) => {
+            const t = e.target as HTMLElement;
+            if (!t.closest('[data-dropdown]')) {
+                setShowPlatformDropdown(false);
+                setShowSizeDropdown(false);
+                setShowSegmentInput(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showPlatformDropdown, showSizeDropdown, showSegmentInput]);
 
     // ── Variation Elapsed Timer ──────────────────
     useEffect(() => {
@@ -1488,10 +1514,13 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                     {/* Mode Tabs */}
                     <div className="flex items-center bg-surface-100 rounded-lg p-1 border border-border">
                         <button
-                            onClick={() => handleModeChange('edit')}
+                            onClick={() => !isFreePlan && handleModeChange('edit')}
+                            disabled={isFreePlan}
                             className={clsx(
                                 'flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-bold transition-all',
-                                editorMode === 'edit'
+                                isFreePlan
+                                    ? 'text-muted-foreground/50 cursor-not-allowed'
+                                    : editorMode === 'edit'
                                     ? 'bg-background text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground'
                             )}
@@ -1500,10 +1529,13 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             画像編集
                         </button>
                         <button
-                            onClick={() => handleModeChange('generate')}
+                            onClick={() => !isFreePlan && handleModeChange('generate')}
+                            disabled={isFreePlan}
                             className={clsx(
                                 'flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-bold transition-all',
-                                editorMode === 'generate'
+                                isFreePlan
+                                    ? 'text-muted-foreground/50 cursor-not-allowed'
+                                    : editorMode === 'generate'
                                     ? 'bg-background text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground'
                             )}
@@ -1512,10 +1544,13 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             新規生成
                         </button>
                         <button
-                            onClick={() => handleModeChange('variations')}
+                            onClick={() => !isFreePlan && handleModeChange('variations')}
+                            disabled={isFreePlan}
                             className={clsx(
                                 'flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-bold transition-all',
-                                editorMode === 'variations'
+                                isFreePlan
+                                    ? 'text-muted-foreground/50 cursor-not-allowed'
+                                    : editorMode === 'variations'
                                     ? 'bg-background text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground'
                             )}
@@ -1524,6 +1559,10 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             複製生成
                         </button>
                     </div>
+
+                    {isFreePlan && (
+                        <UpgradeBanner feature="AI画像生成・編集・複製" />
+                    )}
 
                     {editorMode === 'edit' ? (
                         // ── Edit Mode Controls ──
@@ -2093,140 +2132,161 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             )}
                         </>
                     ) : (
-                        // ── Generate Mode Controls (existing) ──
+                        // ── Generate Mode Controls (Higgsfield-style) ──
                         <>
-                            {/* Platform Selection */}
+                            {/* Prompt Input */}
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    Platform
-                                </label>
-                                <div className="grid grid-cols-4 gap-1.5">
-                                    {BANNER_PLATFORMS.map((p) => (
-                                        <button
-                                            key={p.id}
-                                            onClick={() => handlePlatformChange(p.id)}
-                                            className={clsx(
-                                                'rounded-md px-2 py-2 text-xs font-bold transition-colors',
-                                                platform === p.id
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-surface-100 text-muted-foreground hover:bg-surface-200 hover:text-foreground'
-                                            )}
-                                        >
-                                            {p.shortName}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Size Presets */}
-                            {platformConfig && platformConfig.presets.length > 0 && (
-                                <div>
-                                    <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                        Size
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-1.5">
-                                        {platformConfig.presets.map((preset) => (
-                                            <button
-                                                key={preset.name}
-                                                onClick={() => handlePresetChange(preset)}
-                                                className={clsx(
-                                                    'rounded-md px-2 py-2 text-xs font-medium transition-colors text-left',
-                                                    !isCustomSize && presetName === preset.name
-                                                        ? 'bg-primary text-primary-foreground'
-                                                        : 'bg-surface-100 text-muted-foreground hover:bg-surface-200 hover:text-foreground'
-                                                )}
-                                            >
-                                                <span className="block font-bold">{preset.label}</span>
-                                                <span className="block text-[10px] opacity-70">{preset.name}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Custom Size */}
-                            {(platform === 'custom' || isCustomSize) && (
-                                <div>
-                                    <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                        Custom Size
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            value={width}
-                                            onChange={(e) => setWidth(Math.max(1, Math.min(4096, parseInt(e.target.value) || 1)))}
-                                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                                            placeholder="Width"
-                                            min={1}
-                                            max={4096}
-                                        />
-                                        <span className="text-muted-foreground">×</span>
-                                        <input
-                                            type="number"
-                                            value={height}
-                                            onChange={(e) => setHeight(Math.max(1, Math.min(4096, parseInt(e.target.value) || 1)))}
-                                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                                            placeholder="Height"
-                                            min={1}
-                                            max={4096}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            {platform !== 'custom' && (
-                                <button
-                                    onClick={() => setIsCustomSize(!isCustomSize)}
-                                    className="text-xs text-primary hover:underline"
-                                >
-                                    {isCustomSize ? 'プリセットに戻す' : 'カスタムサイズを指定'}
-                                </button>
-                            )}
-
-                            {/* Segment */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    Segment
-                                </label>
-                                <input
-                                    type="text"
-                                    value={segment}
-                                    onChange={(e) => setSegment(e.target.value)}
-                                    placeholder="ターゲット層やキャンペーン名..."
-                                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/50"
+                                <textarea
+                                    value={prompt}
+                                    onChange={(e) => setPrompt(e.target.value)}
+                                    placeholder="バナーの内容やデザインの指示を入力..."
+                                    rows={4}
+                                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                                 />
                             </div>
 
-                            {/* Reference Image */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    Reference Image
-                                </label>
+                            {/* Product Info (collapsible) */}
+                            <details className="group">
+                                <summary className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none">
+                                    <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+                                    商材情報（任意）
+                                    {productInfo && <span className="ml-1 text-primary">●</span>}
+                                </summary>
+                                <textarea
+                                    value={productInfo}
+                                    onChange={(e) => setProductInfo(e.target.value)}
+                                    placeholder="商材・サービスの説明..."
+                                    rows={3}
+                                    className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                                />
+                            </details>
+
+                            {/* Chip Row */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                {/* Platform Chip */}
+                                <div className="relative" data-dropdown>
+                                    <button
+                                        onClick={() => { setShowPlatformDropdown(!showPlatformDropdown); setShowSizeDropdown(false); setShowSegmentInput(false); }}
+                                        className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-50 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-100 transition-colors"
+                                    >
+                                        {platformConfig?.shortName || 'Platform'}
+                                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                    </button>
+                                    {showPlatformDropdown && (
+                                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[160px] rounded-lg border border-border bg-background shadow-lg py-1">
+                                            {BANNER_PLATFORMS.map((p) => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => { handlePlatformChange(p.id); setShowPlatformDropdown(false); }}
+                                                    className={clsx(
+                                                        'w-full text-left px-3 py-2 text-xs transition-colors',
+                                                        platform === p.id
+                                                            ? 'bg-primary/10 text-primary font-bold'
+                                                            : 'text-foreground hover:bg-surface-100'
+                                                    )}
+                                                >
+                                                    {p.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Size Chip */}
+                                <div className="relative" data-dropdown>
+                                    <button
+                                        onClick={() => { setShowSizeDropdown(!showSizeDropdown); setShowPlatformDropdown(false); setShowSegmentInput(false); }}
+                                        className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-50 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-100 transition-colors"
+                                    >
+                                        {isCustomSize ? `${width}×${height}` : (presetName || `${width}×${height}`)}
+                                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                    </button>
+                                    {showSizeDropdown && (
+                                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] max-h-[280px] overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
+                                            {platformConfig && platformConfig.presets.map((preset) => (
+                                                <button
+                                                    key={preset.name}
+                                                    onClick={() => { handlePresetChange(preset); setShowSizeDropdown(false); }}
+                                                    className={clsx(
+                                                        'w-full text-left px-3 py-2 text-xs transition-colors',
+                                                        !isCustomSize && presetName === preset.name
+                                                            ? 'bg-primary/10 text-primary font-bold'
+                                                            : 'text-foreground hover:bg-surface-100'
+                                                    )}
+                                                >
+                                                    <span className="font-medium">{preset.name}</span>
+                                                    <span className="ml-2 text-muted-foreground">{preset.label}</span>
+                                                </button>
+                                            ))}
+                                            <div className="border-t border-border mt-1 pt-1">
+                                                <button
+                                                    onClick={() => { setIsCustomSize(true); setShowSizeDropdown(false); }}
+                                                    className={clsx(
+                                                        'w-full text-left px-3 py-2 text-xs transition-colors',
+                                                        isCustomSize
+                                                            ? 'bg-primary/10 text-primary font-bold'
+                                                            : 'text-foreground hover:bg-surface-100'
+                                                    )}
+                                                >
+                                                    カスタムサイズ...
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Segment Chip */}
+                                <div className="relative" data-dropdown>
+                                    {segment ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs font-medium text-primary">
+                                            {segment}
+                                            <button onClick={() => setSegment('')} className="hover:text-primary/70 transition-colors">
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        </span>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => { setShowSegmentInput(!showSegmentInput); setShowPlatformDropdown(false); setShowSizeDropdown(false); }}
+                                                className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-surface-50 px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface-100 hover:text-foreground transition-colors"
+                                            >
+                                                <Plus className="h-3 w-3" />
+                                                セグメント
+                                            </button>
+                                            {showSegmentInput && (
+                                                <div className="absolute top-full left-0 mt-1 z-50 rounded-lg border border-border bg-background shadow-lg p-2">
+                                                    <input
+                                                        type="text"
+                                                        value={segment}
+                                                        onChange={(e) => setSegment(e.target.value)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') setShowSegmentInput(false); }}
+                                                        placeholder="ターゲット層..."
+                                                        className="w-48 rounded-md border border-border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Reference Image Chip */}
                                 {referencePreview ? (
-                                    <div className="relative rounded-md border border-border overflow-hidden">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={referencePreview}
-                                            alt="Reference"
-                                            className="w-full h-32 object-contain bg-gray-50"
-                                        />
-                                        <button
-                                            onClick={clearReferenceImage}
-                                            className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80 transition-colors"
-                                        >
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs font-medium text-primary">
+                                        <ImageIcon className="h-3 w-3" />
+                                        参考画像
+                                        <button onClick={clearReferenceImage} className="hover:text-primary/70 transition-colors">
                                             <X className="h-3 w-3" />
                                         </button>
-                                    </div>
+                                    </span>
                                 ) : (
-                                    <div
-                                        onDrop={handleDrop}
-                                        onDragOver={handleDragOver}
+                                    <button
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-border bg-surface-50 py-6 cursor-pointer hover:border-primary/50 hover:bg-surface-100 transition-colors"
+                                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-surface-50 px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface-100 hover:text-foreground transition-colors"
                                     >
-                                        <Upload className="h-6 w-6 text-muted-foreground/50 mb-2" />
-                                        <p className="text-xs text-muted-foreground">ドラッグ&ドロップまたはクリック</p>
-                                    </div>
+                                        <Upload className="h-3 w-3" />
+                                        参考画像
+                                    </button>
                                 )}
                                 <input
                                     ref={fileInputRef}
@@ -2237,39 +2297,54 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                 />
                             </div>
 
-                            {/* Product Info */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    Product Info
-                                </label>
-                                <textarea
-                                    value={productInfo}
-                                    onChange={(e) => setProductInfo(e.target.value)}
-                                    placeholder="商材・サービスの説明（任意）..."
-                                    rows={3}
-                                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/50 resize-none"
-                                />
-                            </div>
+                            {/* Custom Size Inputs (shown when custom selected) */}
+                            {isCustomSize && (
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={width}
+                                        onChange={(e) => setWidth(Math.max(1, Math.min(4096, parseInt(e.target.value) || 1)))}
+                                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                                        placeholder="Width"
+                                        min={1}
+                                        max={4096}
+                                    />
+                                    <span className="text-muted-foreground text-sm">×</span>
+                                    <input
+                                        type="number"
+                                        value={height}
+                                        onChange={(e) => setHeight(Math.max(1, Math.min(4096, parseInt(e.target.value) || 1)))}
+                                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                                        placeholder="Height"
+                                        min={1}
+                                        max={4096}
+                                    />
+                                </div>
+                            )}
 
-                            {/* Prompt */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    Prompt
-                                </label>
-                                <textarea
-                                    value={prompt}
-                                    onChange={(e) => setPrompt(e.target.value)}
-                                    placeholder="バナーの編集指示を入力..."
-                                    rows={4}
-                                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/50 resize-none"
-                                />
-                            </div>
+                            {/* Reference Image Preview */}
+                            {referencePreview && (
+                                <div className="relative rounded-lg border border-border overflow-hidden">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={referencePreview}
+                                        alt="Reference"
+                                        className="w-full h-28 object-contain bg-gray-50"
+                                    />
+                                    <button
+                                        onClick={clearReferenceImage}
+                                        className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80 transition-colors"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Generate Button */}
                             <button
                                 onClick={handleGenerate}
                                 disabled={isGenerating || (!prompt && !productInfo)}
-                                className="w-full rounded-sm bg-gray-900 py-3 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full rounded-lg bg-gray-900 py-3 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {isGenerating ? (
                                     <>
@@ -2277,7 +2352,10 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                         生成中...
                                     </>
                                 ) : (
-                                    'バナーを生成'
+                                    <>
+                                        <Sparkles className="h-4 w-4" />
+                                        このサイズで生成
+                                    </>
                                 )}
                             </button>
                         </>

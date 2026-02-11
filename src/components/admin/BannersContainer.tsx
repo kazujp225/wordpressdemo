@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Plus, Image as ImageIcon, FolderOpen, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Plus, Image as ImageIcon, FolderOpen, Loader2, CheckCircle2, XCircle, ChevronDown } from 'lucide-react';
+import clsx from 'clsx';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { BannerCard } from './BannerCard';
 import { BANNER_PLATFORMS } from '@/lib/banner-presets';
 import type { BannerListItem, BannerPlatform } from '@/types/banner';
+import { useUserSettings } from '@/lib/hooks/useAdminData';
+import { getPlan } from '@/lib/plans';
+import { UpgradeBanner } from './UpgradeBanner';
 
 interface ImportItem {
     file: File;
@@ -62,9 +66,26 @@ interface BannersContainerProps {
 export function BannersContainer({ initialBanners }: BannersContainerProps) {
     const [banners, setBanners] = useState<BannerListItem[]>(initialBanners);
     const [platformFilter, setPlatformFilter] = useState<BannerPlatform | 'all'>('all');
+    const [showPlatformMenu, setShowPlatformMenu] = useState(false);
+    const { data: userSettings } = useUserSettings();
+    const plan = getPlan(userSettings?.plan);
+    const maxBanners = plan.limits.maxBanners;
+    const isAtBannerLimit = maxBanners !== -1 && banners.length >= maxBanners;
     const [importItems, setImportItems] = useState<ImportItem[]>([]);
     const [isImporting, setIsImporting] = useState(false);
     const importFileInputRef = useRef<HTMLInputElement>(null);
+
+    // Close platform dropdown on outside click
+    useEffect(() => {
+        if (!showPlatformMenu) return;
+        const handler = (e: MouseEvent) => {
+            if (!(e.target as HTMLElement).closest('[data-platform-menu]')) {
+                setShowPlatformMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showPlatformMenu]);
 
     const updateImportItem = (index: number, updates: Partial<ImportItem>) => {
         setImportItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
@@ -187,26 +208,67 @@ export function BannersContainer({ initialBanners }: BannersContainerProps) {
                     </h1>
                     <p className="text-muted-foreground mt-1 text-sm font-medium">
                         広告バナーの作成・管理
+                        {maxBanners !== -1 && (
+                            <span className="ml-2 text-xs">
+                                ({banners.length}/{maxBanners})
+                            </span>
+                        )}
                     </p>
                 </div>
 
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* プラットフォームフィルター */}
-                    <select
-                        value={platformFilter}
-                        onChange={(e) => setPlatformFilter(e.target.value as BannerPlatform | 'all')}
-                        className="rounded-md border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground min-h-[44px]"
-                    >
-                        <option value="all">All Platforms</option>
-                        {BANNER_PLATFORMS.filter(p => p.id !== 'custom').map((p) => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
+                    <div className="relative" data-platform-menu>
+                        <button
+                            onClick={() => setShowPlatformMenu(!showPlatformMenu)}
+                            className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground min-h-[44px] hover:bg-surface-100 transition-colors"
+                        >
+                            {platformFilter === 'all'
+                                ? 'All Platforms'
+                                : BANNER_PLATFORMS.find(p => p.id === platformFilter)?.name || platformFilter}
+                            <ChevronDown className={clsx('h-4 w-4 text-muted-foreground transition-transform', showPlatformMenu && 'rotate-180')} />
+                        </button>
+                        {showPlatformMenu && (
+                            <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] rounded-lg border border-border bg-background shadow-lg py-1">
+                                <button
+                                    onClick={() => { setPlatformFilter('all'); setShowPlatformMenu(false); }}
+                                    className={clsx(
+                                        'w-full text-left px-3 py-2 text-sm transition-colors',
+                                        platformFilter === 'all'
+                                            ? 'bg-primary/10 text-primary font-bold'
+                                            : 'text-foreground hover:bg-surface-100'
+                                    )}
+                                >
+                                    All Platforms
+                                </button>
+                                {BANNER_PLATFORMS.filter(p => p.id !== 'custom').map((p) => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => { setPlatformFilter(p.id); setShowPlatformMenu(false); }}
+                                        className={clsx(
+                                            'w-full text-left px-3 py-2 text-sm transition-colors',
+                                            platformFilter === p.id
+                                                ? 'bg-primary/10 text-primary font-bold'
+                                                : 'text-foreground hover:bg-surface-100'
+                                        )}
+                                    >
+                                        {p.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <button
                         type="button"
                         onClick={() => importFileInputRef.current?.click()}
-                        className="flex items-center gap-2 rounded-md bg-surface-100 text-foreground border border-border px-3 sm:px-4 py-2.5 text-sm font-bold transition-all hover:bg-surface-200 active:scale-[0.98] min-h-[44px]"
+                        disabled={isAtBannerLimit}
+                        className={clsx(
+                            "flex items-center gap-2 rounded-md bg-surface-100 text-foreground border border-border px-3 sm:px-4 py-2.5 text-sm font-bold transition-all min-h-[44px]",
+                            isAtBannerLimit
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:bg-surface-200 active:scale-[0.98]"
+                        )}
                     >
                         <FolderOpen className="h-4 w-4" />
                         <span>インポート</span>
@@ -225,15 +287,29 @@ export function BannersContainer({ initialBanners }: BannersContainerProps) {
                         }}
                     />
 
-                    <Link
-                        href="/admin/banners/new"
-                        className="flex items-center gap-2 rounded-md bg-primary px-3 sm:px-4 py-2.5 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98] min-h-[44px]"
-                    >
-                        <Plus className="h-4 w-4" />
-                        <span>新規作成</span>
-                    </Link>
+                    {isAtBannerLimit ? (
+                        <span
+                            className="flex items-center gap-2 rounded-md bg-primary/50 px-3 sm:px-4 py-2.5 text-sm font-bold text-primary-foreground cursor-not-allowed min-h-[44px]"
+                            title={`バナー上限（${maxBanners}件）に達しています`}
+                        >
+                            <Plus className="h-4 w-4" />
+                            <span>新規作成</span>
+                        </span>
+                    ) : (
+                        <Link
+                            href="/admin/banners/new"
+                            className="flex items-center gap-2 rounded-md bg-primary px-3 sm:px-4 py-2.5 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98] min-h-[44px]"
+                        >
+                            <Plus className="h-4 w-4" />
+                            <span>新規作成</span>
+                        </Link>
+                    )}
                 </div>
             </div>
+
+            {isAtBannerLimit && (
+                <UpgradeBanner feature={`バナー上限（${maxBanners}件）`} className="mb-6" />
+            )}
 
             {displayBanners.length === 0 ? (
                 <div className="flex h-96 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface-50/50">

@@ -21,6 +21,8 @@ export interface UsageStats {
   monthlyUploads: number;
   // 総ページ数
   totalPages: number;
+  // 総バナー数
+  totalBanners: number;
   // 総ストレージ使用量（MB）
   totalStorageMB: number;
 }
@@ -51,7 +53,7 @@ export async function getUserUsage(userId: string): Promise<UsageStats> {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   // 並列でクエリを実行
-  const [generationCount, uploadCount, pageCount] = await Promise.all([
+  const [generationCount, uploadCount, pageCount, bannerCount] = await Promise.all([
     // 今月のAI生成回数
     prisma.generationRun.count({
       where: {
@@ -72,6 +74,10 @@ export async function getUserUsage(userId: string): Promise<UsageStats> {
     prisma.page.count({
       where: { userId },
     }),
+    // 総バナー数
+    prisma.banner.count({
+      where: { userId },
+    }),
   ]);
 
   // ストレージ使用量は概算（画像数 × 平均サイズ）
@@ -81,6 +87,7 @@ export async function getUserUsage(userId: string): Promise<UsageStats> {
     monthlyGenerations: generationCount,
     monthlyUploads: uploadCount,
     totalPages: pageCount,
+    totalBanners: bannerCount,
     totalStorageMB: estimatedStorageMB,
   };
 }
@@ -139,21 +146,12 @@ export async function checkGenerationLimit(
   // APIキー情報を取得
   const apiKeyInfo = await getGoogleApiKeyWithInfo(userId);
 
-  // Freeプランの場合
-  if (isFreePlan(planId)) {
-    // Freeプランで自分のAPIキーがない場合はエラー
-    if (!apiKeyInfo.apiKey || !apiKeyInfo.isUserOwnKey) {
-      return {
-        allowed: false,
-        reason: 'Freeプランでは自分のGoogle AI APIキーの設定が必要です。設定画面でAPIキーを入力してください。',
-        needApiKey: true,
-      };
-    }
-    // Freeプランで自分のAPIキーがある場合はクレジット消費をスキップ
+  // Freeプランの場合 — AI生成は一切不可
+  const plan = getPlan(planId);
+  if (!plan.limits.canAIGenerate) {
     return {
-      allowed: true,
-      usingOwnApiKey: true,
-      skipCreditConsumption: true,
+      allowed: false,
+      reason: 'AI機能は有料プランのみご利用いただけます。プランをアップグレードしてください。',
     };
   }
 
@@ -339,6 +337,56 @@ export async function checkPageLimit(userId: string): Promise<UsageLimitCheck> {
 }
 
 /**
+ * バナー作成が可能かチェック
+ */
+export async function checkBannerLimit(userId: string): Promise<UsageLimitCheck> {
+  const [usage, planId] = await Promise.all([
+    getUserUsage(userId),
+    getUserPlan(userId),
+  ]);
+
+  // サブスク必須チェック
+  if (requiresSubscription(planId)) {
+    return {
+      allowed: false,
+      reason: 'サブスクリプションが必要です。',
+      needSubscription: true,
+    };
+  }
+
+  const plan = getPlan(planId);
+  const limit = plan.limits.maxBanners;
+  const current = usage.totalBanners;
+
+  // 無制限の場合
+  if (limit === -1) {
+    return {
+      allowed: true,
+      current,
+      limit,
+      remaining: 'unlimited',
+    };
+  }
+
+  if (current >= limit) {
+    return {
+      allowed: false,
+      reason: `バナー上限（${limit}件）に達しました。プランをアップグレードしてください。`,
+      current,
+      limit,
+      remaining: 0,
+    };
+  }
+
+  return {
+    allowed: true,
+    current,
+    limit,
+    remaining: limit - current,
+  };
+}
+
+/**
  * 機能が利用可能かチェック
  */
 export async function checkFeatureAccess(
@@ -406,6 +454,10 @@ export async function getUsageReport(userId: string) {
         plan.limits.maxPages === -1
           ? 0
           : Math.round((usage.totalPages / plan.limits.maxPages) * 100),
+      banners:
+        plan.limits.maxBanners === -1
+          ? 0
+          : Math.round((usage.totalBanners / plan.limits.maxBanners) * 100),
     },
   };
 }

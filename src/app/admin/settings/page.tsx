@@ -51,6 +51,12 @@ function SettingsPage() {
     // Credit purchase
     const [showCreditPurchaseModal, setShowCreditPurchaseModal] = useState(false);
     const [isPurchasing, setIsPurchasing] = useState(false);
+    // Upgrade request
+    const [upgradeDesiredPlan, setUpgradeDesiredPlan] = useState('pro');
+    const [upgradeReason, setUpgradeReason] = useState('');
+    const [upgradeCompanyName, setUpgradeCompanyName] = useState('');
+    const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
+    const [upgradeRequestStatus, setUpgradeRequestStatus] = useState<'idle' | 'submitted' | 'already_pending'>('idle');
 
     // Handle query params (tab, OAuth callback)
     useEffect(() => {
@@ -257,6 +263,35 @@ function SettingsPage() {
         }
     };
 
+    const handleUpgradeRequest = async () => {
+        setIsSubmittingUpgrade(true);
+        try {
+            const res = await fetch('/api/upgrade-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    desiredPlan: upgradeDesiredPlan,
+                    reason: upgradeReason || undefined,
+                    companyName: upgradeCompanyName || undefined,
+                }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                if (data.error?.includes('既に')) {
+                    setUpgradeRequestStatus('already_pending');
+                    return;
+                }
+                throw new Error(data.error || 'Failed to submit');
+            }
+            setUpgradeRequestStatus('submitted');
+            toast.success('アップグレード申請を送信しました');
+        } catch (error: any) {
+            toast.error(error.message || 'アップグレード申請の送信に失敗しました');
+        } finally {
+            setIsSubmittingUpgrade(false);
+        }
+    };
+
     const planInfo = PLAN_DEFINITIONS[currentPlan as PlanType] || PLAN_DEFINITIONS.free;
     const isFreePlan = currentPlan === 'free';
 
@@ -427,6 +462,78 @@ function SettingsPage() {
                                             onSubscribe={handleSubscribe}
                                             disabled={isPurchasing}
                                         />
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* アップグレード申請（Freeプランのみ） */}
+                            {isFreePlan && (
+                                <section>
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Mail className="h-4 w-4 text-gray-900" />
+                                        <h3 className="text-sm font-semibold text-gray-900 tracking-tight">アップグレード申請</h3>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-200 bg-white p-6">
+                                        {upgradeRequestStatus === 'submitted' ? (
+                                            <div className="text-center py-4">
+                                                <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+                                                <p className="text-sm font-bold text-gray-900">申請を送信しました</p>
+                                                <p className="text-xs text-gray-500 mt-1">管理者が確認後、プランが更新されます</p>
+                                            </div>
+                                        ) : upgradeRequestStatus === 'already_pending' ? (
+                                            <div className="text-center py-4">
+                                                <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
+                                                <p className="text-sm font-bold text-gray-900">既に申請済みです</p>
+                                                <p className="text-xs text-gray-500 mt-1">管理者の承認をお待ちください</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="text-xs font-bold text-gray-700 block mb-1.5">希望プラン</label>
+                                                    <select
+                                                        value={upgradeDesiredPlan}
+                                                        onChange={(e) => setUpgradeDesiredPlan(e.target.value)}
+                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                                    >
+                                                        <option value="pro">Pro — ¥20,000/月</option>
+                                                        <option value="business">Business — ¥40,000/月</option>
+                                                        <option value="enterprise">Enterprise — ¥100,000/月</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-gray-700 block mb-1.5">会社名（任意）</label>
+                                                    <input
+                                                        type="text"
+                                                        value={upgradeCompanyName}
+                                                        onChange={(e) => setUpgradeCompanyName(e.target.value)}
+                                                        placeholder="株式会社〇〇"
+                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-gray-700 block mb-1.5">利用目的（任意）</label>
+                                                    <textarea
+                                                        value={upgradeReason}
+                                                        onChange={(e) => setUpgradeReason(e.target.value)}
+                                                        placeholder="利用目的をご記入ください"
+                                                        rows={3}
+                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={handleUpgradeRequest}
+                                                    disabled={isSubmittingUpgrade}
+                                                    className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {isSubmittingUpgrade ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <Rocket className="h-4 w-4" />
+                                                    )}
+                                                    申請を送信
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </section>
                             )}

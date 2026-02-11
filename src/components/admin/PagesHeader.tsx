@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Plus, Globe, Loader2, X, Layout, Monitor, Smartphone, Copy, Palette, Download, RefreshCw, Settings, PenTool, Sparkles } from 'lucide-react';
+import { Plus, Globe, Loader2, X, Layout, Monitor, Smartphone, Copy, Palette, Download, RefreshCw, Settings, PenTool, Sparkles, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { TextBasedLPGenerator } from '@/components/lp-builder/TextBasedLPGenerator';
+import { useUserSettings } from '@/lib/hooks/useAdminData';
+import { getPlan } from '@/lib/plans';
 
 // スタイル定義
 const STYLE_OPTIONS = [
@@ -41,6 +43,8 @@ interface ImportProgress {
 
 export function PagesHeader() {
     const router = useRouter();
+    const { data: userSettings } = useUserSettings();
+    const canAIGenerate = getPlan(userSettings?.plan).limits.canAIGenerate;
     const [isImporting, setIsImporting] = useState(false);
     const [importUrl, setImportUrl] = useState('');
     const [showSelection, setShowSelection] = useState(false);
@@ -60,6 +64,10 @@ export function PagesHeader() {
 
     // テキストベースLP生成完了時のハンドラ
     const handleTextLPGenerated = async (sections: any[], meta?: { duration: number, estimatedCost: number }) => {
+        if (!canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
         try {
             // セクションをページとして保存
             const sectionsPayload = sections.map((s: any, idx: number) => ({
@@ -445,10 +453,18 @@ export function PagesHeader() {
                                     {/* テキストベースLP作成 */}
                                     <button
                                         onClick={() => {
+                                            if (!canAIGenerate) {
+                                                toast.error('AI機能は有料プランのみご利用いただけます');
+                                                return;
+                                            }
                                             setShowSelection(false);
                                             setIsTextLPModalOpen(true);
                                         }}
-                                        className="group w-full flex items-center gap-4 rounded-lg border-2 border-dashed border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-6 text-left transition-all hover:border-green-400 hover:from-green-100 hover:to-emerald-100"
+                                        className={"group w-full flex items-center gap-4 rounded-lg border-2 border-dashed p-6 text-left transition-all " + (
+                                            canAIGenerate
+                                                ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 hover:border-green-400 hover:from-green-100 hover:to-emerald-100'
+                                                : 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                                        )}
                                     >
                                         <div className="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-3.5 text-white shadow-lg shadow-green-500/20 group-hover:shadow-green-500/40 transition-all">
                                             <PenTool className="h-6 w-6" />

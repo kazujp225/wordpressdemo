@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
+import { getPlan } from '@/lib/plans';
 
 /**
  * GET /api/user/status
@@ -37,6 +38,12 @@ export async function GET() {
         const isBanned = settings?.isBanned === true;
         const plan = settings?.plan || 'free';
         const hasActiveSubscription = plan !== 'free';
+        const planObj = getPlan(plan);
+
+        // バナー数を取得
+        const bannerCount = await prisma.banner.count({
+            where: { userId: user.id },
+        });
 
         return NextResponse.json({
             userId: user.id,
@@ -45,6 +52,8 @@ export async function GET() {
             plan,
             hasActiveSubscription,
             creditBalanceUsd: creditBalance?.balanceUsd ? Number(creditBalance.balanceUsd) : 0,
+            planLimits: planObj.limits,
+            bannerCount,
         });
     } catch (error: any) {
         console.error('Failed to get user status:', error);

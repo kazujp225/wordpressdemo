@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { businessInfoSchema, enhancedContextSchema, designDefinitionSchema, validateRequest } from '@/lib/validations';
+import { checkImageGenerationLimit } from '@/lib/usage';
 
 // ============================================
 // モデル定数（停止・名称変更に対応しやすくする）
@@ -1122,6 +1123,15 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Freeプランのチェック
+    const limitCheck = await checkImageGenerationLimit(user.id, MODELS.IMAGE, 6);
+    if (!limitCheck.allowed) {
+        return NextResponse.json({
+            error: limitCheck.reason,
+            needPurchase: true,
+        }, { status: 402 });
     }
 
     try {

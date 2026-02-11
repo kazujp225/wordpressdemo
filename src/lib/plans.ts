@@ -10,8 +10,12 @@ export type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
 export interface PlanLimits {
   // 最大ページ数
   maxPages: number;
+  // 最大バナー数
+  maxBanners: number;
   // 最大ストレージ（MB）
   maxStorageMB: number;
+  // AI生成全般の可否
+  canAIGenerate: boolean;
   // 4Kアップスケール可能か
   canUpscale4K: boolean;
   // リスタイル機能使用可能か
@@ -79,20 +83,23 @@ export const PLANS: Record<PlanType, Plan> = {
     priceDisplay: '¥0/月',
     colorClass: 'text-gray-600',
     limits: {
-      maxPages: 10, // 10ページまで
+      maxPages: 3, // 3ページまで
+      maxBanners: 3, // 3バナーまで
       maxStorageMB: 500, // 500MBまで
+      canAIGenerate: false, // AI生成不可
       canUpscale4K: false, // 4Kアップスケール不可
       canRestyle: false, // リスタイル不可
       canExport: true, // エクスポートは可能
       canGenerateVideo: false, // 動画生成不可
-      canSetApiKey: true, // APIキー設定必須
+      canSetApiKey: false, // APIキー設定不可
       prioritySupport: false,
     },
     features: [
-      'AI画像生成（自分のAPIキー使用）',
-      '最大10ページ',
+      '最大3ページ',
+      '最大3バナー',
+      '画像アップロード・クロップ・リサイズ',
       'エクスポート機能',
-      '※4Kアップスケール・リスタイル・動画生成は有料プランのみ',
+      '※AI画像生成・インペイント等は有料プランのみ',
     ],
   },
   pro: {
@@ -107,7 +114,9 @@ export const PLANS: Record<PlanType, Plan> = {
     colorClass: 'text-blue-600',
     limits: {
       maxPages: 30,
+      maxBanners: 50,
       maxStorageMB: 5000,
+      canAIGenerate: true,
       canUpscale4K: false,
       canRestyle: false,
       canExport: true,
@@ -117,6 +126,7 @@ export const PLANS: Record<PlanType, Plan> = {
     },
     features: [
       '最大30ページ',
+      '最大50バナー',
       '月間 50,000 クレジット',
       '画像生成',
       'インペイント編集',
@@ -135,7 +145,9 @@ export const PLANS: Record<PlanType, Plan> = {
     colorClass: 'text-purple-600',
     limits: {
       maxPages: 100,
+      maxBanners: 200,
       maxStorageMB: 20000,
+      canAIGenerate: true,
       canUpscale4K: true,
       canRestyle: true,
       canExport: true,
@@ -145,6 +157,7 @@ export const PLANS: Record<PlanType, Plan> = {
     },
     features: [
       '最大100ページ',
+      '最大200バナー',
       '月間 100,000 クレジット',
       'Pro全機能',
       '4Kアップスケール',
@@ -163,7 +176,9 @@ export const PLANS: Record<PlanType, Plan> = {
     colorClass: 'text-amber-600',
     limits: {
       maxPages: -1, // 無制限
+      maxBanners: -1, // 無制限
       maxStorageMB: -1, // 無制限
+      canAIGenerate: true,
       canUpscale4K: true,
       canRestyle: true,
       canExport: true,
@@ -172,7 +187,7 @@ export const PLANS: Record<PlanType, Plan> = {
       prioritySupport: true,
     },
     features: [
-      '無制限ページ',
+      '無制限ページ・バナー',
       '月間 250,000 クレジット',
       'Business全機能',
       '動画生成',

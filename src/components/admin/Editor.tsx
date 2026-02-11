@@ -172,6 +172,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         canUpscale4K: boolean;
         canRestyle: boolean;
         canGenerateVideo: boolean;
+        canAIGenerate: boolean;
         maxPages: number;
     } | null>(null);
 
@@ -983,6 +984,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     };
 
     const handleGenerateAI = async () => {
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
         setIsGenerating(true);
         console.log('セクションのAI生成を開始:', sections.map(s => ({ id: s.id, hasBase64: !!s.base64 })));
         try {
@@ -1204,6 +1209,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     };
 
     const handleSectionAIImage = async (sectionId: string) => {
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
         const section = sections.find(s => s.id === sectionId);
         if (!section) return;
 
@@ -1231,6 +1240,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     const generateSectionImage = async () => {
         if (!editingSectionId || !sectionAIPrompt) return;
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
         setIsGeneratingSectionImage(true);
         try {
             const res = await fetch('/api/ai/generate-image', {
@@ -1377,6 +1390,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // インペインティング（部分編集）モーダルを開く
     const handleOpenInpaint = (sectionId: string, imageUrl: string, mobileImageUrl?: string, mode: 'inpaint' | 'button' | 'text-fix' = 'inpaint') => {
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
         console.log('[handleOpenInpaint] Opening with:', { sectionId, imageUrl, mobileImageUrl, mode });
         setInpaintSectionId(sectionId);
         setInpaintImageUrl(imageUrl);
@@ -1876,6 +1893,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // セグメント個別再生成の実行
     const handleRegenerate = async () => {
         if (!regenerateSectionId) return;
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
 
         // sectionIdから実際のDBのIDを取得
         const section = sections.find(s => s.id === regenerateSectionId);
@@ -1956,6 +1977,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // 一括再生成の実行
     const handleBatchRegenerate = async () => {
         if (selectedSectionsForRegenerate.size === 0) return;
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
 
         // regenerateReferenceAlsoがtrueなら参照セクションも含める、falseなら除外
         const sectionIds = Array.from(selectedSectionsForRegenerate).filter(id =>
@@ -2154,6 +2179,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // 4Kアップスケール実行
     const handle4KUpscale = async () => {
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
         if (pageId === 'new') {
             toast.error('先にページを保存してください');
             return;
@@ -4655,7 +4684,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     {isSectionVisible(['copyEdit', 'cta']) && (
                         <EditorMenuSection title="内容を編集する" color="emerald">
                             {/* 文字を修正 - AI画像編集と同じUIで領域選択 */}
-                            {isMenuItemVisible('copyEdit') && (
+                            {planLimits?.canAIGenerate !== false && isMenuItemVisible('copyEdit') && (
                                 <EditorMenuItem
                                     icon={<Type className="h-3.5 w-3.5" />}
                                     title="文字を修正"
@@ -4750,7 +4779,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     )}
 
                     {/* 別の用途で使う */}
-                    {isSectionVisible(['thumbnail', 'document']) && (
+                    {planLimits?.canAIGenerate !== false && isSectionVisible(['thumbnail', 'document']) && (
                         <EditorMenuSection title="別の用途で使う" color="purple">
                             {/* サムネイル用に変換 */}
                             {isMenuItemVisible('thumbnail') && (
@@ -4785,7 +4814,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     )}
 
                     {/* AIコード生成 */}
-                    {isSectionVisible(['claude']) && (
+                    {planLimits?.canAIGenerate !== false && isSectionVisible(['claude']) && (
                         <EditorMenuSection title="AIコード生成" color="indigo">
                             {isMenuItemVisible('claude') && (
                                 <EditorMenuItem
@@ -4824,7 +4853,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             )}
 
                             {/* まとめて作り直す */}
-                            {isMenuItemVisible('regenerate') && (
+                            {planLimits?.canAIGenerate !== false && isMenuItemVisible('regenerate') && (
                                 <EditorMenuItem
                                     icon={<RefreshCw className="h-3.5 w-3.5" />}
                                     title="まとめて作り直す"

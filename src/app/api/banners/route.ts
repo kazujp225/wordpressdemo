@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
+import { checkBannerLimit } from '@/lib/usage';
 
 // GET /api/banners (List)
 export async function GET() {
@@ -39,6 +40,15 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+        // バナー上限チェック
+        const limitCheck = await checkBannerLimit(user.id);
+        if (!limitCheck.allowed) {
+            return NextResponse.json(
+                { error: limitCheck.reason || 'バナー数の上限に達しました' },
+                { status: 403 }
+            );
+        }
+
         const body = await request.json();
         const { title, platform, width, height, presetName, prompt, productInfo, imageId, referenceImageUrl, status, metadata } = body;
 

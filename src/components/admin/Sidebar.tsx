@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle, Presentation } from 'lucide-react';
+import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle, Presentation, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
@@ -163,6 +163,19 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                         );
                     })}
                 </nav>
+
+                {plan === 'free' && (
+                    <div className="px-3 pb-4">
+                        <Link
+                            href="/admin/settings?tab=plan"
+                            onClick={handleLinkClick}
+                            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 px-3 py-2.5 text-sm font-bold text-blue-700 hover:from-blue-100 hover:to-purple-100 transition-colors"
+                        >
+                            <Sparkles className="h-4 w-4 text-blue-600" />
+                            アップグレード
+                        </Link>
+                    </div>
+                )}
 
                 <div className="border-t border-border p-4 space-y-3">
                     <div className="flex items-center gap-3 rounded-md border border-border bg-surface-50 p-3">
