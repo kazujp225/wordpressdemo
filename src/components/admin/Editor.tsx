@@ -2095,12 +2095,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         }));
                     }
 
-                    // セクション更新
-                    setSections(prev => prev.map(s =>
-                        s.id === sectionId
-                            ? { ...s, imageId: data.newImageId, image: data.media }
-                            : s
-                    ));
+                    // NOTE: セクション画像のstate更新はバッチ完了後に一括で行う（並列競合回避）
 
                     // モバイル画像も再生成（オプションがONの場合）
                     if (includeMobileInBatch && section.mobileImage?.filePath) {
@@ -2126,11 +2121,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             const mobileData = await mobileResponse.json();
                             if (mobileResponse.ok) {
                                 console.log(`✅ [Batch] Mobile for section ${dbSectionId} completed`);
-                                setSections(prev => prev.map(s =>
-                                    s.id === sectionId
-                                        ? { ...s, mobileImageId: mobileData.newImageId, mobileImage: mobileData.media }
-                                        : s
-                                ));
+                                // モバイルもresultに含める
+                                data.mobileImageId = mobileData.newImageId;
+                                data.mobileMedia = mobileData.media;
                             }
                         } catch (mobileError) {
                             console.warn(`Mobile regenerate error for section ${sectionId}`);
@@ -2169,6 +2162,27 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
         if (failedCount > 0) {
             toast.error(`${failedCount}件のセクションで再生成に失敗しました`);
+        }
+
+        // 全結果をまとめて一括でセクション更新（並列処理の競合を回避）
+        if (successCount > 0) {
+            const successResults = results.filter(r => r.success && r.data);
+            setSections(prev => {
+                let updated = [...prev];
+                for (const result of successResults) {
+                    updated = updated.map(s => {
+                        if (String(s.id) !== String(result.sectionId)) return s;
+                        const patch: any = { imageId: result.data.newImageId, image: result.data.media };
+                        if (result.data.mobileImageId) {
+                            patch.mobileImageId = result.data.mobileImageId;
+                            patch.mobileImage = result.data.mobileMedia;
+                        }
+                        return { ...s, ...patch };
+                    });
+                }
+                return updated;
+            });
+            console.log(`[Batch] Applied ${successResults.length} section updates in one setSections call`);
         }
 
         setIsBatchRegenerating(false);
@@ -3823,7 +3837,14 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             <span className="text-gray-400 text-lg">→</span>
 
                                                             {/* After */}
-                                                            <div className="flex-1 relative aspect-[9/16] max-h-24 bg-gray-200 rounded-sm overflow-hidden border-2 border-gray-900">
+                                                            <button
+                                                                onClick={() => handleRestoreFromServer(
+                                                                    showHistoryPanel,
+                                                                    item.newImageId,
+                                                                    item.newImage?.filePath
+                                                                )}
+                                                                className="flex-1 group relative aspect-[9/16] max-h-24 bg-gray-200 rounded-sm overflow-hidden border-2 border-gray-900 hover:border-blue-500 transition-all"
+                                                            >
                                                                 {item.newImage?.filePath && (
                                                                     /* eslint-disable-next-line @next/next/no-img-element */
                                                                     <img
@@ -3832,10 +3853,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                         className="w-full h-full object-cover"
                                                                     />
                                                                 )}
+                                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+                                                                    <span className="opacity-0 group-hover:opacity-100 bg-white text-gray-800 px-2 py-0.5 rounded-full text-[9px] font-bold">
+                                                                        戻す
+                                                                    </span>
+                                                                </div>
                                                                 <span className="absolute bottom-0.5 left-0.5 bg-gray-600 text-white px-1 py-0.5 rounded text-[8px] font-bold">
                                                                     後
                                                                 </span>
-                                                            </div>
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 ))}
