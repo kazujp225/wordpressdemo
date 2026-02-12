@@ -1210,7 +1210,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     const handleSectionAIImage = async (sectionId: string) => {
         if (planLimits && !planLimits.canAIGenerate) {
-            toast.error('AI機能は有料プランのみご利用いただけます');
             return;
         }
         const section = sections.find(s => s.id === sectionId);
@@ -1327,7 +1326,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // 画像編集モーダルを開く
     const handleOpenEditImage = (sectionId: string) => {
         if (planLimits && !planLimits.canAIGenerate) {
-            toast.error('AI機能は有料プランのみご利用いただけます');
             return;
         }
         const section = sections.find(s => s.id === sectionId);
@@ -1395,7 +1393,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // インペインティング（部分編集）モーダルを開く
     const handleOpenInpaint = (sectionId: string, imageUrl: string, mobileImageUrl?: string, mode: 'inpaint' | 'button' | 'text-fix' = 'inpaint') => {
         if (planLimits && !planLimits.canAIGenerate) {
-            toast.error('AI機能は有料プランのみご利用いただけます');
             return;
         }
         console.log('[handleOpenInpaint] Opening with:', { sectionId, imageUrl, mobileImageUrl, mode });
@@ -1890,7 +1887,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // セグメント個別再生成モーダルを開く
     const handleOpenRegenerate = (sectionId: string) => {
         if (planLimits && !planLimits.canAIGenerate) {
-            toast.error('AI機能は有料プランのみご利用いただけます');
             return;
         }
         setRegenerateSectionId(sectionId);
