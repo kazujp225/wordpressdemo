@@ -57,11 +57,11 @@ const nextConfig = {
               // フォント
               "font-src 'self' https://fonts.gstatic.com data:",
               // 画像: self + Supabase Storage + data URI + blob + Stripe
-              "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.com https://replicate.delivery https://pbxt.replicate.delivery https://*.stripe.com https://q.stripe.com",
+              "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.com https://replicate.delivery https://pbxt.replicate.delivery https://*.stripe.com https://q.stripe.com https://img.youtube.com",
               // 接続先: self + Supabase + Stripe（すべてのサブドメイン） + AI APIs + hCaptcha
               "connect-src 'self' https://*.supabase.co https://*.supabase.com https://api.stripe.com https://*.stripe.com https://r.stripe.com https://q.stripe.com https://errors.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://api.hcaptcha.com https://generativelanguage.googleapis.com https://api.anthropic.com https://api.replicate.com wss://*.supabase.co",
               // フレーム: Stripe決済 + hCaptcha
-              "frame-src 'self' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com",
+              "frame-src 'self' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com https://www.youtube.com https://youtube.com",
               // メディア
               "media-src 'self' blob: https://*.supabase.co https://*.supabase.com",
               // オブジェクト

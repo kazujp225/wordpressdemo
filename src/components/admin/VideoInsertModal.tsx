@@ -106,7 +106,6 @@ interface VideoData {
 const VIDEO_SOURCES = [
     { id: 'youtube', label: 'YouTube', icon: Youtube, description: 'YouTube動画を埋め込み' },
     { id: 'upload', label: 'アップロード', icon: Upload, description: '動画ファイルをアップロード' },
-    { id: 'embed', label: '埋め込みコード', icon: Link2, description: 'iframe埋め込みコード' },
     { id: 'ai-generate', label: '動画生成', icon: Sparkles, description: 'Veo 2で動画を生成' },
 ];
 
@@ -180,7 +179,7 @@ export default function VideoInsertModal({
     };
 
     const getYouTubeThumbnail = (videoId: string): string => {
-        return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
     };
 
     // 動画ファイルアップロード処理
@@ -443,12 +442,14 @@ export default function VideoInsertModal({
                                     className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                                 />
                                 {videoUrl && extractYouTubeId(videoUrl) && (
-                                    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                                        <img
-                                            src={getYouTubeThumbnail(extractYouTubeId(videoUrl)!)}
-                                            alt="Video thumbnail"
-                                            className="w-full h-32 object-cover rounded"
+                                    <div className="mt-3 p-3 bg-gray-50 rounded-lg space-y-2">
+                                        <iframe
+                                            src={`https://www.youtube.com/embed/${extractYouTubeId(videoUrl)}?autoplay=0`}
+                                            className="w-full aspect-video rounded"
+                                            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
                                         />
+                                        <p className="text-xs text-gray-500 text-center">プレビュー再生</p>
                                     </div>
                                 )}
                             </div>
