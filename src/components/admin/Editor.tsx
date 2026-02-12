@@ -1326,6 +1326,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // 画像編集モーダルを開く
     const handleOpenEditImage = (sectionId: string) => {
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
         const section = sections.find(s => s.id === sectionId);
         if (!section) return;
 
@@ -1885,6 +1889,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // セグメント個別再生成モーダルを開く
     const handleOpenRegenerate = (sectionId: string) => {
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('AI機能は有料プランのみご利用いただけます');
+            return;
+        }
         setRegenerateSectionId(sectionId);
         setRegeneratePrompt('');
         setShowRegenerateModal(true);
@@ -3514,6 +3522,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         </button>
                         <button
                             onClick={async () => {
+                                if (planLimits && !planLimits.canAIGenerate) {
+                                    toast.error('有料プランにアップグレードしてご利用ください');
+                                    return;
+                                }
                                 if (selectedSectionsForRegenerate.size > 0) {
                                     // 一括再生成前に自動保存（セクションIDを同期するため）
                                     toast.loading('保存中...', { id: 'batch-save' });
@@ -3979,8 +3991,14 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             </div>
 
                             <button
-                                onClick={() => setShowMobileOptimizeModal(true)}
-                                className="flex items-center gap-2 px-4 py-2 hover:bg-white/20 rounded-xl transition-all group"
+                                onClick={() => {
+                                    if (planLimits && !planLimits.canAIGenerate) {
+                                        toast.error('有料プランにアップグレードしてご利用ください');
+                                        return;
+                                    }
+                                    setShowMobileOptimizeModal(true);
+                                }}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all group ${planLimits?.canAIGenerate === false ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/20'}`}
                             >
                                 <Sparkles className="h-4 w-4 text-yellow-400 group-hover:scale-110 transition-transform" />
                                 <span className="text-xs font-bold">一括最適化</span>
