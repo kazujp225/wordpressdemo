@@ -3573,6 +3573,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         </button>
                         <button
                             onClick={() => {
+                                if (planLimits && !planLimits.canAIGenerate) {
+                                    toast.error('AI機能は有料プランのみご利用いただけます');
+                                    return;
+                                }
                                 if (selectedSectionsForBackgroundUnify.size > 0) {
                                     setShowBackgroundUnifyModal(true);
                                 }
@@ -4631,7 +4635,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             )}
 
                             {/* 背景色をそろえる */}
-                            {isMenuItemVisible('background') && (
+                            {planLimits?.canAIGenerate !== false && isMenuItemVisible('background') && (
                                 <EditorMenuItem
                                     icon={<Palette className="h-3.5 w-3.5" />}
                                     title="背景色をそろえる"
@@ -4653,7 +4657,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             )}
 
                             {/* 色の組み合わせ */}
-                            {isMenuItemVisible('colorPalette') && (
+                            {planLimits?.canAIGenerate !== false && isMenuItemVisible('colorPalette') && (
                                 <EditorMenuItem
                                     icon={<Droplet className="h-3.5 w-3.5" />}
                                     title="色の組み合わせ"
