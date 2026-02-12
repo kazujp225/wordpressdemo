@@ -346,12 +346,9 @@ export async function POST(request: NextRequest) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 使用量制限チェック（開発環境ではスキップ可能）
+    // 使用量制限チェック
     log.info(`Checking generation limit for user: ${user.id}`);
-    const isDev = process.env.NODE_ENV === 'development';
-    const limitCheck = isDev
-        ? { allowed: true, skipCreditConsumption: true }
-        : await checkGenerationLimit(user.id);
+    const limitCheck = await checkGenerationLimit(user.id);
 
     if (!limitCheck.allowed) {
         // FreeプランでAPIキー未設定の場合

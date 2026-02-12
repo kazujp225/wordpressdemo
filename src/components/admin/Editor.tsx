@@ -167,14 +167,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // メニュー検索
     const [menuSearch, setMenuSearch] = useState('');
 
-    // プラン情報（機能制限用）
+    // プラン情報（機能制限用） — デフォルトは制限的な値（API失敗時もAIブロック）
     const [planLimits, setPlanLimits] = useState<{
         canUpscale4K: boolean;
         canRestyle: boolean;
         canGenerateVideo: boolean;
         canAIGenerate: boolean;
         maxPages: number;
-    } | null>(null);
+    }>({
+        canUpscale4K: false,
+        canRestyle: false,
+        canGenerateVideo: false,
+        canAIGenerate: false,
+        maxPages: 3,
+    });
 
     // プラン情報を取得
     useEffect(() => {

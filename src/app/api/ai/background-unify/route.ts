@@ -40,11 +40,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // クレジットチェック（開発環境ではスキップ可能）
-    const isDev = process.env.NODE_ENV === 'development';
-    const limitCheck = isDev
-        ? { allowed: true, skipCreditConsumption: true }
-        : await checkGenerationLimit(user.id);
+    // クレジットチェック
+    const limitCheck = await checkGenerationLimit(user.id);
 
     if (!limitCheck.allowed) {
         return NextResponse.json({
