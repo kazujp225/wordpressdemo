@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { X, Loader2, Palette, Check, Sparkles, Eye, DollarSign } from 'lucide-react';
+import { X, Loader2, Palette, Check, Sparkles, Eye, DollarSign, Lock, Crown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Section {
@@ -20,6 +20,7 @@ interface Props {
     selectedSectionIds: string[];
     onClose: () => void;
     onSuccess: (results: { sectionId: string; newImageUrl: string; newImageId: number; mobileImageUrl?: string; mobileImageId?: number }[]) => void;
+    canAIGenerate?: boolean;
 }
 
 type Resolution = '1K' | '2K' | '4K';
@@ -31,7 +32,7 @@ const RESOLUTION_OPTIONS: { value: Resolution; label: string; desc: string }[] =
     { value: '4K', label: '4K', desc: '最高品質' },
 ];
 
-export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, onSuccess }: Props) {
+export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, onSuccess, canAIGenerate = true }: Props) {
     const [step, setStep] = useState<Step>('select-reference');
     const [referenceSectionId, setReferenceSectionId] = useState<string | null>(null);
     const [targetColor, setTargetColor] = useState('#FFFFFF');
@@ -331,16 +332,28 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                                             </div>
                                             <div className="flex-1">
                                                 <button
-                                                    onClick={handleDetectColor}
-                                                    disabled={isDetecting}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-all disabled:opacity-50"
+                                                    onClick={() => {
+                                                        if (!canAIGenerate) {
+                                                            toast.error('有料プランにアップグレードしてご利用ください');
+                                                            return;
+                                                        }
+                                                        handleDetectColor();
+                                                    }}
+                                                    disabled={!canAIGenerate || isDetecting}
+                                                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg transition-all disabled:opacity-50 ${!canAIGenerate ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
                                                 >
-                                                    {isDetecting ? (
+                                                    {!canAIGenerate ? (
+                                                        <>
+                                                            <Lock className="h-4 w-4" />
+                                                            自動検出
+                                                            <span className="px-1.5 py-0.5 text-[10px] bg-white/20 rounded">Pro</span>
+                                                        </>
+                                                    ) : isDetecting ? (
                                                         <Loader2 className="h-4 w-4 animate-spin" />
                                                     ) : (
                                                         <Sparkles className="h-4 w-4" />
                                                     )}
-                                                    背景色を自動検出
+                                                    {canAIGenerate && '背景色を自動検出'}
                                                 </button>
                                                 {detectedColor && (
                                                     <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -551,12 +564,28 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                                 </button>
                             ) : (
                                 <button
-                                    onClick={handleExecute}
-                                    disabled={selectedSections.filter(s => s.id !== referenceSectionId).length === 0}
+                                    onClick={() => {
+                                        if (!canAIGenerate) {
+                                            toast.error('有料プランにアップグレードしてご利用ください');
+                                            return;
+                                        }
+                                        handleExecute();
+                                    }}
+                                    disabled={!canAIGenerate || selectedSections.filter(s => s.id !== referenceSectionId).length === 0}
                                     className="flex items-center gap-2 px-5 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <Palette className="h-4 w-4" />
-                                    {selectedSections.filter(s => s.id !== referenceSectionId).length}件の背景色を変更
+                                    {!canAIGenerate ? (
+                                        <>
+                                            <Lock className="h-4 w-4" />
+                                            アップグレード
+                                            <span className="px-1.5 py-0.5 text-[10px] bg-white/20 rounded">Pro</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Palette className="h-4 w-4" />
+                                            {selectedSections.filter(s => s.id !== referenceSectionId).length}件の背景色を変更
+                                        </>
+                                    )}
                                 </button>
                             )}
                         </div>

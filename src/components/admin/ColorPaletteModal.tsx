@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Sparkles, RefreshCw, Palette, DollarSign } from 'lucide-react';
+import { X, Sparkles, RefreshCw, Palette, DollarSign, Crown, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { GEMINI_PRICING } from '@/lib/ai-costs';
@@ -30,6 +30,7 @@ interface ColorPaletteModalProps {
     onApplyAndRegenerate: (palette: ColorPalette) => Promise<void>;
     onAutoDetect: () => Promise<ColorPalette | null>;
     isRegenerating?: boolean;
+    canAIGenerate?: boolean;
 }
 
 const PRESET_PALETTES: { name: string; colors: ColorPalette }[] = [
@@ -69,6 +70,7 @@ export default function ColorPaletteModal({
     onApplyAndRegenerate,
     onAutoDetect,
     isRegenerating = false,
+    canAIGenerate = true,
 }: ColorPaletteModalProps) {
     const [palette, setPalette] = useState<ColorPalette>({
         primary: '#2563eb',
@@ -181,11 +183,23 @@ export default function ColorPaletteModal({
 
                     {/* 自動検出 */}
                     <button
-                        onClick={handleAutoDetect}
-                        disabled={isDetecting || sections.length === 0}
-                        className="w-full py-3 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                        onClick={() => {
+                            if (!canAIGenerate) {
+                                toast.error('有料プランにアップグレードしてご利用ください');
+                                return;
+                            }
+                            handleAutoDetect();
+                        }}
+                        disabled={!canAIGenerate || isDetecting || sections.length === 0}
+                        className={`w-full py-3 border border-gray-200 rounded-xl text-sm font-medium disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 ${!canAIGenerate ? 'opacity-50 text-gray-400' : 'text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50'}`}
                     >
-                        {isDetecting ? (
+                        {!canAIGenerate ? (
+                            <>
+                                <Lock className="h-4 w-4" />
+                                現在のLPから自動検出
+                                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-gray-900 text-white rounded">Pro</span>
+                            </>
+                        ) : isDetecting ? (
                             <>
                                 <RefreshCw className="h-4 w-4 animate-spin" />
                                 検出中...
@@ -259,11 +273,23 @@ export default function ColorPaletteModal({
                                 保存のみ
                             </button>
                             <button
-                                onClick={() => onApplyAndRegenerate(palette)}
-                                disabled={isRegenerating || imageCount === 0}
+                                onClick={() => {
+                                    if (!canAIGenerate) {
+                                        toast.error('有料プランにアップグレードしてご利用ください');
+                                        return;
+                                    }
+                                    onApplyAndRegenerate(palette);
+                                }}
+                                disabled={!canAIGenerate || isRegenerating || imageCount === 0}
                                 className="px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                                {isRegenerating ? (
+                                {!canAIGenerate ? (
+                                    <>
+                                        <Lock className="h-4 w-4" />
+                                        アップグレード
+                                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-white/20 rounded">Pro</span>
+                                    </>
+                                ) : isRegenerating ? (
                                     <>
                                         <RefreshCw className="h-4 w-4 animate-spin" />
                                         再生成中...

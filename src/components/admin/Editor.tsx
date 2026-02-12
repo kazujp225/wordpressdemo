@@ -5170,6 +5170,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 <BackgroundUnifyModal
                     sections={sections}
                     selectedSectionIds={Array.from(selectedSectionsForBackgroundUnify)}
+                    canAIGenerate={planLimits.canAIGenerate}
                     onClose={() => {
                         setShowBackgroundUnifyModal(false);
                     }}
@@ -5473,6 +5474,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 sections={sections}
                 currentPalette={designDefinition?.colorPalette}
                 designDefinition={designDefinition}
+                canAIGenerate={planLimits.canAIGenerate}
                 onApply={(palette) => {
                     setDesignDefinition((prev: any) => ({
                         ...prev,
