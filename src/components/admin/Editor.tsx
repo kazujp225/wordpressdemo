@@ -4635,36 +4635,50 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             )}
 
                             {/* 背景色をそろえる */}
-                            {planLimits?.canAIGenerate !== false && isMenuItemVisible('background') && (
+                            {isMenuItemVisible('background') && (
                                 <EditorMenuItem
                                     icon={<Palette className="h-3.5 w-3.5" />}
                                     title="背景色をそろえる"
                                     description="全体の背景を同じ色に"
                                     tooltip="選択したブロックの背景色を統一します"
+                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
                                     action={
                                         <EditorActionButton
                                             onClick={() => {
+                                                if (planLimits?.canAIGenerate === false) {
+                                                    toast.error('有料プランにアップグレードしてご利用ください');
+                                                    return;
+                                                }
                                                 setBackgroundUnifyMode(true);
                                                 setBatchRegenerateMode(false);
                                                 setBoundaryFixMode(false);
                                             }}
-                                            disabled={sections.filter(s => s.image?.filePath).length === 0}
+                                            disabled={planLimits?.canAIGenerate === false || sections.filter(s => s.image?.filePath).length === 0}
                                         >
-                                            ブロックを選ぶ
+                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : 'ブロックを選ぶ'}
                                         </EditorActionButton>
                                     }
                                 />
                             )}
 
                             {/* 色の組み合わせ */}
-                            {planLimits?.canAIGenerate !== false && isMenuItemVisible('colorPalette') && (
+                            {isMenuItemVisible('colorPalette') && (
                                 <EditorMenuItem
                                     icon={<Droplet className="h-3.5 w-3.5" />}
                                     title="色の組み合わせ"
                                     description="ページ全体の色を選ぶ"
                                     tooltip="ページ全体の配色テーマを変更できます"
-                                    open={expandedTools.has('color-palette')}
-                                    onOpenChange={(open) => {
+                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
+                                    action={planLimits?.canAIGenerate === false ? (
+                                        <EditorActionButton
+                                            onClick={() => toast.error('有料プランにアップグレードしてご利用ください')}
+                                            disabled
+                                        >
+                                            アップグレード
+                                        </EditorActionButton>
+                                    ) : undefined}
+                                    open={planLimits?.canAIGenerate === false ? false : expandedTools.has('color-palette')}
+                                    onOpenChange={planLimits?.canAIGenerate === false ? undefined : (open) => {
                                         if (open) {
                                             setExpandedTools(prev => new Set([...prev, 'color-palette']));
                                         } else {
@@ -4676,9 +4690,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         }
                                     }}
                                 >
-                                    <EditorActionButton onClick={() => setShowColorPaletteModal(true)}>
-                                        色を選ぶ
-                                    </EditorActionButton>
+                                    {planLimits?.canAIGenerate !== false && (
+                                        <EditorActionButton onClick={() => setShowColorPaletteModal(true)}>
+                                            色を選ぶ
+                                        </EditorActionButton>
+                                    )}
                                 </EditorMenuItem>
                             )}
                         </EditorMenuSection>
@@ -4688,14 +4704,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     {isSectionVisible(['copyEdit', 'cta']) && (
                         <EditorMenuSection title="内容を編集する" color="emerald">
                             {/* 文字を修正 - AI画像編集と同じUIで領域選択 */}
-                            {planLimits?.canAIGenerate !== false && isMenuItemVisible('copyEdit') && (
+                            {isMenuItemVisible('copyEdit') && (
                                 <EditorMenuItem
                                     icon={<Type className="h-3.5 w-3.5" />}
                                     title="文字を修正"
                                     description="変更したい部分を囲んで修正"
                                     tooltip="画像上でテキスト領域を選択し、修正します（複数選択OK）"
-                                    open={expandedTools.has('copy-edit')}
-                                    onOpenChange={(open) => {
+                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
+                                    action={planLimits?.canAIGenerate === false ? (
+                                        <EditorActionButton onClick={() => toast.error('有料プランにアップグレードしてご利用ください')} disabled>
+                                            アップグレード
+                                        </EditorActionButton>
+                                    ) : undefined}
+                                    open={planLimits?.canAIGenerate === false ? false : expandedTools.has('copy-edit')}
+                                    onOpenChange={planLimits?.canAIGenerate === false ? undefined : (open) => {
                                         if (open) {
                                             setExpandedTools(prev => new Set([...prev, 'copy-edit']));
                                         } else {
@@ -4707,18 +4729,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         }
                                     }}
                                 >
-                                    <EditorSectionList
-                                        sections={sections}
-                                        onSelect={(section) => {
-                                            const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
-                                                ? section.mobileImage.filePath
-                                                : section.image?.filePath;
-                                            const mobileImageUrl = section.mobileImage?.filePath;
-                                            if (imageUrl) {
-                                                handleOpenInpaint(String(section.id), imageUrl, mobileImageUrl, 'text-fix');
-                                            }
-                                        }}
-                                    />
+                                    {planLimits?.canAIGenerate !== false && (
+                                        <EditorSectionList
+                                            sections={sections}
+                                            onSelect={(section) => {
+                                                const imageUrl = viewMode === 'mobile' && section.mobileImage?.filePath
+                                                    ? section.mobileImage.filePath
+                                                    : section.image?.filePath;
+                                                const mobileImageUrl = section.mobileImage?.filePath;
+                                                if (imageUrl) {
+                                                    handleOpenInpaint(String(section.id), imageUrl, mobileImageUrl, 'text-fix');
+                                                }
+                                            }}
+                                        />
+                                    )}
                                 </EditorMenuItem>
                             )}
 
@@ -4783,7 +4807,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     )}
 
                     {/* 別の用途で使う */}
-                    {planLimits?.canAIGenerate !== false && isSectionVisible(['thumbnail', 'document']) && (
+                    {isSectionVisible(['thumbnail', 'document']) && (
                         <EditorMenuSection title="別の用途で使う" color="purple">
                             {/* サムネイル用に変換 */}
                             {isMenuItemVisible('thumbnail') && (
@@ -4792,9 +4816,19 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     title="サムネイル用に変換"
                                     description="参考サムネイルを元に変換"
                                     tooltip="LPをYouTubeサムネイル風に変換します"
+                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
                                     action={
-                                        <EditorActionButton onClick={() => setShowThumbnailModal(true)}>
-                                            変換を開始
+                                        <EditorActionButton
+                                            onClick={() => {
+                                                if (planLimits?.canAIGenerate === false) {
+                                                    toast.error('有料プランにアップグレードしてご利用ください');
+                                                    return;
+                                                }
+                                                setShowThumbnailModal(true);
+                                            }}
+                                            disabled={planLimits?.canAIGenerate === false}
+                                        >
+                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : '変換を開始'}
                                         </EditorActionButton>
                                     }
                                 />
@@ -4807,9 +4841,19 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     title="資料にする"
                                     description="スライド風の資料を作成"
                                     tooltip="LPをプレゼン資料形式に変換します"
+                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
                                     action={
-                                        <EditorActionButton onClick={() => setShowDocumentModal(true)}>
-                                            資料を作成
+                                        <EditorActionButton
+                                            onClick={() => {
+                                                if (planLimits?.canAIGenerate === false) {
+                                                    toast.error('有料プランにアップグレードしてご利用ください');
+                                                    return;
+                                                }
+                                                setShowDocumentModal(true);
+                                            }}
+                                            disabled={planLimits?.canAIGenerate === false}
+                                        >
+                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : '資料を作成'}
                                         </EditorActionButton>
                                     }
                                 />
@@ -4818,7 +4862,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     )}
 
                     {/* AIコード生成 */}
-                    {planLimits?.canAIGenerate !== false && isSectionVisible(['claude']) && (
+                    {isSectionVisible(['claude']) && (
                         <EditorMenuSection title="AIコード生成" color="indigo">
                             {isMenuItemVisible('claude') && (
                                 <EditorMenuItem
@@ -4827,10 +4871,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     description="html/css/js"
                                     tooltip="HTML/CSS/JSコードを自動生成します"
                                     iconVariant="dark"
-                                    badge={<EditorBadge variant="new">NEW</EditorBadge>}
+                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : <EditorBadge variant="new">NEW</EditorBadge>}
                                     action={
-                                        <EditorActionButton onClick={() => setShowClaudeGeneratorModal(true)} variant="primary">
-                                            コードを生成
+                                        <EditorActionButton
+                                            onClick={() => {
+                                                if (planLimits?.canAIGenerate === false) {
+                                                    toast.error('有料プランにアップグレードしてご利用ください');
+                                                    return;
+                                                }
+                                                setShowClaudeGeneratorModal(true);
+                                            }}
+                                            variant={planLimits?.canAIGenerate === false ? "default" : "primary"}
+                                            disabled={planLimits?.canAIGenerate === false}
+                                        >
+                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : 'コードを生成'}
                                         </EditorActionButton>
                                     }
                                 />
@@ -4857,22 +4911,27 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             )}
 
                             {/* まとめて作り直す */}
-                            {planLimits?.canAIGenerate !== false && isMenuItemVisible('regenerate') && (
+                            {isMenuItemVisible('regenerate') && (
                                 <EditorMenuItem
                                     icon={<RefreshCw className="h-3.5 w-3.5" />}
                                     title="まとめて作り直す"
                                     description="ページ全体を再生成"
                                     tooltip="選択したブロックを一括再生成します"
+                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
                                     action={
                                         <EditorActionButton
                                             onClick={() => {
+                                                if (planLimits?.canAIGenerate === false) {
+                                                    toast.error('有料プランにアップグレードしてご利用ください');
+                                                    return;
+                                                }
                                                 setBatchRegenerateMode(true);
                                                 setBoundaryFixMode(false);
                                                 setBackgroundUnifyMode(false);
                                             }}
-                                            disabled={sections.filter(s => s.image?.filePath).length === 0}
+                                            disabled={planLimits?.canAIGenerate === false || sections.filter(s => s.image?.filePath).length === 0}
                                         >
-                                            ブロックを選ぶ
+                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : 'ブロックを選ぶ'}
                                         </EditorActionButton>
                                     }
                                 />
