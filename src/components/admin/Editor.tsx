@@ -4949,13 +4949,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     title="SEO/LLMO対策"
                                     description="検索・対話エンジン最適化"
                                     tooltip="Google検索とAI対話エンジン（ChatGPT, Claude等）向けにページを最適化します"
-                                    badge={<EditorBadge variant="pro">PRO</EditorBadge>}
+                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : <EditorBadge variant="pro">PRO</EditorBadge>}
                                     action={
                                         <EditorActionButton
-                                            onClick={() => setShowSeoLlmoModal(true)}
-                                            variant="primary"
+                                            onClick={() => {
+                                                if (planLimits?.canAIGenerate === false) {
+                                                    toast.error('有料プランにアップグレードしてご利用ください');
+                                                    return;
+                                                }
+                                                setShowSeoLlmoModal(true);
+                                            }}
+                                            variant={planLimits?.canAIGenerate === false ? "default" : "primary"}
+                                            disabled={planLimits?.canAIGenerate === false}
                                         >
-                                            最適化する
+                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : '最適化する'}
                                         </EditorActionButton>
                                     }
                                 />
