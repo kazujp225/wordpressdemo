@@ -410,8 +410,16 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                     </section>
                 ))}
 
-                {/* Form Section */}
-                <ContactForm pageSlug={params.slug} />
+                {/* Contact Section */}
+                <section id="contact" className="py-16 bg-gray-50">
+                    <div className="max-w-2xl mx-auto text-center px-4">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-4">お問い合わせ</h2>
+                        <p className="text-gray-600 mb-6">ご質問・ご相談は下記メールアドレスまでお気軽にご連絡ください。</p>
+                        <a href="mailto:team@zettai.co.jp" className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition-colors">
+                            team@zettai.co.jp
+                        </a>
+                    </div>
+                </section>
             </main>
 
             {/* Footer */}
