@@ -605,29 +605,51 @@ export function PagesHeader() {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setImportMode('light')}
+                                                        onClick={() => {
+                                                            if (!canAIGenerate) return;
+                                                            setImportMode('light');
+                                                        }}
                                                         disabled={isImporting}
-                                                        className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 ${importMode === 'light'
-                                                            ? 'bg-primary text-primary-foreground'
-                                                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                                        className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 relative ${!canAIGenerate
+                                                            ? 'opacity-50 cursor-not-allowed'
+                                                            : importMode === 'light'
+                                                                ? 'bg-primary text-primary-foreground'
+                                                                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                                                             }`}
                                                     >
                                                         <Palette className="h-4 w-4" />
                                                         <span>色だけ変更</span>
+                                                        {!canAIGenerate && <span className="absolute -top-1 -right-1 text-[8px] bg-amber-500 text-white px-1 rounded font-bold">PRO</span>}
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setImportMode('heavy')}
+                                                        onClick={() => {
+                                                            if (!canAIGenerate) return;
+                                                            setImportMode('heavy');
+                                                        }}
                                                         disabled={isImporting}
-                                                        className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 ${importMode === 'heavy'
-                                                            ? 'bg-primary text-primary-foreground'
-                                                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                                        className={`flex-1 flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-bold transition-all disabled:opacity-50 relative ${!canAIGenerate
+                                                            ? 'opacity-50 cursor-not-allowed'
+                                                            : importMode === 'heavy'
+                                                                ? 'bg-primary text-primary-foreground'
+                                                                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                                                             }`}
                                                     >
                                                         <RefreshCw className="h-4 w-4" />
                                                         <span>全体を再構成</span>
+                                                        {!canAIGenerate && <span className="absolute -top-1 -right-1 text-[8px] bg-amber-500 text-white px-1 rounded font-bold">PRO</span>}
                                                     </button>
                                                 </div>
+                                                {!canAIGenerate && (
+                                                    <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3">
+                                                        <Sparkles className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                                        <div>
+                                                            <p className="text-xs font-bold text-amber-800">AIデザイン解析は有料プランで利用できます</p>
+                                                            <p className="text-[10px] text-amber-600 mt-0.5">AIがデザインを解析・再構成します。「そのまま」モードは無料でご利用いただけます。</p>
+                                                            <a href="/admin/settings?tab=plan" className="inline-block mt-1.5 text-[10px] font-bold text-amber-700 underline underline-offset-2 hover:text-amber-900">プランをアップグレード →</a>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <p className="mt-2 text-[10px] text-muted-foreground">
                                                     {importMode === 'faithful' && '変更なし。元のデザインをそのまま取り込みます。'}
                                                     {importMode === 'light' && '配置は維持して、色・フォント・装飾のみ変更します。'}
