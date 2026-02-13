@@ -442,7 +442,7 @@ function getFeaturedAssets(category: string = 'all', page: number = 1, perPage: 
             title: btn.name,
             thumbnailUrl: svgDataUrl,
             downloadUrl: svgDataUrl,
-            author: 'OTASUKE！なんでもしゅうせいくん',
+            author: 'OTASUKE！なんでも修正くん',
             source: 'Buttons'
         };
     });
