@@ -10,6 +10,9 @@
 
 export type PlanType = 'free' | 'starter' | 'pro' | 'business' | 'enterprise' | 'unlimited';
 
+/** Freeプランのバナー AI編集無料回数（生涯） */
+export const FREE_BANNER_EDIT_LIMIT = 3;
+
 export interface PlanLimits {
   // 最大ページ数
   maxPages: number;
@@ -31,6 +34,8 @@ export interface PlanLimits {
   canSetApiKey: boolean;
   // 優先サポート
   prioritySupport: boolean;
+  // Freeプラン用: バナーAI編集の無料回数（0 = 無料枠なし＝クレジット制）
+  freeBannerEditLimit: number;
 }
 
 export interface Plan {
@@ -98,11 +103,13 @@ export const PLANS: Record<PlanType, Plan> = {
       canGenerateVideo: false,
       canSetApiKey: false,
       prioritySupport: false,
+      freeBannerEditLimit: FREE_BANNER_EDIT_LIMIT,
     },
     features: [
       '最大3ページ',
       '画像アップロード・編集',
       'エクスポート機能',
+      `バナーAI編集 ${FREE_BANNER_EDIT_LIMIT}回無料`,
     ],
   },
 
@@ -128,6 +135,7 @@ export const PLANS: Record<PlanType, Plan> = {
       canGenerateVideo: false,
       canSetApiKey: false,
       prioritySupport: false,
+      freeBannerEditLimit: 0,
     },
     features: [
       '最大10ページ',
@@ -160,6 +168,7 @@ export const PLANS: Record<PlanType, Plan> = {
       canGenerateVideo: false,
       canSetApiKey: false,
       prioritySupport: false,
+      freeBannerEditLimit: 0,
     },
     features: [
       '最大30ページ',
@@ -191,6 +200,7 @@ export const PLANS: Record<PlanType, Plan> = {
       canGenerateVideo: true,
       canSetApiKey: false,
       prioritySupport: false,
+      freeBannerEditLimit: 0,
     },
     features: [
       '最大50ページ',
@@ -222,6 +232,7 @@ export const PLANS: Record<PlanType, Plan> = {
       canGenerateVideo: true,
       canSetApiKey: false,
       prioritySupport: false,
+      freeBannerEditLimit: 0,
     },
     features: [
       '無制限ページ',
@@ -253,6 +264,7 @@ export const PLANS: Record<PlanType, Plan> = {
       canGenerateVideo: true,
       canSetApiKey: false,
       prioritySupport: false,
+      freeBannerEditLimit: 0,
     },
     features: [
       '無制限ページ',

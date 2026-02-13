@@ -9,7 +9,7 @@ import { BannerCard } from './BannerCard';
 import { BANNER_PLATFORMS } from '@/lib/banner-presets';
 import type { BannerListItem, BannerPlatform } from '@/types/banner';
 import { useUserSettings } from '@/lib/hooks/useAdminData';
-import { getPlan } from '@/lib/plans';
+import { getPlan, isFreePlan as checkIsFreePlan } from '@/lib/plans';
 import { UpgradeBanner } from './UpgradeBanner';
 
 interface ImportItem {
@@ -71,6 +71,10 @@ export function BannersContainer({ initialBanners }: BannersContainerProps) {
     const plan = getPlan(userSettings?.plan);
     const maxBanners = plan.limits.maxBanners;
     const isAtBannerLimit = maxBanners !== -1 && banners.length >= maxBanners;
+    const isFreePlan = checkIsFreePlan(userSettings?.plan);
+    const freeBannerEditsUsed = userSettings?.freeBannerEditsUsed ?? 0;
+    const freeBannerEditLimit = userSettings?.freeBannerEditLimit ?? 0;
+    const freeBannerEditsRemaining = freeBannerEditLimit - freeBannerEditsUsed;
     const [importItems, setImportItems] = useState<ImportItem[]>([]);
     const [isImporting, setIsImporting] = useState(false);
     const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -306,6 +310,31 @@ export function BannersContainer({ initialBanners }: BannersContainerProps) {
                     )}
                 </div>
             </div>
+
+            {/* Free Banner Edit Counter */}
+            {isFreePlan && freeBannerEditLimit > 0 && (
+                <div className={clsx(
+                    'mb-6 p-4 rounded-lg border text-center',
+                    freeBannerEditsRemaining > 0
+                        ? 'bg-blue-50 border-blue-200'
+                        : 'bg-red-50 border-red-200'
+                )}>
+                    {freeBannerEditsRemaining > 0 ? (
+                        <p className="text-sm font-bold text-blue-900">
+                            🎁 無料AI編集 残り <span className="text-xl font-extrabold">{freeBannerEditsRemaining}</span>/{freeBannerEditLimit} 回 ― バナーのAI編集を無料でお試しいただけます！
+                        </p>
+                    ) : (
+                        <>
+                            <p className="text-sm font-bold text-red-900">
+                                無料AI編集（{freeBannerEditLimit}回）を使い切りました
+                            </p>
+                            <a href="/admin/settings" className="text-xs text-red-600 hover:underline mt-1 inline-block">
+                                プランをアップグレードして引き続きAI編集 →
+                            </a>
+                        </>
+                    )}
+                </div>
+            )}
 
             {isAtBannerLimit && (
                 <UpgradeBanner feature={`バナー上限（${maxBanners}件）`} className="mb-6" />

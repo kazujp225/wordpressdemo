@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '@/lib/db';
-import { getPlan, PlanType, requiresSubscription, isFreePlan } from '@/lib/plans';
+import { getPlan, PlanType, requiresSubscription, isFreePlan, FREE_BANNER_EDIT_LIMIT } from '@/lib/plans';
 import {
   checkCreditBalance,
   consumeCredit,
@@ -42,6 +42,7 @@ export interface UsageLimitCheck {
   needApiKey?: boolean; // Freeプランで自分のAPIキーが必要
   usingOwnApiKey?: boolean; // 自分のAPIキーを使用中
   skipCreditConsumption?: boolean; // クレジット消費をスキップするか
+  isFreeBannerEdit?: boolean; // Freeプランの無料バナー編集か（成功後にカウンターをインクリメントする）
 }
 
 /**
@@ -115,12 +116,13 @@ const DEVELOPER_EMAILS: string[] = [
  */
 export async function checkGenerationLimit(
   userId: string,
-  estimatedCostUsd?: number
+  estimatedCostUsd?: number,
+  context?: { isBannerEdit?: boolean }
 ): Promise<UsageLimitCheck> {
   // 開発者アカウントチェック
   const userSettings = await prisma.userSettings.findUnique({
     where: { userId },
-    select: { plan: true, email: true },
+    select: { plan: true, email: true, freeBannerEditsUsed: true },
   });
 
   // 開発者アカウントはクレジット無制限
@@ -146,9 +148,35 @@ export async function checkGenerationLimit(
   // APIキー情報を取得
   const apiKeyInfo = await getGoogleApiKeyWithInfo(userId);
 
-  // Freeプランの場合 — AI生成は一切不可
+  // Freeプランの場合
   const plan = getPlan(planId);
   if (!plan.limits.canAIGenerate) {
+    // Freeプラン バナーAI編集の無料枠チェック
+    const freeLimit = plan.limits.freeBannerEditLimit ?? 0;
+    if (context?.isBannerEdit && freeLimit > 0) {
+      const used = userSettings?.freeBannerEditsUsed ?? 0;
+      if (used < freeLimit) {
+        return {
+          allowed: true,
+          skipCreditConsumption: true,
+          isFreeBannerEdit: true,
+          current: used,
+          limit: freeLimit,
+          remaining: freeLimit - used,
+        };
+      }
+      // 無料枠を使い切った
+      return {
+        allowed: false,
+        reason: `無料バナーAI編集の上限（${freeLimit}回）に達しました。プランをアップグレードしてください。`,
+        current: used,
+        limit: freeLimit,
+        remaining: 0,
+        needSubscription: true,
+      };
+    }
+
+    // バナー以外 or 無料枠なし → AI機能は一切不可
     return {
       allowed: false,
       reason: 'AI機能は有料プランのみご利用いただけます。プランをアップグレードしてください。',
@@ -199,10 +227,11 @@ export async function checkGenerationLimit(
 export async function checkImageGenerationLimit(
   userId: string,
   model: string = 'gemini-3-pro-image-preview',
-  imageCount: number = 1
+  imageCount: number = 1,
+  context?: { isBannerEdit?: boolean }
 ): Promise<UsageLimitCheck> {
   const estimatedCost = estimateImageCost(model, imageCount);
-  return checkGenerationLimit(userId, estimatedCost);
+  return checkGenerationLimit(userId, estimatedCost, context);
 }
 
 /**
@@ -423,6 +452,23 @@ export async function checkFeatureAccess(
   }
 
   return { allowed: true };
+}
+
+/**
+ * Freeプラン バナーAI編集カウンターをインクリメント（原子的操作）
+ * 成功したAI操作の後に呼び出す
+ * 二重防御: インクリメント後に上限超過をチェック
+ */
+export async function incrementFreeBannerEditCount(userId: string): Promise<{ newCount: number; limitReached: boolean }> {
+  const updated = await prisma.userSettings.update({
+    where: { userId },
+    data: { freeBannerEditsUsed: { increment: 1 } },
+    select: { freeBannerEditsUsed: true },
+  });
+  const newCount = updated.freeBannerEditsUsed;
+  const limitReached = newCount >= FREE_BANNER_EDIT_LIMIT;
+  console.log(`[FREE-BANNER-EDIT] userId=${userId}, count=${newCount}/${FREE_BANNER_EDIT_LIMIT}, limitReached=${limitReached}`);
+  return { newCount, limitReached };
 }
 
 /**

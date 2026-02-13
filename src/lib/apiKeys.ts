@@ -8,13 +8,13 @@ export interface ApiKeyResult {
 }
 
 // ユーザーIDを指定してAPIキーを取得
-export async function getGoogleApiKeyForUser(userId: string | null): Promise<string | null> {
-    const result = await getGoogleApiKeyWithInfo(userId);
+export async function getGoogleApiKeyForUser(userId: string | null, options?: { useSystemKey?: boolean }): Promise<string | null> {
+    const result = await getGoogleApiKeyWithInfo(userId, options);
     return result.apiKey;
 }
 
 // ユーザーIDを指定してAPIキーを取得（詳細情報付き）
-export async function getGoogleApiKeyWithInfo(userId: string | null): Promise<ApiKeyResult> {
+export async function getGoogleApiKeyWithInfo(userId: string | null, options?: { useSystemKey?: boolean }): Promise<ApiKeyResult> {
     if (!userId) {
         // ユーザーIDがない場合は環境変数のみ使用
         return {
@@ -33,6 +33,13 @@ export async function getGoogleApiKeyWithInfo(userId: string | null): Promise<Ap
 
         // Freeプランの場合のみ自分のAPIキーを使用
         if (isFreePlan(planId)) {
+            // 無料バナー編集など、自社APIキーを使うケース
+            if (options?.useSystemKey) {
+                return {
+                    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || null,
+                    isUserOwnKey: false
+                };
+            }
             if (userSettings?.googleApiKey) {
                 return {
                     apiKey: userSettings.googleApiKey,

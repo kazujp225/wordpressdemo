@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
-import { checkImageGenerationLimit } from '@/lib/usage';
+import { checkImageGenerationLimit, incrementFreeBannerEditCount } from '@/lib/usage';
 import { deductCreditAtomic, refundCredit } from '@/lib/credits';
 import {
     checkAllRateLimits,
@@ -62,8 +62,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'width and height are required' }, { status: 400 });
         }
 
-        // 2. クレジット残高チェック
-        const limitCheck = await checkImageGenerationLimit(user.id, modelUsed, 1);
+        // 2. クレジット残高チェック（generate-bannerは常にバナー操作）
+        const limitCheck = await checkImageGenerationLimit(user.id, modelUsed, 1, { isBannerEdit: true });
         if (!limitCheck.allowed) {
             if (limitCheck.needApiKey) {
                 return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
@@ -152,8 +152,8 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             );
         }
 
-        // 6. APIキーを取得
-        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id);
+        // 6. APIキーを取得（無料バナー編集時は自社キーを使用）
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id, { useSystemKey: !!limitCheck.isFreeBannerEdit });
         if (!GOOGLE_API_KEY) {
             if (creditDeducted) {
                 await refundCredit(user.id, estimatedCostUsd, requestId, 'APIキー未設定');
@@ -304,6 +304,11 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
         });
 
         console.log(`[BANNER-GEN] Completed successfully, requestId: ${requestId}`);
+
+        // Freeプラン無料バナー編集カウンターをインクリメント
+        if (limitCheck.isFreeBannerEdit) {
+            await incrementFreeBannerEditCount(user.id);
+        }
 
         return resultClone;
 

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Plus, Trash2, Link2, MousePointer, ExternalLink, Hash, MessageCircle, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { CTA_TEMPLATES, getTemplateStyle } from '@/lib/cta-templates';
+import { CTA_TEMPLATES, CTA_CATEGORIES, getTemplateStyle, type CTACategory } from '@/lib/cta-templates';
 
 // future: animation variants
 // future: line_primary_url from workspace settings
@@ -55,12 +55,19 @@ const ACTION_TYPES = [
     { value: 'line' as const, label: 'LINE', icon: MessageCircle, description: 'LINE誘導' },
 ];
 
-// LINE SVG icon
-const LineIcon = () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 mr-1.5 inline-block">
+// Icon components
+const LineIcon = ({ className = "h-4 w-4 mr-1.5 inline-block" }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
         <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
     </svg>
 );
+
+const TemplateIcon = ({ icon, className = "h-4 w-4 mr-1.5 inline-block" }: { icon?: string; className?: string }) => {
+    if (icon === 'line') return <LineIcon className={className} />;
+    if (icon === 'phone') return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>;
+    if (icon === 'mail') return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg>;
+    return null;
+};
 
 export default function OverlayEditorModal({
     isOpen,
@@ -75,6 +82,7 @@ export default function OverlayEditorModal({
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [categoryFilter, setCategoryFilter] = useState<CTACategory | 'all'>('all');
 
     const selectedOverlay = overlays.find(o => o.id === selectedId);
 
@@ -92,7 +100,7 @@ export default function OverlayEditorModal({
             height: 48,
             content: template.label,
             template: templateId,
-            action: templateId === 'line_green'
+            action: template.icon === 'line'
                 ? { type: 'line', url: '' }
                 : { type: 'external', url: '' },
             style: {
@@ -179,7 +187,7 @@ export default function OverlayEditorModal({
                     padding: template.padding,
                     border: template.border,
                 },
-                action: templateId === 'line_green'
+                action: template.icon === 'line'
                     ? { type: 'line' as const, url: o.action?.url || '' }
                     : o.action,
             };
@@ -292,7 +300,7 @@ export default function OverlayEditorModal({
                             {overlays.map(overlay => {
                                 const style = getOverlayStyle(overlay);
                                 const template = overlay.template ? CTA_TEMPLATES[overlay.template] : null;
-                                const isPulse = template?.animation === 'pulse';
+                                const animClass = template?.animation === 'pulse' ? 'animate-pulse' : template?.animation === 'bounce' ? 'animate-bounce' : '';
 
                                 return (
                                     <div
@@ -300,7 +308,7 @@ export default function OverlayEditorModal({
                                         className={clsx(
                                             "absolute cursor-grab active:cursor-grabbing transition-shadow",
                                             selectedId === overlay.id && "ring-2 ring-white ring-offset-2 ring-offset-gray-900",
-                                            isPulse && "animate-pulse"
+                                            animClass
                                         )}
                                         style={{
                                             left: `${overlay.x}%`,
@@ -314,7 +322,7 @@ export default function OverlayEditorModal({
                                             setSelectedId(overlay.id);
                                         }}
                                     >
-                                        {template?.icon === 'line' && <LineIcon />}
+                                        <TemplateIcon icon={template?.icon} />
                                         {overlay.content}
 
                                         {selectedId === overlay.id && (
@@ -343,10 +351,40 @@ export default function OverlayEditorModal({
                     {/* 右: 設定パネル */}
                     <div className="w-80 bg-gray-50 flex flex-col overflow-hidden">
                         {/* CTAテンプレート一覧 */}
-                        <div className="p-4 border-b border-gray-200 overflow-y-auto max-h-[280px]">
-                            <h3 className="text-sm font-bold text-gray-900 mb-3">CTAテンプレート</h3>
+                        <div className="p-4 border-b border-gray-200 overflow-y-auto max-h-[340px]">
+                            <h3 className="text-sm font-bold text-gray-900 mb-2">CTAテンプレート</h3>
+                            {/* カテゴリフィルタ */}
+                            <div className="flex gap-1 mb-3 flex-wrap">
+                                <button
+                                    onClick={() => setCategoryFilter('all')}
+                                    className={clsx(
+                                        "px-2 py-0.5 text-[10px] rounded-full border transition-colors",
+                                        categoryFilter === 'all'
+                                            ? "bg-gray-900 text-white border-gray-900"
+                                            : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+                                    )}
+                                >
+                                    すべて
+                                </button>
+                                {(Object.entries(CTA_CATEGORIES) as [CTACategory, string][]).map(([key, label]) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => setCategoryFilter(key)}
+                                        className={clsx(
+                                            "px-2 py-0.5 text-[10px] rounded-full border transition-colors",
+                                            categoryFilter === key
+                                                ? "bg-gray-900 text-white border-gray-900"
+                                                : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+                                        )}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
                             <div className="grid grid-cols-2 gap-2">
-                                {Object.entries(CTA_TEMPLATES).map(([id, template]) => {
+                                {Object.entries(CTA_TEMPLATES)
+                                    .filter(([, template]) => categoryFilter === 'all' || template.category === categoryFilter)
+                                    .map(([id, template]) => {
                                     const previewStyle = getTemplateStyle(id);
                                     return (
                                         <button
@@ -357,7 +395,8 @@ export default function OverlayEditorModal({
                                             <div
                                                 className={clsx(
                                                     "text-[10px] px-2 py-1 mb-1.5 truncate max-w-full",
-                                                    template.animation === 'pulse' && "animate-pulse"
+                                                    template.animation === 'pulse' && "animate-pulse",
+                                                    template.animation === 'bounce' && "animate-bounce"
                                                 )}
                                                 style={{
                                                     ...previewStyle,
@@ -365,7 +404,7 @@ export default function OverlayEditorModal({
                                                     padding: '4px 10px',
                                                 }}
                                             >
-                                                {template.icon === 'line' && <LineIcon />}
+                                                <TemplateIcon icon={template.icon} className="h-3 w-3 mr-0.5 inline-block" />
                                                 {template.label.length > 8 ? template.label.slice(0, 8) + '…' : template.label}
                                             </div>
                                             <span className="text-[10px] text-gray-500 font-medium">{template.name}</span>
@@ -411,8 +450,14 @@ export default function OverlayEditorModal({
                                                 onChange={(e) => changeTemplate(selectedId!, e.target.value)}
                                                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-gray-300"
                                             >
-                                                {Object.entries(CTA_TEMPLATES).map(([id, t]) => (
-                                                    <option key={id} value={id}>{t.name}</option>
+                                                {(Object.entries(CTA_CATEGORIES) as [CTACategory, string][]).map(([catKey, catLabel]) => (
+                                                    <optgroup key={catKey} label={catLabel}>
+                                                        {Object.entries(CTA_TEMPLATES)
+                                                            .filter(([, t]) => t.category === catKey)
+                                                            .map(([id, t]) => (
+                                                                <option key={id} value={id}>{t.name}</option>
+                                                            ))}
+                                                    </optgroup>
                                                 ))}
                                             </select>
                                         </div>

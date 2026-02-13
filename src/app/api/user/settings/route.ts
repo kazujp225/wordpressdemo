@@ -50,6 +50,9 @@ export async function GET() {
         hasResendApiKey: !!settings.resendApiKey,
         notificationEmail: settings.notificationEmail || '',
         resendFromDomain: settings.resendFromDomain || '',
+        // Free banner edit counter
+        freeBannerEditsUsed: settings.freeBannerEditsUsed ?? 0,
+        freeBannerEditLimit: plan.limits.freeBannerEditLimit ?? 0,
     });
 }
 

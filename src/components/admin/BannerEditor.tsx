@@ -189,6 +189,13 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     const { data: userSettings } = useUserSettings();
     const isFreePlan = userSettings?.plan === 'free';
 
+    // ── Free Banner Edit Counter ─────────────────
+    const [freeBannerEditsUsed, setFreeBannerEditsUsed] = useState<number>(0);
+    const [freeBannerEditLimit, setFreeBannerEditLimit] = useState<number>(0);
+    const freeBannerEditsRemaining = freeBannerEditLimit - freeBannerEditsUsed;
+    const hasFreeBannerEdits = isFreePlan && freeBannerEditsRemaining > 0;
+    const isFreeBannerLimitReached = isFreePlan && freeBannerEditLimit > 0 && freeBannerEditsRemaining <= 0;
+
     // ── Credit Balance ───────────────────────────
     const [creditBalance, setCreditBalance] = useState<number | null>(null);
     const [isLoadingCredit, setIsLoadingCredit] = useState(true);
@@ -204,6 +211,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                 if (response.ok) {
                     const data = await response.json();
                     setCreditBalance(data.creditBalanceUsd || 0);
+                    setFreeBannerEditsUsed(data.freeBannerEditsUsed ?? 0);
+                    setFreeBannerEditLimit(data.freeBannerEditLimit ?? 0);
                 }
             } catch (error) {
                 console.error('Failed to fetch credit balance:', error);
@@ -486,7 +495,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                 }));
                 res = await fetch('/api/ai/inpaint', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-source': 'banner' },
                     body: JSON.stringify({
                         imageUrl: generatedImageUrl,
                         masks,
@@ -500,7 +509,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                 // Full image editing via /api/ai/edit-image
                 res = await fetch('/api/ai/edit-image', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-source': 'banner' },
                     body: JSON.stringify({
                         imageUrl: generatedImageUrl,
                         prompt: editPrompt,
@@ -530,6 +539,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                 setGeneratedImageId(data.media.id);
                 setSelections([]);
                 toast.success('編集が完了しました');
+                // Freeプラン: カウンター更新
+                if (isFreePlan) setFreeBannerEditsUsed(prev => prev + 1);
             } else {
                 setImageHistory(prev => prev.slice(0, -1));
                 setEditError(data.message || '編集に失敗しました');
@@ -658,7 +669,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
         try {
             const res = await fetch('/api/ai/generate-banner', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'x-source': 'banner' },
                 body: JSON.stringify({
                     prompt,
                     productInfo,
@@ -688,6 +699,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                 setGeneratedImageUrl(data.media.filePath);
                 setGeneratedImageId(data.media.id);
                 toast.success('バナーを生成しました');
+                // Freeプラン: カウンター更新
+                if (isFreePlan) setFreeBannerEditsUsed(prev => prev + 1);
             } else {
                 toast.error(data.message || 'バナー画像を生成できませんでした');
             }
@@ -857,7 +870,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
 
                     const res = await fetch('/api/ai/inpaint', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-source': 'banner' },
                         body: JSON.stringify(body),
                     });
 
@@ -884,6 +897,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             };
                             return next;
                         });
+                        // Freeプラン: カウンター更新（各バリエーション成功ごと）
+                        if (isFreePlan) setFreeBannerEditsUsed(prev => prev + 1);
                     } else {
                         setVariationResults(prev => {
                             const next = [...prev];
@@ -961,7 +976,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
 
             const res = await fetch('/api/ai/inpaint', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'x-source': 'banner' },
                 body: JSON.stringify(body),
             });
 
@@ -988,6 +1003,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                     };
                     return next;
                 });
+                // Freeプラン: カウンター更新
+                if (isFreePlan) setFreeBannerEditsUsed(prev => prev + 1);
             } else {
                 setVariationResults(prev => {
                     const next = [...prev];
@@ -1033,7 +1050,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                     />
                 </div>
                 <div className="flex items-center gap-2">
-                    {editorMode === 'edit' && imageHistory.length > 0 && (
+                    {imageHistory.length > 0 && (
                         <button
                             onClick={handleUndo}
                             className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-100 transition-colors"
@@ -1512,13 +1529,38 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                 {/* Right Panel */}
                 <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border bg-background overflow-y-auto p-4 lg:p-5 space-y-6">
                     {/* Mode Tabs */}
+                    {/* Free Banner Edit Counter */}
+                    {isFreePlan && freeBannerEditLimit > 0 && (
+                        <div className={clsx(
+                            'p-3 rounded-lg border text-center',
+                            freeBannerEditsRemaining > 0
+                                ? 'bg-blue-50 border-blue-200'
+                                : 'bg-red-50 border-red-200'
+                        )}>
+                            {freeBannerEditsRemaining > 0 ? (
+                                <p className="text-sm font-bold text-blue-900">
+                                    🎁 無料AI編集 残り <span className="text-lg">{freeBannerEditsRemaining}</span>/{freeBannerEditLimit} 回
+                                </p>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-bold text-red-900">
+                                        無料AI編集を使い切りました
+                                    </p>
+                                    <a href="/admin/settings" className="text-xs text-red-600 hover:underline mt-1 block">
+                                        プランをアップグレード →
+                                    </a>
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     <div className="flex items-center bg-surface-100 rounded-lg p-1 border border-border">
                         <button
-                            onClick={() => !isFreePlan && handleModeChange('edit')}
-                            disabled={isFreePlan}
+                            onClick={() => !isFreeBannerLimitReached && handleModeChange('edit')}
+                            disabled={isFreeBannerLimitReached}
                             className={clsx(
                                 'flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-bold transition-all',
-                                isFreePlan
+                                isFreeBannerLimitReached
                                     ? 'text-muted-foreground/50 cursor-not-allowed'
                                     : editorMode === 'edit'
                                     ? 'bg-background text-foreground shadow-sm'
@@ -1529,11 +1571,11 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             画像編集
                         </button>
                         <button
-                            onClick={() => !isFreePlan && handleModeChange('generate')}
-                            disabled={isFreePlan}
+                            onClick={() => !isFreeBannerLimitReached && handleModeChange('generate')}
+                            disabled={isFreeBannerLimitReached}
                             className={clsx(
                                 'flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-bold transition-all',
-                                isFreePlan
+                                isFreeBannerLimitReached
                                     ? 'text-muted-foreground/50 cursor-not-allowed'
                                     : editorMode === 'generate'
                                     ? 'bg-background text-foreground shadow-sm'
@@ -1544,11 +1586,11 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             新規生成
                         </button>
                         <button
-                            onClick={() => !isFreePlan && handleModeChange('variations')}
-                            disabled={isFreePlan}
+                            onClick={() => !isFreeBannerLimitReached && handleModeChange('variations')}
+                            disabled={isFreeBannerLimitReached}
                             className={clsx(
                                 'flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-bold transition-all',
-                                isFreePlan
+                                isFreeBannerLimitReached
                                     ? 'text-muted-foreground/50 cursor-not-allowed'
                                     : editorMode === 'variations'
                                     ? 'bg-background text-foreground shadow-sm'
@@ -1560,7 +1602,54 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                         </button>
                     </div>
 
-                    {isFreePlan && (
+                    {/* ── Edit History Panel ── */}
+                    {imageHistory.length > 0 && (
+                        <div className="p-3 rounded-lg border border-border bg-surface-50">
+                            <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                                編集履歴 ({imageHistory.length}件)
+                            </label>
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                                {imageHistory.map((url, index) => (
+                                    <button
+                                        key={`${index}-${url.slice(-20)}`}
+                                        onClick={() => {
+                                            setGeneratedImageUrl(url);
+                                            setSelections([]);
+                                        }}
+                                        className={clsx(
+                                            'shrink-0 w-14 h-14 rounded-md border-2 overflow-hidden transition-all hover:opacity-100',
+                                            generatedImageUrl === url
+                                                ? 'border-blue-500 ring-2 ring-blue-200 opacity-100'
+                                                : 'border-border opacity-70 hover:border-blue-300'
+                                        )}
+                                        title={`履歴 ${index + 1}`}
+                                    >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={url}
+                                            alt={`履歴 ${index + 1}`}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </button>
+                                ))}
+                                {generatedImageUrl && !imageHistory.includes(generatedImageUrl) && (
+                                    <div
+                                        className="shrink-0 w-14 h-14 rounded-md border-2 border-blue-500 ring-2 ring-blue-200 overflow-hidden"
+                                        title="現在の画像"
+                                    >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={generatedImageUrl}
+                                            alt="現在"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {isFreeBannerLimitReached && (
                         <UpgradeBanner feature="AI画像生成・編集・複製" />
                     )}
 
@@ -1728,8 +1817,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                 </div>
                             )}
 
-                            {/* Credit Warning */}
-                            {hasInsufficientCredit && (
+                            {/* Credit Warning (hide when free banner edits available) */}
+                            {hasInsufficientCredit && !hasFreeBannerEdits && (
                                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
                                     <p className="text-xs text-amber-700 font-bold flex items-center gap-2">
                                         <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1746,19 +1835,24 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                 onClick={handleEdit}
                                 disabled={
                                     isEditing ||
-                                    isLoadingCredit ||
-                                    hasInsufficientCredit ||
+                                    (isLoadingCredit && !hasFreeBannerEdits) ||
+                                    (hasInsufficientCredit && !hasFreeBannerEdits) ||
                                     !generatedImageUrl ||
                                     !generatePromptFromSlots().trim()
                                 }
-                                className="w-full rounded-sm bg-gray-900 py-3 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className={clsx(
+                                    'w-full rounded-sm py-3 text-sm font-bold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2',
+                                    hasFreeBannerEdits
+                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                        : 'bg-gray-900 hover:bg-gray-800'
+                                )}
                             >
-                                {isLoadingCredit ? (
+                                {isLoadingCredit && !hasFreeBannerEdits ? (
                                     <>
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                         残高確認中...
                                     </>
-                                ) : hasInsufficientCredit ? (
+                                ) : hasInsufficientCredit && !hasFreeBannerEdits ? (
                                     <>
                                         <AlertTriangle className="h-4 w-4" />
                                         クレジット不足
@@ -1767,6 +1861,11 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                     <>
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                         編集中...
+                                    </>
+                                ) : hasFreeBannerEdits ? (
+                                    <>
+                                        <Wand2 className="h-4 w-4" />
+                                        🎁 お試し無料編集実行（残り{freeBannerEditsRemaining}回）
                                     </>
                                 ) : (
                                     <>
@@ -1922,8 +2021,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                 />
                             </div>
 
-                            {/* Credit Warning */}
-                            {hasInsufficientCredit && (
+                            {/* Credit Warning (hide when free banner edits available) */}
+                            {hasInsufficientCredit && !hasFreeBannerEdits && (
                                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                                     <p className="text-xs text-amber-700 font-bold flex items-center gap-2">
                                         <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1945,8 +2044,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                     onClick={handleGenerateVariations}
                                     disabled={
                                         isGeneratingVariations ||
-                                        isLoadingCredit ||
-                                        hasInsufficientCredit ||
+                                        (isLoadingCredit && !hasFreeBannerEdits) ||
+                                        (hasInsufficientCredit && !hasFreeBannerEdits) ||
                                         !generatedImageUrl ||
                                         !prompt.trim()
                                     }
@@ -1954,9 +2053,11 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                         'w-full rounded-lg py-3.5 text-sm font-bold text-white transition-all duration-200 flex items-center justify-center gap-2 shadow-sm relative overflow-hidden',
                                         isGeneratingVariations
                                             ? 'bg-indigo-600'
-                                            : !generatedImageUrl || !prompt.trim() || hasInsufficientCredit
+                                            : !generatedImageUrl || !prompt.trim() || (hasInsufficientCredit && !hasFreeBannerEdits)
                                                 ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 hover:shadow-md hover:shadow-indigo-500/25 active:scale-[0.98]',
+                                                : hasFreeBannerEdits
+                                                    ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-md hover:shadow-blue-500/25 active:scale-[0.98]'
+                                                    : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 hover:shadow-md hover:shadow-indigo-500/25 active:scale-[0.98]',
                                         'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100'
                                     )}
                                 >
@@ -1968,7 +2069,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                         />
                                     )}
                                     <span className="relative flex items-center gap-2">
-                                        {isLoadingCredit ? (
+                                        {isLoadingCredit && !hasFreeBannerEdits ? (
                                             <>
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                                 残高確認中...
@@ -1978,7 +2079,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                                 <ImageIcon className="h-4 w-4" />
                                                 元画像が必要です
                                             </>
-                                        ) : hasInsufficientCredit ? (
+                                        ) : hasInsufficientCredit && !hasFreeBannerEdits ? (
                                             <>
                                                 <AlertTriangle className="h-4 w-4" />
                                                 クレジット不足
@@ -1990,6 +2091,11 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                                 <span className="text-white/60 text-xs font-mono tabular-nums">
                                                     {Math.floor(variationElapsed / 60)}:{String(variationElapsed % 60).padStart(2, '0')}
                                                 </span>
+                                            </>
+                                        ) : hasFreeBannerEdits ? (
+                                            <>
+                                                <Sparkles className="h-4 w-4" />
+                                                🎁 お試し無料生成（残り{freeBannerEditsRemaining}回）
                                             </>
                                         ) : (
                                             <>
@@ -2344,12 +2450,22 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             <button
                                 onClick={handleGenerate}
                                 disabled={isGenerating || (!prompt && !productInfo)}
-                                className="w-full rounded-lg bg-gray-900 py-3 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className={clsx(
+                                    'w-full rounded-lg py-3 text-sm font-bold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2',
+                                    hasFreeBannerEdits
+                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                        : 'bg-gray-900 hover:bg-gray-800'
+                                )}
                             >
                                 {isGenerating ? (
                                     <>
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                         生成中...
+                                    </>
+                                ) : hasFreeBannerEdits ? (
+                                    <>
+                                        <Sparkles className="h-4 w-4" />
+                                        🎁 お試し無料生成（残り{freeBannerEditsRemaining}回）
                                     </>
                                 ) : (
                                     <>

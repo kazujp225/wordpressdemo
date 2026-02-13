@@ -6,7 +6,7 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { estimateImageCost } from '@/lib/ai-costs';
 import { fetchWithRetry } from '@/lib/gemini-retry';
-import { checkImageGenerationLimit } from '@/lib/usage';
+import { checkImageGenerationLimit, incrementFreeBannerEditCount } from '@/lib/usage';
 import { deductCreditAtomic, refundCredit } from '@/lib/credits';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
@@ -157,8 +157,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // バナー操作かどうかをヘッダーで判定
+    const isBannerEdit = request.headers.get('x-source') === 'banner';
+
     // クレジット残高チェック（先にチェックのみ）
-    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1);
+    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1, { isBannerEdit });
     if (!limitCheck.allowed) {
         if (limitCheck.needApiKey) {
             return NextResponse.json({
@@ -242,7 +245,7 @@ export async function POST(request: NextRequest) {
         // 複数選択か単一選択か判定
         const allMasks: MaskArea[] = masks && masks.length > 0 ? masks : (mask ? [mask] : []);
 
-        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id);
+        const GOOGLE_API_KEY = await getGoogleApiKeyForUser(user.id, { useSystemKey: !!limitCheck.isFreeBannerEdit });
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({
                 error: 'Google API key is not configured. 設定画面でAPIキーを設定してください。'
@@ -475,6 +478,11 @@ export async function POST(request: NextRequest) {
 
         // クレジットは先払い済みなので、成功時は何もしない
         console.log(`[INPAINT] Success, requestId: ${requestId}`);
+
+        // Freeプラン無料バナー編集カウンターをインクリメント
+        if (limitCheck.isFreeBannerEdit) {
+            await incrementFreeBannerEditCount(user.id);
+        }
 
         // セクション画像変更履歴を保存（sectionIdとpreviousImageIdが渡された場合）
         if (sectionId && previousImageId) {

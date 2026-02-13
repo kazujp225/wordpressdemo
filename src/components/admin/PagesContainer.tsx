@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { Plus, Star } from 'lucide-react';
+import clsx from 'clsx';
 import { PageCard } from './PageCard';
 import type { PageListItem } from '@/types';
+import { useUserSettings } from '@/lib/hooks/useAdminData';
+import { isFreePlan as checkIsFreePlan } from '@/lib/plans';
 
 interface PagesContainerProps {
     initialPages: PageListItem[];
@@ -13,6 +16,11 @@ interface PagesContainerProps {
 export function PagesContainer({ initialPages, headerContent }: PagesContainerProps) {
     const [pages, setPages] = useState<PageListItem[]>(initialPages);
     const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+    const { data: userSettings } = useUserSettings();
+    const isFreePlan = checkIsFreePlan(userSettings?.plan);
+    const freeBannerEditsUsed = userSettings?.freeBannerEditsUsed ?? 0;
+    const freeBannerEditLimit = userSettings?.freeBannerEditLimit ?? 0;
+    const freeBannerEditsRemaining = freeBannerEditLimit - freeBannerEditsUsed;
 
     const handleDelete = (id: number) => {
         setPages((prev) => prev.filter((page) => page.id !== id));
@@ -70,6 +78,31 @@ export function PagesContainer({ initialPages, headerContent }: PagesContainerPr
                     {headerContent}
                 </div>
             </div>
+
+            {/* Free Banner Edit Counter */}
+            {isFreePlan && freeBannerEditLimit > 0 && (
+                <div className={clsx(
+                    'mb-6 p-4 rounded-lg border text-center',
+                    freeBannerEditsRemaining > 0
+                        ? 'bg-blue-50 border-blue-200'
+                        : 'bg-red-50 border-red-200'
+                )}>
+                    {freeBannerEditsRemaining > 0 ? (
+                        <p className="text-sm font-bold text-blue-900">
+                            🎁 無料AI編集 残り <span className="text-xl font-extrabold">{freeBannerEditsRemaining}</span>/{freeBannerEditLimit} 回 ― バナーのAI編集を無料でお試しいただけます！
+                        </p>
+                    ) : (
+                        <>
+                            <p className="text-sm font-bold text-red-900">
+                                無料AI編集（{freeBannerEditLimit}回）を使い切りました
+                            </p>
+                            <a href="/admin/settings" className="text-xs text-red-600 hover:underline mt-1 inline-block">
+                                プランをアップグレードして引き続きAI編集 →
+                            </a>
+                        </>
+                    )}
+                </div>
+            )}
 
             {displayPages.length === 0 ? (
                 <div className="flex h-96 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface-50/50">

@@ -27,6 +27,7 @@ export async function GET() {
                     isBanned: true,
                     banReason: true,
                     plan: true,
+                    freeBannerEditsUsed: true,
                 },
             }),
             prisma.creditBalance.findUnique({
@@ -54,6 +55,8 @@ export async function GET() {
             creditBalanceUsd: creditBalance?.balanceUsd ? Number(creditBalance.balanceUsd) : 0,
             planLimits: planObj.limits,
             bannerCount,
+            freeBannerEditsUsed: settings?.freeBannerEditsUsed ?? 0,
+            freeBannerEditLimit: planObj.limits.freeBannerEditLimit ?? 0,
         });
     } catch (error: any) {
         console.error('Failed to get user status:', error);

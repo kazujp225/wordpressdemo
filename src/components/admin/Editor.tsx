@@ -4331,20 +4331,30 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 }
                             }}
                         >
-                            <div className="space-y-3 p-2">
+                            <div className="space-y-1 p-2">
                                 {/* ロゴテキスト */}
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">ロゴテキスト</label>
-                                    <input
-                                        type="text"
-                                        value={headerConfig.logoText || ''}
-                                        onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoText: e.target.value }))}
-                                        placeholder="サイト名"
-                                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                                    />
-                                </div>
-                                {/* CTAボタン - 横並び */}
-                                <div className="flex gap-2">
+                                <details className="group" open>
+                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600">
+                                        <span>ロゴテキスト</span>
+                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                    </summary>
+                                    <div className="pt-1 pb-2">
+                                        <input
+                                            type="text"
+                                            value={headerConfig.logoText || ''}
+                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoText: e.target.value }))}
+                                            placeholder="サイト名"
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                        />
+                                    </div>
+                                </details>
+                                {/* CTAボタン */}
+                                <details className="group">
+                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600 border-t border-gray-100 pt-2">
+                                        <span>CTAボタン</span>
+                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                    </summary>
+                                <div className="flex gap-2 pt-1 pb-2">
                                     <div className="flex-1">
                                         <label className="block text-xs font-medium text-gray-600 mb-1">CTAテキスト</label>
                                         <input
@@ -4397,9 +4407,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         })()}
                                     </div>
                                 </div>
-                                {/* ナビゲーション - アコーディオン */}
+                                </details>
+                                {/* ナビゲーション */}
                                 <details className="group">
-                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600">
+                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600 border-t border-gray-100 pt-2">
                                         <span>ナビゲーション ({headerConfig.navItems?.length || 0}件)</span>
                                         <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
                                     </summary>
@@ -4497,18 +4508,24 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     </div>
                                 </details>
                                 {/* ヘッダー固定設定 */}
-                                <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
-                                    <input
-                                        type="checkbox"
-                                        id="header-sticky"
-                                        checked={headerConfig.sticky}
-                                        onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, sticky: e.target.checked }))}
-                                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                                    />
-                                    <label htmlFor="header-sticky" className="text-xs text-gray-600">
-                                        スクロール時にヘッダーを固定
-                                    </label>
-                                </div>
+                                <details className="group">
+                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600 border-t border-gray-100 pt-2">
+                                        <span>表示オプション</span>
+                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                    </summary>
+                                    <div className="flex items-center gap-2 pt-1 pb-2">
+                                        <input
+                                            type="checkbox"
+                                            id="header-sticky"
+                                            checked={headerConfig.sticky}
+                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, sticky: e.target.checked }))}
+                                            className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                        />
+                                        <label htmlFor="header-sticky" className="text-xs text-gray-600">
+                                            スクロール時にヘッダーを固定
+                                        </label>
+                                    </div>
+                                </details>
                             </div>
                         </EditorMenuItem>
                     </EditorMenuSection>
