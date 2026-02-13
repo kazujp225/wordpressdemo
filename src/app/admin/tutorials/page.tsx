@@ -6,7 +6,7 @@ const TUTORIAL_VIDEOS = [
     {
         id: 'tknr6vbsNOM',
         title: 'LP作成ツール説明動画',
-        description: 'オタスケ LPの基本的な使い方を解説しています。',
+        description: 'OTASUKE！なんでもしゅうせいくんの基本的な使い方を解説しています。',
     },
 ];
 
@@ -19,7 +19,7 @@ export default function TutorialsPage() {
                     説明動画
                 </h1>
                 <p className="mt-2 text-sm text-gray-500">
-                    オタスケ LPの使い方を動画で解説しています。
+                    OTASUKE！なんでもしゅうせいくんの使い方を動画で解説しています。
                 </p>
             </div>
 

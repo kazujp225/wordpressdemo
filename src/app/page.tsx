@@ -147,7 +147,7 @@ export default function LoginPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 bg-primary rounded-sm" />
-            <span className="text-xl font-bold tracking-tight">オタスケ LP</span>
+            <span className="text-xl font-bold tracking-tight">OTASUKE！なんでもしゅうせいくん</span>
           </div>
         </div>
       </header>
@@ -373,7 +373,7 @@ export default function LoginPage() {
       <footer className="border-t border-gray-100 mt-16">
         <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col items-center gap-2">
           <p className="text-sm text-muted-foreground">
-            © 2024 オタスケ LP All rights reserved.
+            © 2024 OTASUKE！なんでもしゅうせいくん All rights reserved.
           </p>
         </div>
       </footer>

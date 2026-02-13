@@ -47,7 +47,7 @@ export async function sendWelcomeEmail({
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
         <div style="text-align:center;margin-bottom:32px;">
           <div style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:8px;font-size:20px;font-weight:bold;">
-            オタスケ LP
+            OTASUKE！なんでもしゅうせいくん
           </div>
         </div>
 
@@ -95,7 +95,7 @@ export async function sendWelcomeEmail({
     await resend.emails.send({
       from: SYSTEM_FROM_EMAIL,
       to,
-      subject: '【オタスケ LP】ご登録完了 - パスワード設定のお願い',
+      subject: '【OTASUKE！なんでもしゅうせいくん】ご登録完了 - パスワード設定のお願い',
       html,
     });
 

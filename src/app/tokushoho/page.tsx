@@ -14,7 +14,7 @@ export default function TokushohoPage() {
                         <span className="text-sm font-medium">戻る</span>
                     </Link>
                     <Link href="/" className="text-xl font-black tracking-tighter">
-                        オタスケ LP
+                        OTASUKE！なんでもしゅうせいくん
                     </Link>
                 </div>
             </header>
@@ -52,7 +52,7 @@ export default function TokushohoPage() {
                                 </tr>
                                 <tr>
                                     <th className="py-4 px-4 text-left text-sm font-bold text-gray-900 bg-gray-50 align-top">商品・サービス名</th>
-                                    <td className="py-4 px-4 text-sm text-gray-700">オタスケ LP（AIランディングページ作成支援SaaS）</td>
+                                    <td className="py-4 px-4 text-sm text-gray-700">OTASUKE！なんでもしゅうせいくん（AIランディングページ作成支援SaaS）</td>
                                 </tr>
                                 <tr>
                                     <th className="py-4 px-4 text-left text-sm font-bold text-gray-900 bg-gray-50 align-top">販売価格</th>

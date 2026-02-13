@@ -386,7 +386,7 @@ export default function LPBuilderPage() {
                 <div className="h-16 flex items-center px-6 border-b border-gray-100/50">
                     <div className="flex items-center gap-2 font-bold text-lg tracking-tight font-manrope">
                         <div className="w-5 h-5 bg-black rounded-md shadow-sm shadow-black/20"></div>
-                        オタスケ LP
+                        OTASUKE！なんでもしゅうせいくん
                     </div>
                 </div>
 
