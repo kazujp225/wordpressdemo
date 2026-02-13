@@ -1436,22 +1436,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             : null;
 
         if (newMedia) {
-            // サーバー側にも履歴を保存
-            if (currentSection?.imageId) {
-                try {
-                    await fetch(`/api/sections/${targetSectionId}/history`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            previousImageId: currentSection.imageId,
-                            newImageId: newMedia.id,
-                            actionType: 'inpaint'
-                        }),
-                    });
-                } catch (e) {
-                    console.error('Failed to save history:', e);
-                }
-            }
+            // 履歴はインペイントAPI側で自動保存されるため、ここでは保存しない
 
             setSections(prev => prev.map(s =>
                 s.id === targetSectionId
@@ -5057,6 +5042,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     }}
                     onSave={handleInpaintSave}
                     sectionId={inpaintSectionId}
+                    previousImageId={sections.find(s => s.id === inpaintSectionId)?.imageId}
                     clickableAreas={sections.find(s => s.id === inpaintSectionId)?.config?.clickableAreas || []}
                     mobileClickableAreas={sections.find(s => s.id === inpaintSectionId)?.config?.mobileClickableAreas || []}
                     onSaveClickableAreas={handleSaveClickableAreas}

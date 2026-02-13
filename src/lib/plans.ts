@@ -3,9 +3,12 @@
  * クレジットベースのAPI使用量管理
  * 内部的には円で管理し、表示時はクレジット（1円 = 10クレジット）
  * 例: ¥5,000 = 50,000クレジット
+ *
+ * クレジット付与ロジック: 月額の25%を原価としてクレジット化
+ * 例: ¥10,000プラン → ¥2,500分 = 25,000クレジット
  */
 
-export type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
+export type PlanType = 'free' | 'starter' | 'pro' | 'business' | 'enterprise' | 'unlimited';
 
 export interface PlanLimits {
   // 最大ページ数
@@ -36,7 +39,7 @@ export interface Plan {
   description: string;
   // 月額（円）
   priceJpy: number;
-  // 月額に含まれるクレジット（1円 = 100クレジット）
+  // 月額に含まれるクレジット（1円 = 10クレジット）
   includedTokens: number;
   // 後方互換性：USDでのクレジット額（内部処理用）
   includedCreditUsd: number;
@@ -50,6 +53,8 @@ export interface Plan {
   limits: PlanLimits;
   // 機能一覧（表示用）
   features: string[];
+  // おすすめプランかどうか
+  popular?: boolean;
 }
 
 // クレジット変換レート（1円 = 10クレジット）
@@ -71,127 +76,189 @@ export function formatTokens(tokens: number): string {
 }
 
 export const PLANS: Record<PlanType, Plan> = {
-  // 無料プラン（レガシー、新規登録は非推奨）
+  // 無料プラン
   free: {
     id: 'free',
     name: 'Free',
-    description: '無料プラン（自分のAPIキーが必要）',
+    description: '無料で試せるプラン',
     priceJpy: 0,
-    includedTokens: 0, // クレジットなし（自分のAPIキーを使用）
-    includedCreditUsd: 0, // 後方互換性
+    includedTokens: 0,
+    includedCreditUsd: 0,
     stripePriceId: '',
     priceDisplay: '¥0/月',
     colorClass: 'text-gray-600',
     limits: {
-      maxPages: 3, // 3ページまで
-      maxBanners: 3, // 3バナーまで
-      maxStorageMB: 500, // 500MBまで
-      canAIGenerate: false, // AI生成不可
-      canUpscale4K: false, // 4Kアップスケール不可
-      canRestyle: false, // リスタイル不可
-      canExport: true, // エクスポートは可能
-      canGenerateVideo: false, // 動画生成不可
-      canSetApiKey: false, // APIキー設定不可
+      maxPages: 3,
+      maxBanners: -1, // 無制限
+      maxStorageMB: 500,
+      canAIGenerate: false,
+      canUpscale4K: false,
+      canRestyle: false,
+      canExport: true,
+      canGenerateVideo: false,
+      canSetApiKey: false,
       prioritySupport: false,
     },
     features: [
       '最大3ページ',
-      '最大3バナー',
-      '画像アップロード・クロップ・リサイズ',
+      '画像アップロード・編集',
       'エクスポート機能',
-      '※AI画像生成・インペイント等は有料プランのみ',
     ],
   },
-  pro: {
-    id: 'pro',
-    name: 'Pro',
-    description: 'スタートアップ・個人事業主向け',
-    priceJpy: 20000,
-    includedTokens: 50000, // ¥5,000分 = 50,000クレジット
-    includedCreditUsd: 33.33, // 後方互換性: ¥5,000 / 150
-    stripePriceId: process.env.STRIPE_PRICE_PRO || 'price_pro',
-    priceDisplay: '¥20,000/月',
+
+  // Starter: ¥10,000/月 → 25% = ¥2,500分 = 25,000クレジット
+  starter: {
+    id: 'starter',
+    name: 'Starter',
+    description: '個人・小規模事業向け',
+    priceJpy: 10000,
+    includedTokens: 25000, // ¥2,500分
+    includedCreditUsd: 16.67, // ¥2,500 / 150
+    stripePriceId: process.env.STRIPE_PRICE_STARTER || 'price_starter',
+    priceDisplay: '¥10,000/月',
     colorClass: 'text-blue-600',
     limits: {
-      maxPages: 30,
-      maxBanners: 50,
+      maxPages: 10,
+      maxBanners: -1,
       maxStorageMB: 5000,
       canAIGenerate: true,
       canUpscale4K: false,
       canRestyle: false,
       canExport: true,
       canGenerateVideo: false,
-      canSetApiKey: false, // 有料プランは自社APIを使用
+      canSetApiKey: false,
       prioritySupport: false,
     },
     features: [
-      '最大30ページ',
-      '最大50バナー',
-      '月間 50,000 クレジット',
+      '最大10ページ',
+      '月25,000クレジット',
       '画像生成',
       'インペイント編集',
-      'HTMLエクスポート',
     ],
   },
-  business: {
-    id: 'business',
-    name: 'Business',
-    description: '成長企業・制作会社向け',
-    priceJpy: 40000,
-    includedTokens: 100000, // ¥10,000分 = 100,000クレジット
-    includedCreditUsd: 66.67, // 後方互換性: ¥10,000 / 150
-    stripePriceId: process.env.STRIPE_PRICE_BUSINESS || 'price_business',
-    priceDisplay: '¥40,000/月',
-    colorClass: 'text-purple-600',
+
+  // Pro: ¥30,000/月 → 25% = ¥7,500分 = 75,000クレジット
+  pro: {
+    id: 'pro',
+    name: 'Pro',
+    description: 'スタートアップ・個人事業主向け',
+    priceJpy: 30000,
+    includedTokens: 75000, // ¥7,500分
+    includedCreditUsd: 50.00, // ¥7,500 / 150
+    stripePriceId: process.env.STRIPE_PRICE_PRO || 'price_pro',
+    priceDisplay: '¥30,000/月',
+    colorClass: 'text-indigo-600',
+    popular: true,
     limits: {
-      maxPages: 100,
-      maxBanners: 200,
-      maxStorageMB: 20000,
+      maxPages: 30,
+      maxBanners: -1,
+      maxStorageMB: 10000,
       canAIGenerate: true,
       canUpscale4K: true,
       canRestyle: true,
       canExport: true,
       canGenerateVideo: false,
-      canSetApiKey: false, // 有料プランは自社APIを使用
+      canSetApiKey: false,
       prioritySupport: false,
     },
     features: [
-      '最大100ページ',
-      '最大200バナー',
-      '月間 100,000 クレジット',
-      'Pro全機能',
+      '最大30ページ',
+      '月75,000クレジット',
       '4Kアップスケール',
       'リスタイル機能',
     ],
   },
-  enterprise: {
-    id: 'enterprise',
-    name: 'Enterprise',
-    description: '代理店・大規模ビジネス向け',
-    priceJpy: 100000,
-    includedTokens: 250000, // ¥25,000分 = 250,000クレジット
-    includedCreditUsd: 166.67, // 後方互換性: ¥25,000 / 150
-    stripePriceId: process.env.STRIPE_PRICE_ENTERPRISE || 'price_enterprise',
-    priceDisplay: '¥100,000/月',
-    colorClass: 'text-amber-600',
+
+  // Business: ¥50,000/月 → 25% = ¥12,500分 = 125,000クレジット
+  business: {
+    id: 'business',
+    name: 'Business',
+    description: '成長企業・制作会社向け',
+    priceJpy: 50000,
+    includedTokens: 125000, // ¥12,500分
+    includedCreditUsd: 83.33, // ¥12,500 / 150
+    stripePriceId: process.env.STRIPE_PRICE_BUSINESS || 'price_business',
+    priceDisplay: '¥50,000/月',
+    colorClass: 'text-purple-600',
     limits: {
-      maxPages: -1, // 無制限
-      maxBanners: -1, // 無制限
-      maxStorageMB: -1, // 無制限
+      maxPages: 50,
+      maxBanners: -1,
+      maxStorageMB: 20000,
       canAIGenerate: true,
       canUpscale4K: true,
       canRestyle: true,
       canExport: true,
       canGenerateVideo: true,
-      canSetApiKey: false, // 有料プランは自社APIを使用
-      prioritySupport: true,
+      canSetApiKey: false,
+      prioritySupport: false,
     },
     features: [
-      '無制限ページ・バナー',
-      '月間 250,000 クレジット',
-      'Business全機能',
+      '最大50ページ',
+      '月125,000クレジット',
       '動画生成',
-      '優先サポート',
+      '全機能利用可能',
+    ],
+  },
+
+  // Enterprise: ¥100,000/月 → 25% = ¥25,000分 = 250,000クレジット
+  enterprise: {
+    id: 'enterprise',
+    name: 'Enterprise',
+    description: '代理店・大規模ビジネス向け',
+    priceJpy: 100000,
+    includedTokens: 250000, // ¥25,000分
+    includedCreditUsd: 166.67, // ¥25,000 / 150
+    stripePriceId: process.env.STRIPE_PRICE_ENTERPRISE || 'price_enterprise',
+    priceDisplay: '¥100,000/月',
+    colorClass: 'text-amber-600',
+    limits: {
+      maxPages: -1, // 無制限
+      maxBanners: -1,
+      maxStorageMB: -1,
+      canAIGenerate: true,
+      canUpscale4K: true,
+      canRestyle: true,
+      canExport: true,
+      canGenerateVideo: true,
+      canSetApiKey: false,
+      prioritySupport: false,
+    },
+    features: [
+      '無制限ページ',
+      '月250,000クレジット',
+      '動画生成',
+      '全機能利用可能',
+    ],
+  },
+
+  // Unlimited: ¥500,000/月 → 25% = ¥125,000分 = 1,250,000クレジット
+  unlimited: {
+    id: 'unlimited',
+    name: 'Unlimited',
+    description: '大量運用・エージェンシー向け',
+    priceJpy: 500000,
+    includedTokens: 1250000, // ¥125,000分
+    includedCreditUsd: 833.33, // ¥125,000 / 150
+    stripePriceId: process.env.STRIPE_PRICE_UNLIMITED || 'price_unlimited',
+    priceDisplay: '¥500,000/月',
+    colorClass: 'text-rose-600',
+    limits: {
+      maxPages: -1,
+      maxBanners: -1,
+      maxStorageMB: -1,
+      canAIGenerate: true,
+      canUpscale4K: true,
+      canRestyle: true,
+      canExport: true,
+      canGenerateVideo: true,
+      canSetApiKey: false,
+      prioritySupport: false,
+    },
+    features: [
+      '無制限ページ',
+      '月1,250,000クレジット',
+      '動画生成',
+      '全機能利用可能',
     ],
   },
 };
@@ -199,20 +266,22 @@ export const PLANS: Record<PlanType, Plan> = {
 // デフォルトプラン（サブスク未契約時）
 export const DEFAULT_PLAN: PlanType = 'free';
 
-// 追加クレジットパッケージ（プランごとの月間クレジット分のみ）
+// 追加クレジットパッケージ（有料プラン向け）
 export interface TokenPackage {
   id: number;
   name: string;
   priceJpy: number;
-  tokens: number; // クレジット数（1円 = 100クレジット）
-  creditUsd: number; // 後方互換性: USD換算
-  planId: PlanType; // 対応するプラン
+  tokens: number;
+  creditUsd: number;
+  planId: PlanType;
 }
 
 export const TOKEN_PACKAGES: TokenPackage[] = [
-  { id: 1, name: '50,000 クレジット', priceJpy: 20000, tokens: 50000, creditUsd: 33.33, planId: 'pro' },
-  { id: 2, name: '50,000 クレジット', priceJpy: 20000, tokens: 50000, creditUsd: 33.33, planId: 'business' },
-  { id: 3, name: '50,000 クレジット', priceJpy: 20000, tokens: 50000, creditUsd: 33.33, planId: 'enterprise' },
+  { id: 1, name: '25,000 クレジット', priceJpy: 10000, tokens: 25000, creditUsd: 16.67, planId: 'starter' },
+  { id: 2, name: '75,000 クレジット', priceJpy: 30000, tokens: 75000, creditUsd: 50.00, planId: 'pro' },
+  { id: 3, name: '125,000 クレジット', priceJpy: 50000, tokens: 125000, creditUsd: 83.33, planId: 'business' },
+  { id: 4, name: '250,000 クレジット', priceJpy: 100000, tokens: 250000, creditUsd: 166.67, planId: 'enterprise' },
+  { id: 5, name: '1,250,000 クレジット', priceJpy: 500000, tokens: 1250000, creditUsd: 833.33, planId: 'unlimited' },
 ];
 
 // 後方互換性のためのエイリアス
@@ -270,11 +339,7 @@ export function isFreePlan(planId: string | null | undefined): boolean {
 
 // プランがサブスク必須かどうか
 export function requiresSubscription(planId: string | null | undefined): boolean {
-  // 有効なプランIDでない場合はサブスク必須
-  if (!planId) return false; // デフォルトでfreeプランを使用
-  // starterは廃止
-  if (planId === 'starter') return true;
-  // 有効なプランIDの場合はOK（freeも含む）
+  if (!planId) return false;
   return !(planId in PLANS);
 }
 
@@ -288,17 +353,18 @@ export function getPlanIncludedTokens(planId: string | null | undefined): number
 // 1 USD = 150円、1円 = 10クレジット → 1 USD = 1,500クレジット
 export const USD_TO_JPY_RATE = 150;
 export function usdToTokens(usd: number): number {
-  // USD → 円 → クレジット
   const jpy = usd * USD_TO_JPY_RATE;
   return Math.round(jpy * JPY_TO_TOKEN_RATE);
 }
 
 // 後方互換性のためのエイリアス
 export function getPlanIncludedCredit(planId: string | null | undefined): number {
-  // クレジットをUSDに変換して返す（後方互換性）
   const tokens = getPlanIncludedTokens(planId);
   return tokens / USD_TO_JPY_RATE;
 }
 
 // プランIDの一覧
 export const PLAN_IDS = Object.keys(PLANS) as PlanType[];
+
+// 有料プランのみ（UI表示用）
+export const PAID_PLAN_IDS: PlanType[] = ['starter', 'pro', 'business', 'enterprise', 'unlimited'];

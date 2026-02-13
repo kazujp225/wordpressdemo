@@ -132,6 +132,8 @@ interface InpaintRequest {
     outputSize?: OutputImageSize; // 出力画像サイズ（デフォルト: 4K）
     originalWidth?: number;  // 元画像の幅（アスペクト比維持用）
     originalHeight?: number; // 元画像の高さ（アスペクト比維持用）
+    sectionId?: number;      // セクションID（履歴保存用）
+    previousImageId?: number; // 変更前の画像ID（履歴保存用）
 }
 
 interface InpaintHistoryData {
@@ -220,7 +222,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { imageUrl, imageBase64, mask, masks, prompt, referenceDesign, referenceImageBase64, outputSize, originalWidth, originalHeight }: InpaintRequest = await request.json();
+        const { imageUrl, imageBase64, mask, masks, prompt, referenceDesign, referenceImageBase64, outputSize, originalWidth, originalHeight, sectionId, previousImageId }: InpaintRequest = await request.json();
 
         if (!prompt) {
             return NextResponse.json({ error: '修正指示(prompt)を入力してください' }, { status: 400 });
@@ -473,6 +475,29 @@ export async function POST(request: NextRequest) {
 
         // クレジットは先払い済みなので、成功時は何もしない
         console.log(`[INPAINT] Success, requestId: ${requestId}`);
+
+        // セクション画像変更履歴を保存（sectionIdとpreviousImageIdが渡された場合）
+        if (sectionId && previousImageId) {
+            try {
+                // resultからmedia.idを取得
+                const resultBody = await result.clone().json();
+                if (resultBody.media?.id) {
+                    await prisma.sectionImageHistory.create({
+                        data: {
+                            sectionId,
+                            userId: user.id,
+                            previousImageId,
+                            newImageId: resultBody.media.id,
+                            actionType: 'inpaint',
+                            prompt: prompt || null,
+                        },
+                    });
+                    console.log(`[INPAINT] Section image history saved: section=${sectionId}, prev=${previousImageId}, new=${resultBody.media.id}`);
+                }
+            } catch (e) {
+                console.error('[INPAINT] Failed to save section image history:', e);
+            }
+        }
 
         return result;
 

@@ -6,9 +6,11 @@ import { Check, X, RefreshCw, Shield, Clock, Mail, Zap, Database, FileText, Crow
 // プラン定義（src/lib/plans.ts と同期）
 const PLANS = {
     free: { name: 'Free', color: 'bg-gray-100 text-gray-700', description: '自分のAPIキー使用', monthlyTokens: 0 },
-    pro: { name: 'Pro', color: 'bg-purple-100 text-purple-700', description: '月50,000クレジット', monthlyTokens: 50000 },
-    business: { name: 'Business', color: 'bg-blue-100 text-blue-700', description: '月100,000クレジット', monthlyTokens: 100000 },
+    starter: { name: 'Starter', color: 'bg-blue-100 text-blue-700', description: '月25,000クレジット', monthlyTokens: 25000 },
+    pro: { name: 'Pro', color: 'bg-indigo-100 text-indigo-700', description: '月75,000クレジット', monthlyTokens: 75000 },
+    business: { name: 'Business', color: 'bg-purple-100 text-purple-700', description: '月125,000クレジット', monthlyTokens: 125000 },
     enterprise: { name: 'Enterprise', color: 'bg-amber-100 text-amber-700', description: '月250,000クレジット', monthlyTokens: 250000 },
+    unlimited: { name: 'Unlimited', color: 'bg-rose-100 text-rose-700', description: '月1,250,000クレジット', monthlyTokens: 1250000 },
 };
 
 // USD → クレジット変換（1 USD = 150円、1円 = 10クレジット → 1 USD = 1,500クレジット）
@@ -831,7 +833,7 @@ export default function UsersPage() {
             {/* Legend */}
             <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
                 <h4 className="text-sm font-medium text-gray-900 mb-2">プラン説明</h4>
-                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-sm">
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 text-sm">
                     {Object.entries(PLANS).map(([planId, planInfo]) => (
                         <div key={planId} className="flex items-start gap-2">
                             <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${planInfo.color}`}>

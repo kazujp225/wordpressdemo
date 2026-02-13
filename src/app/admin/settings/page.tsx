@@ -51,12 +51,11 @@ function SettingsPage() {
     // Credit purchase
     const [showCreditPurchaseModal, setShowCreditPurchaseModal] = useState(false);
     const [isPurchasing, setIsPurchasing] = useState(false);
-    // Upgrade request
-    const [upgradeDesiredPlan, setUpgradeDesiredPlan] = useState('pro');
-    const [upgradeReason, setUpgradeReason] = useState('');
-    const [upgradeCompanyName, setUpgradeCompanyName] = useState('');
-    const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
-    const [upgradeRequestStatus, setUpgradeRequestStatus] = useState<'idle' | 'submitted' | 'already_pending'>('idle');
+    // お問い合わせ
+    const [inquirySubject, setInquirySubject] = useState('');
+    const [inquiryBody, setInquiryBody] = useState('');
+    const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false);
+    const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'submitted'>('idle');
 
     // Handle query params (tab, OAuth callback)
     useEffect(() => {
@@ -263,32 +262,33 @@ function SettingsPage() {
         }
     };
 
-    const handleUpgradeRequest = async () => {
-        setIsSubmittingUpgrade(true);
+    const handleInquirySubmit = async () => {
+        if (!inquirySubject.trim() || !inquiryBody.trim()) {
+            toast.error('件名と本文を入力してください');
+            return;
+        }
+        setIsSubmittingInquiry(true);
         try {
-            const res = await fetch('/api/upgrade-request', {
+            const res = await fetch('/api/inquiries', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    desiredPlan: upgradeDesiredPlan,
-                    reason: upgradeReason || undefined,
-                    companyName: upgradeCompanyName || undefined,
+                    subject: inquirySubject,
+                    body: inquiryBody,
                 }),
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                if (data.error?.includes('既に')) {
-                    setUpgradeRequestStatus('already_pending');
-                    return;
-                }
-                throw new Error(data.error || 'Failed to submit');
+                throw new Error(data.error || '送信に失敗しました');
             }
-            setUpgradeRequestStatus('submitted');
-            toast.success('アップグレード申請を送信しました');
+            setInquiryStatus('submitted');
+            setInquirySubject('');
+            setInquiryBody('');
+            toast.success('お問い合わせを送信しました');
         } catch (error: any) {
-            toast.error(error.message || 'アップグレード申請の送信に失敗しました');
+            toast.error(error.message || 'お問い合わせの送信に失敗しました');
         } finally {
-            setIsSubmittingUpgrade(false);
+            setIsSubmittingInquiry(false);
         }
     };
 
@@ -434,22 +434,31 @@ function SettingsPage() {
                                         <Star className="h-4 w-4 text-gray-900" />
                                         <h3 className="text-sm font-semibold text-gray-900 tracking-tight">プラン一覧</h3>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <PlanCard
+                                            planId="starter"
+                                            name="Starter"
+                                            price="¥10,000"
+                                            features={['最大10ページ', '画像生成', 'インペイント編集', '月25,000クレジット']}
+                                            highlighted={false}
+                                            onSubscribe={handleSubscribe}
+                                            disabled={isPurchasing}
+                                        />
                                         <PlanCard
                                             planId="pro"
                                             name="Pro"
-                                            price="¥20,000"
-                                            features={['最大30ページ', '画像生成', 'インペイント編集', '月¥5,000分クレジット']}
-                                            highlighted={false}
+                                            price="¥30,000"
+                                            features={['最大30ページ', '4Kアップスケール', 'リスタイル機能', '月75,000クレジット']}
+                                            highlighted={true}
                                             onSubscribe={handleSubscribe}
                                             disabled={isPurchasing}
                                         />
                                         <PlanCard
                                             planId="business"
                                             name="Business"
-                                            price="¥40,000"
-                                            features={['最大100ページ', '4Kアップスケール', 'リスタイル機能', '月¥10,000分クレジット']}
-                                            highlighted={true}
+                                            price="¥50,000"
+                                            features={['最大50ページ', '動画生成', '全機能利用可能', '月125,000クレジット']}
+                                            highlighted={false}
                                             onSubscribe={handleSubscribe}
                                             disabled={isPurchasing}
                                         />
@@ -457,86 +466,94 @@ function SettingsPage() {
                                             planId="enterprise"
                                             name="Enterprise"
                                             price="¥100,000"
-                                            features={['無制限ページ', '動画生成', '優先サポート', '月¥25,000分クレジット']}
+                                            features={['無制限ページ', '動画生成', '全機能利用可能', '月250,000クレジット']}
                                             highlighted={false}
                                             onSubscribe={handleSubscribe}
                                             disabled={isPurchasing}
                                         />
+                                        <PlanCard
+                                            planId="unlimited"
+                                            name="Unlimited"
+                                            price="¥500,000"
+                                            features={['無制限ページ', '動画生成', '全機能利用可能', '月1,250,000クレジット']}
+                                            highlighted={false}
+                                            onSubscribe={handleSubscribe}
+                                            disabled={isPurchasing}
+                                        />
+                                        <div className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-6 flex flex-col items-center justify-center text-center">
+                                            <h4 className="text-base font-bold text-gray-900 mb-1">カスタム</h4>
+                                            <p className="text-xs text-gray-500 mb-4">大規模運用・特別要件に対応</p>
+                                            <button
+                                                onClick={() => {
+                                                    document.getElementById('inquiry-section')?.scrollIntoView({ behavior: 'smooth' });
+                                                    setInquirySubject('カスタムプランについて');
+                                                }}
+                                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                                            >
+                                                お問い合わせ
+                                            </button>
+                                        </div>
                                     </div>
                                 </section>
                             )}
 
-                            {/* アップグレード申請（Freeプランのみ） */}
-                            {isFreePlan && (
-                                <section>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <Mail className="h-4 w-4 text-gray-900" />
-                                        <h3 className="text-sm font-semibold text-gray-900 tracking-tight">アップグレード申請</h3>
-                                    </div>
-                                    <div className="rounded-xl border border-gray-200 bg-white p-6">
-                                        {upgradeRequestStatus === 'submitted' ? (
-                                            <div className="text-center py-4">
-                                                <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
-                                                <p className="text-sm font-bold text-gray-900">申請を送信しました</p>
-                                                <p className="text-xs text-gray-500 mt-1">管理者が確認後、プランが更新されます</p>
+                            {/* お問い合わせ */}
+                            <section id="inquiry-section">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Mail className="h-4 w-4 text-gray-900" />
+                                    <h3 className="text-sm font-semibold text-gray-900 tracking-tight">お問い合わせ</h3>
+                                </div>
+                                <div className="rounded-xl border border-gray-200 bg-white p-6">
+                                    {inquiryStatus === 'submitted' ? (
+                                        <div className="text-center py-4">
+                                            <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+                                            <p className="text-sm font-bold text-gray-900">お問い合わせを送信しました</p>
+                                            <p className="text-xs text-gray-500 mt-1">担当者より折り返しご連絡いたします</p>
+                                            <button
+                                                onClick={() => setInquiryStatus('idle')}
+                                                className="mt-4 text-xs text-gray-500 hover:text-gray-900 underline underline-offset-2"
+                                            >
+                                                新しいお問い合わせを送信
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-700 block mb-1.5">件名</label>
+                                                <input
+                                                    type="text"
+                                                    value={inquirySubject}
+                                                    onChange={(e) => setInquirySubject(e.target.value)}
+                                                    placeholder="お問い合わせ内容の件名"
+                                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-400"
+                                                />
                                             </div>
-                                        ) : upgradeRequestStatus === 'already_pending' ? (
-                                            <div className="text-center py-4">
-                                                <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-                                                <p className="text-sm font-bold text-gray-900">既に申請済みです</p>
-                                                <p className="text-xs text-gray-500 mt-1">管理者の承認をお待ちください</p>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-700 block mb-1.5">本文</label>
+                                                <textarea
+                                                    value={inquiryBody}
+                                                    onChange={(e) => setInquiryBody(e.target.value)}
+                                                    placeholder="お問い合わせ内容を入力してください"
+                                                    rows={4}
+                                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-400 resize-none"
+                                                />
                                             </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <label className="text-xs font-bold text-gray-700 block mb-1.5">希望プラン</label>
-                                                    <select
-                                                        value={upgradeDesiredPlan}
-                                                        onChange={(e) => setUpgradeDesiredPlan(e.target.value)}
-                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                                    >
-                                                        <option value="pro">Pro — ¥20,000/月</option>
-                                                        <option value="business">Business — ¥40,000/月</option>
-                                                        <option value="enterprise">Enterprise — ¥100,000/月</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-bold text-gray-700 block mb-1.5">会社名（任意）</label>
-                                                    <input
-                                                        type="text"
-                                                        value={upgradeCompanyName}
-                                                        onChange={(e) => setUpgradeCompanyName(e.target.value)}
-                                                        placeholder="株式会社〇〇"
-                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-bold text-gray-700 block mb-1.5">利用目的（任意）</label>
-                                                    <textarea
-                                                        value={upgradeReason}
-                                                        onChange={(e) => setUpgradeReason(e.target.value)}
-                                                        placeholder="利用目的をご記入ください"
-                                                        rows={3}
-                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                                                    />
-                                                </div>
-                                                <button
-                                                    onClick={handleUpgradeRequest}
-                                                    disabled={isSubmittingUpgrade}
-                                                    className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                >
-                                                    {isSubmittingUpgrade ? (
-                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                        <Rocket className="h-4 w-4" />
-                                                    )}
-                                                    申請を送信
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
-                            )}
+                                            <button
+                                                onClick={handleInquirySubmit}
+                                                disabled={isSubmittingInquiry || !inquirySubject.trim() || !inquiryBody.trim()}
+                                                className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isSubmittingInquiry ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Mail className="h-4 w-4" />
+                                                )}
+                                                送信する
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
 
                             {/* クレジット情報（有料プランのみ） */}
                             {!isFreePlan && (

@@ -42,6 +42,8 @@ interface ImageInpaintEditorProps {
     initialMode?: EditorMode;
     // 追加: セクションID（ボタン保存用）
     sectionId?: string;
+    // 変更前の画像ID（履歴保存用）
+    previousImageId?: number;
     // デュアルモード用（モバイル画像）
     mobileImageUrl?: string;
     mobileClickableAreas?: ClickableArea[];
@@ -71,6 +73,7 @@ export function ImageInpaintEditor({
     onSaveClickableAreas,
     initialMode = 'inpaint',
     sectionId,
+    previousImageId,
     mobileImageUrl,
     mobileClickableAreas: initialMobileClickableAreas = [],
 }: ImageInpaintEditorProps) {
@@ -1185,7 +1188,9 @@ export function ImageInpaintEditor({
                         referenceImageBase64: resizedReferenceImage,
                         outputSize: outputSize,
                         originalWidth: originalWidth,
-                        originalHeight: originalHeight
+                        originalHeight: originalHeight,
+                        sectionId: sectionId ? parseInt(String(sectionId)) || undefined : undefined,
+                        previousImageId: previousImageId || undefined,
                     })
                 });
 

@@ -360,6 +360,25 @@ model Subscription {
   @@index([stripeCustomerId])
 }
 
+// お問い合わせ
+model ContactInquiry {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  email     String?
+  subject   String
+  body      String   @db.Text
+  isRead    Boolean  @default(false)
+  status    String   @default("open") // open | closed
+  adminNote String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
 // Stripe Webhookイベント処理履歴（冪等性確保）
 model WebhookEvent {
   id          Int       @id @default(autoincrement())

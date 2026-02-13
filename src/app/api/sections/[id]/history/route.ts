@@ -48,7 +48,7 @@ export async function GET(
         }
 
         // 履歴を取得（新しい順）
-        // セクションIDで検索 + 現在の画像IDに関連する履歴も検索
+        // セクションIDで検索 + 画像チェーンを遡って追跡
         const currentImageId = section.imageId;
 
         log('Looking for history', { sectionId, currentImageId });
@@ -57,29 +57,82 @@ export async function GET(
         const historyBySectionId = await prisma.sectionImageHistory.findMany({
             where: { sectionId },
             orderBy: { createdAt: 'desc' },
-            take: 10,
+            take: 20,
         });
 
-        // 2. 現在の画像に関連する履歴（セクションIDが変わっても追跡可能）
-        let historyByImageId: any[] = [];
+        // 2. 同じページで同じimageIdを使っていた旧セクションの履歴も検索
+        // （ページ保存時にセクションIDが変わるケースに対応）
+        let sameImageHistory: any[] = [];
         if (currentImageId) {
-            historyByImageId = await prisma.sectionImageHistory.findMany({
+            // currentImageIdをimageIdとして持っていた(過去の)セクションを探す
+            const relatedSections = await prisma.sectionImageHistory.findMany({
                 where: {
                     userId: user.id,
                     OR: [
-                        { previousImageId: currentImageId },
                         { newImageId: currentImageId },
-                    ]
+                        { previousImageId: currentImageId },
+                    ],
                 },
-                orderBy: { createdAt: 'desc' },
-                take: 10,
+                select: { sectionId: true },
+                distinct: ['sectionId'],
             });
+            const relatedSectionIds = relatedSections.map(s => s.sectionId).filter(id => id !== sectionId);
+            if (relatedSectionIds.length > 0) {
+                sameImageHistory = await prisma.sectionImageHistory.findMany({
+                    where: {
+                        sectionId: { in: relatedSectionIds },
+                        userId: user.id,
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 20,
+                });
+            }
+        }
+
+        // 3. 画像チェーンを遡って追跡（currentImageId → previousImageId → ...）
+        let chainHistory: any[] = [];
+        if (currentImageId) {
+            // 現在の画像を起点に、関連する画像IDを収集
+            const trackedImageIds = new Set<number>([currentImageId]);
+            let frontier = [currentImageId];
+            const maxIterations = 5; // 最大5段階遡る
+
+            for (let i = 0; i < maxIterations && frontier.length > 0; i++) {
+                const related = await prisma.sectionImageHistory.findMany({
+                    where: {
+                        userId: user.id,
+                        OR: [
+                            { previousImageId: { in: frontier } },
+                            { newImageId: { in: frontier } },
+                        ]
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 20,
+                });
+
+                chainHistory.push(...related);
+
+                // 新たに見つかったimageIdをfrontierに追加
+                const newFrontier: number[] = [];
+                for (const h of related) {
+                    if (!trackedImageIds.has(h.previousImageId)) {
+                        trackedImageIds.add(h.previousImageId);
+                        newFrontier.push(h.previousImageId);
+                    }
+                    if (!trackedImageIds.has(h.newImageId)) {
+                        trackedImageIds.add(h.newImageId);
+                        newFrontier.push(h.newImageId);
+                    }
+                }
+                frontier = newFrontier;
+                if (newFrontier.length === 0) break;
+            }
         }
 
         // 重複を除去してマージ
         const allHistoryIds = new Set<number>();
         const mergedHistory: any[] = [];
-        for (const h of [...historyBySectionId, ...historyByImageId]) {
+        for (const h of [...historyBySectionId, ...sameImageHistory, ...chainHistory]) {
             if (!allHistoryIds.has(h.id)) {
                 allHistoryIds.add(h.id);
                 mergedHistory.push(h);
@@ -88,9 +141,9 @@ export async function GET(
 
         // 日付順にソート
         mergedHistory.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        const history = mergedHistory.slice(0, 10);
+        const history = mergedHistory.slice(0, 20);
 
-        log('History found', { bySectionId: historyBySectionId.length, byImageId: historyByImageId.length, merged: history.length });
+        log('History found', { bySectionId: historyBySectionId.length, sameImage: sameImageHistory.length, chain: chainHistory.length, merged: history.length });
 
         // 各履歴エントリの画像情報を取得
         const historyWithImages = await Promise.all(
