@@ -668,6 +668,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     };
 
     const analyzeCurrentDesign = async () => {
+        if (planLimits && !planLimits.canAIGenerate) {
+            return; // Freeプランでは静かにスキップ
+        }
         setIsAnalyzing(true);
         try {
             // Can limit to top 3 sections to define the "vibe"
@@ -916,6 +919,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const handleDesignImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        if (planLimits && !planLimits.canAIGenerate) {
+            toast.error('デザイン解析は有料プランでご利用いただけます');
+            return;
+        }
 
         setIsAnalyzing(true);
         try {
