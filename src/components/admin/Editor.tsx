@@ -4261,13 +4261,17 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         {/* デプロイ - Premium standalone button */}
                         <button
                             onClick={() => {
+                                if (planLimits && !planLimits.canAIGenerate) {
+                                    toast.error('ページ公開は有料プランでご利用いただけます');
+                                    return;
+                                }
                                 if (pageId === 'new') {
                                     toast.error('デプロイする前にページを保存してください。');
                                     return;
                                 }
                                 setShowPageDeployModal(true);
                             }}
-                            className="group w-full flex items-center gap-3 px-4 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all shadow-sm mt-2"
+                            className={`group w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all shadow-sm mt-2 ${planLimits?.canAIGenerate === false ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
                         >
                             <div className="h-5 w-5 flex items-center justify-center">
                                 <Rocket className="h-4 w-4 text-gray-300 group-hover:text-white transition-colors" />
@@ -5018,6 +5022,10 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     action={
                                         <EditorActionButton
                                             onClick={() => {
+                                                if (planLimits && !planLimits.canAIGenerate) {
+                                                    toast.error('ページ公開は有料プランでご利用いただけます');
+                                                    return;
+                                                }
                                                 if (pageId === 'new') {
                                                     toast.error('デプロイする前にページを保存してください。');
                                                     return;
@@ -5025,8 +5033,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 setShowPageDeployModal(true);
                                             }}
                                             variant="primary"
+                                            disabled={planLimits?.canAIGenerate === false}
                                         >
-                                            公開する
+                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : '公開する'}
                                         </EditorActionButton>
                                     }
                                 />
