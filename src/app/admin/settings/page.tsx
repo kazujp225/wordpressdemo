@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import {
     Save, Globe, Github, Loader2, CheckCircle, Sparkles, LogOut,
     Crown, Zap, ArrowUpRight, CreditCard, Key, Settings2,
-    ChevronRight, AlertCircle, Star, Rocket, Upload, Mail, ChevronDown
+    ChevronRight, AlertCircle, Star, Rocket, Upload, Mail, ChevronDown, Lock
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -56,6 +56,12 @@ function SettingsPage() {
     const [inquiryBody, setInquiryBody] = useState('');
     const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false);
     const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'submitted'>('idle');
+    // パスワード変更
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [passwordStatus, setPasswordStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [passwordError, setPasswordError] = useState('');
 
     // Handle query params (tab, OAuth callback)
     useEffect(() => {
@@ -259,6 +265,33 @@ function SettingsPage() {
             console.error('Subscription error:', error);
             toast.error('サブスクリプション処理に失敗しました');
             setIsPurchasing(false);
+        }
+    };
+
+    const handlePasswordUpdate = async () => {
+        setPasswordError('');
+        setPasswordStatus('idle');
+        if (newPassword.length < 6) {
+            setPasswordError('パスワードは6文字以上で入力してください');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setPasswordError('パスワードが一致しません');
+            return;
+        }
+        setIsUpdatingPassword(true);
+        try {
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
+            if (error) throw error;
+            setPasswordStatus('success');
+            setNewPassword('');
+            setConfirmPassword('');
+            toast.success('パスワードを更新しました');
+        } catch (error: any) {
+            setPasswordError(error.message || 'パスワードの更新に失敗しました');
+            setPasswordStatus('error');
+        } finally {
+            setIsUpdatingPassword(false);
         }
     };
 
@@ -496,6 +529,66 @@ function SettingsPage() {
                                     </div>
                                 </section>
                             )}
+
+                            {/* パスワード変更 */}
+                            <section>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Lock className="h-4 w-4 text-gray-900" />
+                                    <h3 className="text-sm font-semibold text-gray-900 tracking-tight">パスワード変更</h3>
+                                </div>
+                                <div className="rounded-xl border border-gray-200 bg-white p-6">
+                                    {passwordStatus === 'success' ? (
+                                        <div className="text-center py-4">
+                                            <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+                                            <p className="text-sm font-bold text-gray-900">パスワードを更新しました</p>
+                                            <button
+                                                onClick={() => setPasswordStatus('idle')}
+                                                className="mt-4 text-xs text-gray-500 hover:text-gray-900 underline underline-offset-2"
+                                            >
+                                                閉じる
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-700 block mb-1.5">新しいパスワード</label>
+                                                <input
+                                                    type="password"
+                                                    value={newPassword}
+                                                    onChange={(e) => setNewPassword(e.target.value)}
+                                                    placeholder="6文字以上"
+                                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-400"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-700 block mb-1.5">パスワード確認</label>
+                                                <input
+                                                    type="password"
+                                                    value={confirmPassword}
+                                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                                    placeholder="もう一度入力"
+                                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-400"
+                                                />
+                                            </div>
+                                            {passwordError && (
+                                                <p className="text-xs text-red-600">{passwordError}</p>
+                                            )}
+                                            <button
+                                                onClick={handlePasswordUpdate}
+                                                disabled={isUpdatingPassword || !newPassword || !confirmPassword}
+                                                className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isUpdatingPassword ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Lock className="h-4 w-4" />
+                                                )}
+                                                パスワードを更新
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
 
                             {/* お問い合わせ */}
                             <section id="inquiry-section">

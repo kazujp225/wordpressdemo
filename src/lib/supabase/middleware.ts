@@ -79,6 +79,7 @@ export async function updateSession(request: NextRequest) {
         || pathname.startsWith('/api/billing/')
         || pathname.startsWith('/api/webhooks/')
         || pathname.startsWith('/api/user/status')  // BAN/planチェック用API
+        || pathname.startsWith('/api/inquiries/password-reset')  // パスワードリセット依頼
         || pathname.startsWith('/reset-password');
 
     // 未認証ユーザーがプライベートルートにアクセスした場合、ログインページへリダイレクト

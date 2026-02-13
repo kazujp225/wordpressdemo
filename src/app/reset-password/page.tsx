@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, Mail, Check } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState('');
@@ -11,9 +10,8 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -25,13 +23,15 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password/confirm`,
+      const res = await fetch('/api/inquiries/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
 
-      if (resetError) {
-        setError(resetError.message);
-        return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '送信に失敗しました');
       }
 
       setSuccess(true);
@@ -44,7 +44,6 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header */}
       <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
@@ -57,21 +56,17 @@ export default function ResetPasswordPage() {
       <main className="flex items-center justify-center min-h-[calc(100vh-73px)] px-4">
         <div className="w-full max-w-md space-y-8">
           {success ? (
-            /* 送信完了 */
             <div className="text-center space-y-6">
               <div className="inline-flex items-center justify-center h-16 w-16 bg-green-100 rounded-full mx-auto">
                 <Check className="h-8 w-8 text-green-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold tracking-tight mb-2">メールを送信しました</h2>
+                <h2 className="text-2xl font-bold tracking-tight mb-2">リセット依頼を送信しました</h2>
                 <p className="text-muted-foreground">
-                  {email} 宛にパスワード再設定用のメールを送信しました。
-                  メール内のリンクをクリックして、新しいパスワードを設定してください。
+                  {email} のパスワードリセット依頼を管理者に送信しました。
+                  管理者がパスワードを再設定後、ご連絡いたします。
                 </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                メールが届かない場合は、迷惑メールフォルダをご確認ください。
-              </p>
               <button
                 onClick={() => router.push('/')}
                 className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium transition-colors"
@@ -81,16 +76,16 @@ export default function ResetPasswordPage() {
               </button>
             </div>
           ) : (
-            /* 入力フォーム */
             <>
               <div className="text-center">
                 <h2 className="text-2xl font-bold tracking-tight">パスワードを再設定</h2>
                 <p className="mt-2 text-muted-foreground">
-                  登録したメールアドレスを入力してください
+                  登録したメールアドレスを入力してください。<br />
+                  管理者がパスワードを再設定いたします。
                 </p>
               </div>
 
-              <form onSubmit={handleResetPassword} className="space-y-6">
+              <form onSubmit={handleResetRequest} className="space-y-6">
                 <div className="space-y-2">
                   <label htmlFor="email" className="text-sm font-bold">
                     メールアドレス
@@ -124,7 +119,7 @@ export default function ResetPasswordPage() {
                   {loading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    '再設定メールを送信'
+                    'パスワードリセットを依頼'
                   )}
                 </button>
 
