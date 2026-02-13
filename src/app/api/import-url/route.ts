@@ -346,72 +346,20 @@ export async function POST(request: NextRequest) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 使用量制限チェック
+    // 使用量制限チェック（インポート自体は全プラン許可、AI処理のみ制限）
     log.info(`Checking generation limit for user: ${user.id}`);
     const limitCheck = await checkGenerationLimit(user.id);
 
     if (!limitCheck.allowed) {
-        // FreeプランでAPIキー未設定の場合
-        if (limitCheck.needApiKey) {
-            log.error(`[LIMIT] API key required for user ${user.id}`);
-            console.error('[IMPORT-URL] 402 Error: API key required', { userId: user.id, reason: limitCheck.reason });
-            return Response.json({
-                error: 'API_KEY_REQUIRED',
-                message: limitCheck.reason || 'Freeプランでは自分のGoogle AI APIキーの設定が必要です。設定画面でAPIキーを入力してください。',
-                needApiKey: true,
-            }, { status: 402 });
-        }
-
-        // クレジット不足の場合
-        if (limitCheck.needPurchase) {
-            log.error(`[LIMIT] Credit insufficient for user ${user.id}: balance=$${limitCheck.currentBalanceUsd?.toFixed(4)}`);
-            console.error('[IMPORT-URL] 429 Error: Credit insufficient', {
-                userId: user.id,
-                balance: limitCheck.currentBalanceUsd,
-                reason: limitCheck.reason
-            });
-            return Response.json({
-                error: 'CREDIT_INSUFFICIENT',
-                message: limitCheck.reason || `クレジットが不足しています。現在の残高: $${limitCheck.currentBalanceUsd?.toFixed(2) || '0.00'}`,
-                needPurchase: true,
-                currentBalanceUsd: limitCheck.currentBalanceUsd,
-            }, { status: 429 });
-        }
-
-        // サブスクリプションが必要な場合
-        if (limitCheck.needSubscription) {
-            log.error(`[LIMIT] Subscription required for user ${user.id}`);
-            console.error('[IMPORT-URL] 429 Error: Subscription required', { userId: user.id, reason: limitCheck.reason });
-            return Response.json({
-                error: 'SUBSCRIPTION_REQUIRED',
-                message: limitCheck.reason || 'サブスクリプションが必要です。プランを選択してください。',
-                needSubscription: true,
-            }, { status: 429 });
-        }
-
-        // その他の制限
-        log.error(`[LIMIT] Usage limit exceeded for user ${user.id}: ${limitCheck.reason}`);
-        console.error('[IMPORT-URL] 429 Error: Usage limit exceeded', {
-            userId: user.id,
-            reason: limitCheck.reason,
-            current: limitCheck.current,
-            limit: limitCheck.limit
-        });
-        return Response.json({
-            error: 'USAGE_LIMIT_EXCEEDED',
-            message: limitCheck.reason || '使用量制限に達しました。',
-            usage: {
-                current: limitCheck.current,
-                limit: limitCheck.limit,
-            }
-        }, { status: 429 });
-    }
-
-    log.success(`Limit check passed for user ${user.id}`);
-    if (limitCheck.usingOwnApiKey) {
-        log.info(`Using user's own API key (credit consumption skipped)`);
+        // AI処理は不可だが、インポート自体は許可（faithfulモードとして続行）
+        log.info(`[LIMIT] AI not available for user ${user.id}, proceeding with faithful mode (no AI): ${limitCheck.reason}`);
     } else {
-        log.info(`Using system API key, balance: $${limitCheck.currentBalanceUsd?.toFixed(4) || 'N/A'}`);
+        log.success(`Limit check passed for user ${user.id}`);
+        if (limitCheck.usingOwnApiKey) {
+            log.info(`Using user's own API key (credit consumption skipped)`);
+        } else {
+            log.info(`Using system API key, balance: $${limitCheck.currentBalanceUsd?.toFixed(4) || 'N/A'}`);
+        }
     }
 
     const body = await request.json();
@@ -428,7 +376,7 @@ export async function POST(request: NextRequest) {
     const {
         url,
         device = 'desktop',
-        importMode = 'faithful',
+        importMode: requestedImportMode = 'faithful',
         style = 'sampling',  // デフォルトは元デザイン維持
         colorScheme,
         layoutOption,
@@ -436,6 +384,13 @@ export async function POST(request: NextRequest) {
         customSections,  // ユーザーが調整したセクション境界
         startFrom = 0,   // 開始セクション番号（続きを取得用）
     } = validation.data;
+
+    // AI制限に引っかかった場合はfaithfulモードにフォールバック
+    let importMode = requestedImportMode;
+    if (importMode !== 'faithful' && !limitCheck.allowed) {
+        log.info(`AI not available for user, falling back to faithful mode`);
+        importMode = 'faithful';
+    }
 
     // デザインオプションをまとめる
     const designOptions: DesignOptions = {
