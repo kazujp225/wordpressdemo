@@ -4411,6 +4411,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             <button
                                                                 onClick={() => {
                                                                     setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: 'https://' }));
+                                                                    if (!isCustom) toggleHeaderSection('ctaLink');
                                                                 }}
                                                                 className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${isCustom ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
                                                             >
@@ -4537,6 +4538,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                                     i === index ? { ...navItem, href: 'https://' } : navItem
                                                                                 )
                                                                             }));
+                                                                            if (!navIsCustom) toggleHeaderSection(navKey);
                                                                         }}
                                                                         className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navIsCustom ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
                                                                     >

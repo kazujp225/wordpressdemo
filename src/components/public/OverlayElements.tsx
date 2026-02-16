@@ -231,14 +231,16 @@ export function OverlayElements({ overlays, editorBaseWidth }: OverlayElementsPr
                             ),
                         }
                         : {
-                            ...style,
-                            width: 'auto',
+                            ...(isFixed
+                                ? fixedPositionStyles[posMode]
+                                : { ...style, width: 'auto' }
+                            ),
                             backgroundColor: overlay.style?.backgroundColor || '#6366f1',
                             color: overlay.style?.textColor || '#ffffff',
-                            borderRadius: scalePx(btnBorderRadius, 8),
-                            fontSize: scalePx(btnFontSize, 16),
+                            borderRadius: isFixed ? `${btnBorderRadius}px` : scalePx(btnBorderRadius, 8),
+                            fontSize: isFixed ? `${btnFontSize}px` : scalePx(btnFontSize, 16),
                             fontWeight: overlay.style?.fontWeight,
-                            padding: scalePadding(btnPadding, '12px 24px'),
+                            padding: isFixed ? btnPadding : scalePadding(btnPadding, '12px 24px'),
                             border: overlay.style?.border,
                             boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
                             whiteSpace: 'nowrap' as const,

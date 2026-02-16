@@ -1195,10 +1195,10 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                     if (saveRes.ok) {
                         toast.success('クロップ画像を保存しました');
                     } else {
-                        toast.success('画像をカットしました（手動で保存してください）');
+                        toast.error('自動保存に失敗しました。手動で保存してください');
                     }
                 } catch {
-                    toast.success('画像をカットしました（手動で保存してください）');
+                    toast.error('自動保存に失敗しました。手動で保存してください');
                 }
             } else {
                 toast.success('画像をカットしました');
