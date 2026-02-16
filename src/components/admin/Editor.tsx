@@ -4365,49 +4365,67 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         />
                                     </div>
                                     <div className="flex-1">
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">リンク先</label>
                                         {(() => {
                                             const ctaVal = headerConfig.ctaLink || '';
                                             const sectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
                                             const isCustom = ctaVal !== '' && !sectionOptions.includes(ctaVal);
+                                            const roleLabels: Record<string, string> = {
+                                                hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
+                                                pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
+                                                cta: 'CTA', footer: 'フッター', other: 'その他',
+                                                'html-embed': 'HTML埋め込み',
+                                            };
+                                            const selectedLabel = isCustom ? 'カスタムURL' : ctaVal === '#contact' ? 'お問い合わせ' : ctaVal ? (roleLabels[ctaVal.replace('#', '')] || ctaVal) : '未選択';
                                             return (
                                                 <>
-                                                    <select
-                                                        value={isCustom ? '__custom__' : ctaVal}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setHeaderConfig((prev: typeof headerConfig) => ({
-                                                                ...prev,
-                                                                ctaLink: val === '__custom__' ? 'https://' : val
-                                                            }));
-                                                        }}
-                                                        className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white"
+                                                    <button
+                                                        onClick={() => toggleHeaderSection('ctaLink')}
+                                                        className="flex items-center justify-between w-full text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
                                                     >
-                                                        <option value="">選択...</option>
-                                                        {sections.map((section: any) => {
-                                                            const roleLabels: Record<string, string> = {
-                                                                hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
-                                                                pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
-                                                                cta: 'CTA', footer: 'フッター', other: 'その他',
-                                                                'html-embed': 'HTML埋め込み',
-                                                            };
-                                                            return (
-                                                                <option key={section.id} value={`#${section.role}`}>
-                                                                    {roleLabels[section.role] || section.role}（#{section.role}）
-                                                                </option>
-                                                            );
-                                                        })}
-                                                        <option value="#contact">お問い合わせ（#contact）</option>
-                                                        <option value="__custom__">カスタムURL</option>
-                                                    </select>
-                                                    {isCustom && (
-                                                        <input
-                                                            type="text"
-                                                            value={ctaVal}
-                                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
-                                                            placeholder="https://example.com"
-                                                            className="w-full mt-1 px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                                                        />
+                                                        <span>リンク先: <span className="text-purple-600">{selectedLabel}</span></span>
+                                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('ctaLink') ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                    {headerOpenSections.has('ctaLink') && (
+                                                        <div className="space-y-1 pb-2">
+                                                            {sections.map((section: any) => (
+                                                                <button
+                                                                    key={section.id}
+                                                                    onClick={() => {
+                                                                        setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: `#${section.role}` }));
+                                                                        toggleHeaderSection('ctaLink');
+                                                                    }}
+                                                                    className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${ctaVal === `#${section.role}` ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                >
+                                                                    {roleLabels[section.role] || section.role}
+                                                                </button>
+                                                            ))}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: '#contact' }));
+                                                                    toggleHeaderSection('ctaLink');
+                                                                }}
+                                                                className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${ctaVal === '#contact' ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                            >
+                                                                お問い合わせ
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: 'https://' }));
+                                                                }}
+                                                                className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${isCustom ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                            >
+                                                                カスタムURL
+                                                            </button>
+                                                            {isCustom && (
+                                                                <input
+                                                                    type="text"
+                                                                    value={ctaVal}
+                                                                    onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
+                                                                    placeholder="https://example.com"
+                                                                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                                />
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </>
                                             );
@@ -4461,55 +4479,87 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                     const navVal = item.href || '';
                                                     const navSectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
                                                     const navIsCustom = navVal !== '' && !navSectionOptions.includes(navVal);
+                                                    const roleLabels: Record<string, string> = {
+                                                        hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
+                                                        pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
+                                                        cta: 'CTA', footer: 'フッター', other: 'その他',
+                                                        'html-embed': 'HTML埋め込み',
+                                                    };
+                                                    const navKey = `navLink-${item.id}`;
+                                                    const selectedLabel = navIsCustom ? 'カスタムURL' : navVal === '#contact' ? 'お問い合わせ' : navVal ? (roleLabels[navVal.replace('#', '')] || navVal) : '未選択';
                                                     return (
                                                         <div className="flex flex-col">
-                                                            <select
-                                                                value={navIsCustom ? '__custom__' : navVal}
-                                                                onChange={(e) => {
-                                                                    const val = e.target.value;
-                                                                    const newHref = val === '__custom__' ? 'https://' : val;
-                                                                    setHeaderConfig((prev: typeof headerConfig) => ({
-                                                                        ...prev,
-                                                                        navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                            i === index ? { ...navItem, href: newHref } : navItem
-                                                                        )
-                                                                    }));
-                                                                }}
-                                                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                            <button
+                                                                onClick={() => toggleHeaderSection(navKey)}
+                                                                className="flex items-center justify-between w-full text-xs text-gray-500 py-1 hover:text-purple-600"
                                                             >
-                                                                <option value="">リンク先を選択...</option>
-                                                                {sections.map((section: any) => {
-                                                                    const roleLabels: Record<string, string> = {
-                                                                        hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
-                                                                        pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
-                                                                        cta: 'CTA', footer: 'フッター', other: 'その他',
-                                                                        'html-embed': 'HTML埋め込み',
-                                                                    };
-                                                                    return (
-                                                                        <option key={section.id} value={`#${section.role}`}>
+                                                                <span>リンク先: <span className="text-purple-600">{selectedLabel}</span></span>
+                                                                <ChevronDown className={`h-3 w-3 transition-transform ${headerOpenSections.has(navKey) ? 'rotate-180' : ''}`} />
+                                                            </button>
+                                                            {headerOpenSections.has(navKey) && (
+                                                                <div className="space-y-0.5 pb-1">
+                                                                    {sections.map((section: any) => (
+                                                                        <button
+                                                                            key={section.id}
+                                                                            onClick={() => {
+                                                                                setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                                    ...prev,
+                                                                                    navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                                        i === index ? { ...navItem, href: `#${section.role}` } : navItem
+                                                                                    )
+                                                                                }));
+                                                                                toggleHeaderSection(navKey);
+                                                                            }}
+                                                                            className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navVal === `#${section.role}` ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                        >
                                                                             {roleLabels[section.role] || section.role}
-                                                                        </option>
-                                                                    );
-                                                                })}
-                                                                <option value="#contact">お問い合わせ</option>
-                                                                <option value="__custom__">カスタムURL</option>
-                                                            </select>
-                                                            {navIsCustom && (
-                                                                <input
-                                                                    type="text"
-                                                                    value={navVal}
-                                                                    onChange={(e) => {
-                                                                        const newHref = e.target.value;
-                                                                        setHeaderConfig((prev: typeof headerConfig) => ({
-                                                                            ...prev,
-                                                                            navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                                i === index ? { ...navItem, href: newHref } : navItem
-                                                                            )
-                                                                        }));
-                                                                    }}
-                                                                    placeholder="https://example.com"
-                                                                    className="w-full mt-1 px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
-                                                                />
+                                                                        </button>
+                                                                    ))}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                                ...prev,
+                                                                                navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                                    i === index ? { ...navItem, href: '#contact' } : navItem
+                                                                                )
+                                                                            }));
+                                                                            toggleHeaderSection(navKey);
+                                                                        }}
+                                                                        className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navVal === '#contact' ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                    >
+                                                                        お問い合わせ
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                                ...prev,
+                                                                                navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                                    i === index ? { ...navItem, href: 'https://' } : navItem
+                                                                                )
+                                                                            }));
+                                                                        }}
+                                                                        className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navIsCustom ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                    >
+                                                                        カスタムURL
+                                                                    </button>
+                                                                    {navIsCustom && (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={navVal}
+                                                                            onChange={(e) => {
+                                                                                const newHref = e.target.value;
+                                                                                setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                                    ...prev,
+                                                                                    navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                                        i === index ? { ...navItem, href: newHref } : navItem
+                                                                                    )
+                                                                                }));
+                                                                            }}
+                                                                            placeholder="https://example.com"
+                                                                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     );
