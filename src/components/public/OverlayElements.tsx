@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { CTA_TEMPLATES, getTemplateStyle } from '@/lib/cta-templates';
 
@@ -19,6 +19,7 @@ interface OverlayItem {
     fontWeight?: string;
     link?: string;
     template?: string;
+    positionMode?: 'absolute' | 'fixed_bottom' | 'fixed_right' | 'fixed_left';
     action?: {
         type: 'external' | 'anchor' | 'line';
         url: string;
@@ -37,6 +38,8 @@ interface OverlayItem {
 
 interface OverlayElementsProps {
     overlays: OverlayItem[];
+    /** Editor画面でのレンダリング基準幅（px）。省略時はスケーリングなし */
+    editorBaseWidth?: number;
 }
 
 // Lottieアニメーション用コンポーネント
@@ -67,9 +70,34 @@ function LottiePlayer({ url, className }: { url: string; className?: string }) {
     return <div ref={containerRef} className={className} />;
 }
 
-export function OverlayElements({ overlays }: OverlayElementsProps) {
+export function OverlayElements({ overlays, editorBaseWidth }: OverlayElementsProps) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [scale, setScale] = useState(1);
+
+    useEffect(() => {
+        if (!editorBaseWidth || !containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const w = entry.contentRect.width;
+                if (w > 0) setScale(w / editorBaseWidth);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, [editorBaseWidth]);
+
+    // ピクセル値をスケーリングするヘルパー
+    const scalePx = (val: number | undefined, fallback: number) => {
+        const v = val ?? fallback;
+        return `${Math.round(v * scale)}px`;
+    };
+    const scalePadding = (padding: string | undefined, fallback: string) => {
+        const p = padding || fallback;
+        return p.replace(/(\d+)px/g, (_, n) => `${Math.round(parseInt(n) * scale)}px`);
+    };
+
     return (
-        <>
+        <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
             {overlays.map((overlay) => {
                 const style: React.CSSProperties = {
                     position: 'absolute',
@@ -84,7 +112,7 @@ export function OverlayElements({ overlays }: OverlayElementsProps) {
                 if (overlay.type === 'text') {
                     const textStyle: React.CSSProperties = {
                         ...style,
-                        fontSize: `${overlay.fontSize || 16}px`,
+                        fontSize: scalePx(overlay.fontSize, 16),
                         color: overlay.fontColor || '#ffffff',
                         fontWeight: overlay.fontWeight || 'normal',
                         textAlign: 'center',
@@ -171,20 +199,34 @@ export function OverlayElements({ overlays }: OverlayElementsProps) {
                 // ボタンオーバーレイ（CTAテンプレート対応）
                 if (overlay.type === 'button') {
                     const template = overlay.template ? CTA_TEMPLATES[overlay.template] : null;
-                    const isFixedBottom = template?.positionMode === 'fixed_bottom';
+                    const posMode = overlay.positionMode || template?.positionMode || 'absolute';
+                    const isFixed = posMode.startsWith('fixed_');
                     const animClass = template?.animation === 'pulse' ? 'animate-pulse'
                         : template?.animation === 'bounce' ? 'animate-bounce' : undefined;
 
-                    // テンプレートスタイル or カスタムスタイル（ユーザーのサイズ変更を反映）
+                    // テンプレートベースのスタイルを取得
+                    const tplStyle = template ? getTemplateStyle(overlay.template!) : null;
+                    // フォントサイズ/パディング/角丸をスケーリング（固定配置はスケーリングしない）
+                    const btnFontSize = overlay.style?.fontSize ?? (tplStyle ? parseInt(String(tplStyle.fontSize)) : 16);
+                    const btnPadding = overlay.style?.padding ?? (tplStyle ? String(tplStyle.padding) : '12px 24px');
+                    const btnBorderRadius = overlay.style?.borderRadius ?? (template ? parseInt(template.borderRadius) : 8);
+
+                    // 固定配置用のスタイル
+                    const fixedPositionStyles: Record<string, React.CSSProperties> = {
+                        fixed_bottom: { position: 'fixed', bottom: 0, left: 0, right: 0, width: '100%', zIndex: 50, borderRadius: 0, textAlign: 'center' as const },
+                        fixed_right: { position: 'fixed', right: 0, top: '50%', transform: 'translateY(-50%)', writingMode: 'vertical-rl', zIndex: 50, textAlign: 'center' as const },
+                        fixed_left: { position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)', writingMode: 'vertical-rl', zIndex: 50, textAlign: 'center' as const },
+                    };
+
+                    // テンプレートスタイル or カスタムスタイル（スケーリング対応）
                     const buttonStyle: React.CSSProperties = template
                         ? {
-                            ...getTemplateStyle(overlay.template!),
-                            // ユーザーが変更したサイズ系プロパティを上書き
-                            ...(overlay.style?.fontSize != null && { fontSize: overlay.style.fontSize }),
-                            ...(overlay.style?.borderRadius != null && { borderRadius: overlay.style.borderRadius }),
-                            ...(overlay.style?.padding != null && { padding: overlay.style.padding }),
-                            ...(isFixedBottom
-                                ? { position: 'fixed', bottom: 0, left: 0, right: 0, width: '100%', zIndex: 50, borderRadius: 0, textAlign: 'center' as const }
+                            ...tplStyle,
+                            fontSize: isFixed ? `${btnFontSize}px` : scalePx(btnFontSize, 16),
+                            borderRadius: isFixed ? tplStyle?.borderRadius : scalePx(btnBorderRadius, 8),
+                            padding: isFixed ? btnPadding : scalePadding(btnPadding, '12px 24px'),
+                            ...(isFixed
+                                ? fixedPositionStyles[posMode]
                                 : { ...style, width: 'auto' }
                             ),
                         }
@@ -193,10 +235,10 @@ export function OverlayElements({ overlays }: OverlayElementsProps) {
                             width: 'auto',
                             backgroundColor: overlay.style?.backgroundColor || '#6366f1',
                             color: overlay.style?.textColor || '#ffffff',
-                            borderRadius: overlay.style?.borderRadius,
-                            fontSize: overlay.style?.fontSize,
+                            borderRadius: scalePx(btnBorderRadius, 8),
+                            fontSize: scalePx(btnFontSize, 16),
                             fontWeight: overlay.style?.fontWeight,
-                            padding: overlay.style?.padding,
+                            padding: scalePadding(btnPadding, '12px 24px'),
                             border: overlay.style?.border,
                             boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
                             whiteSpace: 'nowrap' as const,
@@ -270,6 +312,6 @@ export function OverlayElements({ overlays }: OverlayElementsProps) {
 
                 return null;
             })}
-        </>
+        </div>
     );
 }

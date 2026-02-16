@@ -19,7 +19,7 @@ export interface CTATemplate {
     border?: string;
     boxShadow?: string;
     icon?: 'line' | 'phone' | 'mail';
-    positionMode?: 'absolute' | 'fixed_bottom';
+    positionMode?: 'absolute' | 'fixed_bottom' | 'fixed_right' | 'fixed_left';
     letterSpacing?: string;
     textShadow?: string;
 }
@@ -211,6 +211,48 @@ export const CTA_TEMPLATES: Record<string, CTATemplate> = {
         fontSize: 16,
         animation: 'none',
         positionMode: 'fixed_bottom',
+    },
+
+    fixed_right_bar: {
+        name: '右固定バー',
+        label: 'エントリーはこちら ＞',
+        category: 'cv',
+        background: '#dc2626',
+        color: '#ffffff',
+        borderRadius: '8px 0 0 8px',
+        fontWeight: 'bold',
+        padding: '20px 12px',
+        fontSize: 14,
+        animation: 'none',
+        positionMode: 'fixed_right',
+        letterSpacing: '0.1em',
+    },
+    fixed_right_gradient: {
+        name: '右固定（グラデ）',
+        label: 'お問い合わせ ＞',
+        category: 'cv',
+        background: 'linear-gradient(180deg, #7c3aed, #db2777)',
+        color: '#ffffff',
+        borderRadius: '8px 0 0 8px',
+        fontWeight: 'bold',
+        padding: '20px 12px',
+        fontSize: 14,
+        animation: 'none',
+        positionMode: 'fixed_right',
+    },
+    fixed_left_bar: {
+        name: '左固定バー',
+        label: 'お問い合わせ',
+        category: 'cv',
+        background: '#1e40af',
+        color: '#ffffff',
+        borderRadius: '0 8px 8px 0',
+        fontWeight: 'bold',
+        padding: '20px 12px',
+        fontSize: 14,
+        animation: 'none',
+        positionMode: 'fixed_left',
+        letterSpacing: '0.1em',
     },
 
     // ========== 業種別 ==========

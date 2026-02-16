@@ -23,6 +23,7 @@ import LPComparePanel from '@/components/admin/LPComparePanel';
 import SectionInsertModal from '@/components/admin/SectionInsertModal';
 import SectionCropModal from '@/components/admin/SectionCropModal';
 import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
+import { CTA_TEMPLATES, getTemplateStyle } from '@/lib/cta-templates';
 import ThumbnailTransformModal from '@/components/admin/ThumbnailTransformModal';
 import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
 import ClaudeCodeGeneratorModal from '@/components/admin/ClaudeCodeGeneratorModal';
@@ -149,6 +150,17 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // デュアルスクリーンショット取り込みモーダル
     const [showDualImportModal, setShowDualImportModal] = useState(false);
+
+    // ヘッダー設定アコーディオン
+    const [headerOpenSections, setHeaderOpenSections] = useState<Set<string>>(new Set(['logo']));
+    const toggleHeaderSection = (key: string) => {
+        setHeaderOpenSections(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
 
     // 境界修正モーダル（複数選択対応）
     const [showBoundaryFixModal, setShowBoundaryFixModal] = useState(false);
@@ -2993,6 +3005,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                     });
                                                                 }}
                                                             >
+                                                                {/* 固定配置バッジ */}
+                                                                {(overlay.positionMode === 'fixed_right' || overlay.positionMode === 'fixed_left' || overlay.positionMode === 'fixed_bottom' ||
+                                                                    (overlay.template && CTA_TEMPLATES[overlay.template]?.positionMode && CTA_TEMPLATES[overlay.template].positionMode !== 'absolute')) && (
+                                                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 bg-cyan-600 text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap">
+                                                                        {(overlay.positionMode || CTA_TEMPLATES[overlay.template]?.positionMode) === 'fixed_right' ? '右固定'
+                                                                            : (overlay.positionMode || CTA_TEMPLATES[overlay.template]?.positionMode) === 'fixed_left' ? '左固定'
+                                                                            : '下固定'}
+                                                                    </span>
+                                                                )}
                                                                 {overlay.type === 'button' && (
                                                                     editingOverlayId === overlay.id ? (
                                                                         <input
@@ -3021,28 +3042,46 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                             }}
                                                                             className="whitespace-nowrap text-center outline-none"
                                                                             style={{
-                                                                                backgroundColor: overlay.style?.backgroundColor || '#6366f1',
-                                                                                color: overlay.style?.textColor || '#fff',
-                                                                                borderRadius: `${overlay.style?.borderRadius || 8}px`,
-                                                                                fontSize: `${overlay.style?.fontSize || 16}px`,
-                                                                                fontWeight: overlay.style?.fontWeight || 'bold',
-                                                                                padding: overlay.style?.padding || '12px 24px',
-                                                                                boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
+                                                                                ...(overlay.template && CTA_TEMPLATES[overlay.template]
+                                                                                    ? {
+                                                                                        ...getTemplateStyle(overlay.template),
+                                                                                        ...(overlay.style?.fontSize != null && { fontSize: overlay.style.fontSize }),
+                                                                                        ...(overlay.style?.borderRadius != null && { borderRadius: overlay.style.borderRadius }),
+                                                                                        ...(overlay.style?.padding != null && { padding: overlay.style.padding }),
+                                                                                    }
+                                                                                    : {
+                                                                                        backgroundColor: overlay.style?.backgroundColor || '#6366f1',
+                                                                                        color: overlay.style?.textColor || '#fff',
+                                                                                        borderRadius: `${overlay.style?.borderRadius || 8}px`,
+                                                                                        fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                                        fontWeight: overlay.style?.fontWeight || 'bold',
+                                                                                        padding: overlay.style?.padding || '12px 24px',
+                                                                                        boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
+                                                                                    }
+                                                                                ),
                                                                                 minWidth: '80px',
                                                                             }}
                                                                         />
                                                                     ) : (
                                                                         <div
                                                                             className="whitespace-nowrap"
-                                                                            style={{
-                                                                                backgroundColor: overlay.style?.backgroundColor || '#6366f1',
-                                                                                color: overlay.style?.textColor || '#fff',
-                                                                                borderRadius: `${overlay.style?.borderRadius || 8}px`,
-                                                                                fontSize: `${overlay.style?.fontSize || 16}px`,
-                                                                                fontWeight: overlay.style?.fontWeight || 'bold',
-                                                                                padding: overlay.style?.padding || '12px 24px',
-                                                                                boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
-                                                                            }}
+                                                                            style={overlay.template && CTA_TEMPLATES[overlay.template]
+                                                                                ? {
+                                                                                    ...getTemplateStyle(overlay.template),
+                                                                                    ...(overlay.style?.fontSize != null && { fontSize: overlay.style.fontSize }),
+                                                                                    ...(overlay.style?.borderRadius != null && { borderRadius: overlay.style.borderRadius }),
+                                                                                    ...(overlay.style?.padding != null && { padding: overlay.style.padding }),
+                                                                                }
+                                                                                : {
+                                                                                    backgroundColor: overlay.style?.backgroundColor || '#6366f1',
+                                                                                    color: overlay.style?.textColor || '#fff',
+                                                                                    borderRadius: `${overlay.style?.borderRadius || 8}px`,
+                                                                                    fontSize: `${overlay.style?.fontSize || 16}px`,
+                                                                                    fontWeight: overlay.style?.fontWeight || 'bold',
+                                                                                    padding: overlay.style?.padding || '12px 24px',
+                                                                                    boxShadow: overlay.style?.boxShadow || '0 4px 12px rgba(0,0,0,0.15)',
+                                                                                }
+                                                                            }
                                                                         >
                                                                             {overlay.content}
                                                                         </div>
@@ -4209,56 +4248,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
                             <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">基本操作</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            {/* チュートリアル */}
-                            <button
-                                onClick={() => setShowTutorialModal(true)}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-violet-50 text-violet-700 text-xs font-medium border border-violet-200 hover:border-violet-300 hover:bg-violet-100 transition-all min-h-[40px]"
-                            >
-                                <HelpCircle className="h-3.5 w-3.5" />
-                                使い方
-                            </button>
-                            {/* 画像追加 */}
-                            <button
-                                onClick={() => document.getElementById('file-upload-input')?.click()}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all min-h-[40px]"
-                            >
-                                <Plus className="h-3.5 w-3.5 text-gray-400" />
-                                画像追加
-                            </button>
-                            {/* プレビュー */}
-                            <Link
-                                href={`/p/${initialSlug || pageId}`}
-                                target="_blank"
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all min-h-[40px]"
-                            >
-                                <Eye className="h-3.5 w-3.5 text-gray-400" />
-                                プレビュー
-                            </Link>
-                            {/* ダウンロード */}
-                            <button
-                                onClick={handleExport}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all min-h-[40px]"
-                            >
-                                <Download className="h-3.5 w-3.5 text-gray-400" />
-                                ZIP出力
-                            </button>
-                            {/* PDF出力 */}
-                            <button
-                                onClick={handleExportPdf}
-                                disabled={isExportingPdf}
-                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-white text-gray-600 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
-                            >
-                                {isExportingPdf ? (
-                                    <Loader2 className="h-3.5 w-3.5 text-gray-400 animate-spin" />
-                                ) : (
-                                    <FileText className="h-3.5 w-3.5 text-gray-400" />
-                                )}
-                                PDF出力
-                            </button>
-                        </div>
-
-                        {/* デプロイ - Premium standalone button */}
+                        {/* ページを公開 */}
                         <button
                             onClick={() => {
                                 if (planLimits && !planLimits.canAIGenerate) {
@@ -4333,11 +4323,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         >
                             <div className="space-y-1 p-2">
                                 {/* ロゴテキスト */}
-                                <details className="group" open>
-                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600">
+                                <div>
+                                    <button
+                                        onClick={() => toggleHeaderSection('logo')}
+                                        className="flex items-center justify-between w-full cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
+                                    >
                                         <span>ロゴテキスト</span>
-                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
-                                    </summary>
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('logo') ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {headerOpenSections.has('logo') && (
                                     <div className="pt-1 pb-2">
                                         <input
                                             type="text"
@@ -4347,13 +4341,18 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                         />
                                     </div>
-                                </details>
+                                    )}
+                                </div>
                                 {/* CTAボタン */}
-                                <details className="group">
-                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600 border-t border-gray-100 pt-2">
+                                <div className="border-t border-gray-100 pt-1">
+                                    <button
+                                        onClick={() => toggleHeaderSection('cta')}
+                                        className="flex items-center justify-between w-full cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
+                                    >
                                         <span>CTAボタン</span>
-                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
-                                    </summary>
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('cta') ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {headerOpenSections.has('cta') && (
                                 <div className="flex gap-2 pt-1 pb-2">
                                     <div className="flex-1">
                                         <label className="block text-xs font-medium text-gray-600 mb-1">CTAテキスト</label>
@@ -4389,7 +4388,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                             const roleLabels: Record<string, string> = {
                                                                 hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
                                                                 pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
-                                                                footer: 'フッター', other: 'その他',
+                                                                cta: 'CTA', footer: 'フッター', other: 'その他',
+                                                                'html-embed': 'HTML埋め込み',
                                                             };
                                                             return (
                                                                 <option key={section.id} value={`#${section.role}`}>
@@ -4414,31 +4414,49 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         })()}
                                     </div>
                                 </div>
-                                </details>
+                                )}
+                                </div>
                                 {/* ナビゲーション */}
-                                <details className="group">
-                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600 border-t border-gray-100 pt-2">
+                                <div className="border-t border-gray-100 pt-1">
+                                    <button
+                                        onClick={() => toggleHeaderSection('nav')}
+                                        className="flex items-center justify-between w-full cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
+                                    >
                                         <span>ナビゲーション ({headerConfig.navItems?.length || 0}件)</span>
-                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
-                                    </summary>
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('nav') ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {headerOpenSections.has('nav') && (
                                     <div className="pt-2 space-y-2">
                                         {headerConfig.navItems.map((item: { id: string; label: string; href: string }, index: number) => (
-                                            <div key={item.id} className="flex gap-1.5 items-center">
-                                                <input
-                                                    type="text"
-                                                    value={item.label}
-                                                    onChange={(e) => {
-                                                        const newLabel = e.target.value;
-                                                        setHeaderConfig((prev: typeof headerConfig) => ({
-                                                            ...prev,
-                                                            navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                i === index ? { ...navItem, label: newLabel } : navItem
-                                                            )
-                                                        }));
-                                                    }}
-                                                    placeholder="ラベル"
-                                                    className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
-                                                />
+                                            <div key={item.id} className="p-2 bg-gray-50 rounded-lg space-y-1.5">
+                                                <div className="flex gap-1.5 items-center">
+                                                    <input
+                                                        type="text"
+                                                        value={item.label}
+                                                        onChange={(e) => {
+                                                            const newLabel = e.target.value;
+                                                            setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                ...prev,
+                                                                navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                    i === index ? { ...navItem, label: newLabel } : navItem
+                                                                )
+                                                            }));
+                                                        }}
+                                                        placeholder="表示テキスト"
+                                                        className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                ...prev,
+                                                                navItems: prev.navItems.filter((_: { id: string; label: string; href: string }, i: number) => i !== index)
+                                                            }));
+                                                        }}
+                                                        className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
                                                 {(() => {
                                                     const navVal = item.href || '';
                                                     const navSectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
@@ -4457,15 +4475,23 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                         )
                                                                     }));
                                                                 }}
-                                                                className="w-28 px-1.5 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30 bg-white"
+                                                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
                                                             >
-                                                                <option value="">リンク...</option>
-                                                                {sections.map((section: any) => (
-                                                                    <option key={section.id} value={`#${section.role}`}>
-                                                                        #{section.role}
-                                                                    </option>
-                                                                ))}
-                                                                <option value="#contact">#contact</option>
+                                                                <option value="">リンク先を選択...</option>
+                                                                {sections.map((section: any) => {
+                                                                    const roleLabels: Record<string, string> = {
+                                                                        hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
+                                                                        pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
+                                                                        cta: 'CTA', footer: 'フッター', other: 'その他',
+                                                                        'html-embed': 'HTML埋め込み',
+                                                                    };
+                                                                    return (
+                                                                        <option key={section.id} value={`#${section.role}`}>
+                                                                            {roleLabels[section.role] || section.role}
+                                                                        </option>
+                                                                    );
+                                                                })}
+                                                                <option value="#contact">お問い合わせ</option>
                                                                 <option value="__custom__">カスタムURL</option>
                                                             </select>
                                                             {navIsCustom && (
@@ -4482,23 +4508,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                         }));
                                                                     }}
                                                                     placeholder="https://example.com"
-                                                                    className="w-28 mt-1 px-1.5 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                                    className="w-full mt-1 px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
                                                                 />
                                                             )}
                                                         </div>
                                                     );
                                                 })()}
-                                                <button
-                                                    onClick={() => {
-                                                        setHeaderConfig((prev: typeof headerConfig) => ({
-                                                            ...prev,
-                                                            navItems: prev.navItems.filter((_: { id: string; label: string; href: string }, i: number) => i !== index)
-                                                        }));
-                                                    }}
-                                                    className="p-1 text-red-500 hover:bg-red-50 rounded"
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </button>
                                             </div>
                                         ))}
                                         <button
@@ -4513,13 +4528,18 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             + ナビを追加
                                         </button>
                                     </div>
-                                </details>
+                                    )}
+                                </div>
                                 {/* ヘッダー固定設定 */}
-                                <details className="group">
-                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600 border-t border-gray-100 pt-2">
+                                <div className="border-t border-gray-100 pt-1">
+                                    <button
+                                        onClick={() => toggleHeaderSection('display')}
+                                        className="flex items-center justify-between w-full cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
+                                    >
                                         <span>表示オプション</span>
-                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
-                                    </summary>
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('display') ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {headerOpenSections.has('display') && (
                                     <div className="flex items-center gap-2 pt-1 pb-2">
                                         <input
                                             type="checkbox"
@@ -4532,7 +4552,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             スクロール時にヘッダーを固定
                                         </label>
                                     </div>
-                                </details>
+                                    )}
+                                </div>
                             </div>
                         </EditorMenuItem>
                     </EditorMenuSection>
@@ -6744,6 +6765,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     }}
                     imageUrl={overlayEditImageUrl}
                     sectionId={overlayEditSectionId}
+                    sections={sections.map((s: any) => ({ id: s.id, role: s.role }))}
                     initialOverlays={
                         sections.find(s => String(s.id) === overlayEditSectionId)?.config?.overlays || []
                     }

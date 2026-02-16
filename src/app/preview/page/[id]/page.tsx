@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Monitor, Smartphone } from 'lucide-react';
 import type { ClickableArea } from '@/types';
+import { OverlayElements } from '@/components/public/OverlayElements';
 
 interface Section {
     id: string;
@@ -319,6 +320,10 @@ export default function PagePreviewPage() {
                                             )}
                                         </div>
                                     </div>
+                                )}
+                                {/* オーバーレイ要素（CTAボタン等） */}
+                                {parsedConfig.overlays && parsedConfig.overlays.length > 0 && (
+                                    <OverlayElements overlays={parsedConfig.overlays} editorBaseWidth={672} />
                                 )}
                                 {/* Clickable Areas (CTA) - 常に表示（デバッグ用に薄い枠線） */}
                                 {clickableAreas.map((area, idx) => {

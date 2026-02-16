@@ -23,6 +23,7 @@ interface OverlayElement {
     height: number; // pixels or auto
     content: string;
     template?: string; // template ID
+    positionMode?: 'absolute' | 'fixed_bottom' | 'fixed_right' | 'fixed_left';
     action?: OverlayAction;
     style: {
         backgroundColor?: string;
@@ -40,6 +41,11 @@ interface OverlayElement {
     };
 }
 
+interface SectionInfo {
+    id: string | number;
+    role: string;
+}
+
 interface OverlayEditorModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -47,6 +53,7 @@ interface OverlayEditorModalProps {
     sectionId: string;
     initialOverlays?: OverlayElement[];
     onSave: (overlays: OverlayElement[]) => void;
+    sections?: SectionInfo[];
 }
 
 const ACTION_TYPES = [
@@ -75,7 +82,8 @@ export default function OverlayEditorModal({
     imageUrl,
     sectionId,
     initialOverlays = [],
-    onSave
+    onSave,
+    sections: sectionsList = [],
 }: OverlayEditorModalProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [overlays, setOverlays] = useState<OverlayElement[]>(initialOverlays);
@@ -84,6 +92,7 @@ export default function OverlayEditorModal({
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [categoryFilter, setCategoryFilter] = useState<CTACategory | 'all'>('all');
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+        ctaTemplates: true,
         template: true,
         action: false,
         size: false,
@@ -111,6 +120,7 @@ export default function OverlayEditorModal({
             height: 48,
             content: template.label,
             template: templateId,
+            positionMode: template.positionMode,
             action: template.icon === 'line'
                 ? { type: 'line', url: '' }
                 : { type: 'external', url: '' },
@@ -367,9 +377,17 @@ export default function OverlayEditorModal({
 
                     {/* 右: 設定パネル */}
                     <div className="w-80 bg-gray-50 flex flex-col overflow-hidden">
-                        {/* CTAテンプレート一覧 */}
-                        <div className="p-4 border-b border-gray-200 overflow-y-auto max-h-[340px]">
-                            <h3 className="text-sm font-bold text-gray-900 mb-2">CTAテンプレート</h3>
+                        {/* CTAテンプレート一覧（アコーディオン） */}
+                        <div className="border-b border-gray-200">
+                            <button
+                                onClick={() => toggleSection('ctaTemplates')}
+                                className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-gray-900 hover:bg-gray-100 transition-colors"
+                            >
+                                CTAテンプレート
+                                <ChevronDown className={clsx("h-3.5 w-3.5 text-gray-400 transition-transform", openSections.ctaTemplates && "rotate-180")} />
+                            </button>
+                            {openSections.ctaTemplates && (
+                            <div className="px-4 pb-4 overflow-y-auto max-h-[300px]">
                             {/* カテゴリフィルタ */}
                             <div className="flex gap-1 mb-3 flex-wrap">
                                 <button
@@ -436,6 +454,8 @@ export default function OverlayEditorModal({
                                 <Plus className="h-3 w-3" />
                                 カスタムボタン
                             </button>
+                            </div>
+                            )}
                         </div>
 
                         {/* 選択中の要素の設定 */}
@@ -452,43 +472,6 @@ export default function OverlayEditorModal({
                                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
                                     />
                                 </div>
-
-                                {/* テンプレート（アコーディオン） */}
-                                {selectedOverlay.template && (
-                                    <div className="border-b border-gray-200">
-                                        <button
-                                            onClick={() => toggleSection('template')}
-                                            className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
-                                        >
-                                            テンプレート
-                                            <ChevronDown className={clsx("h-3.5 w-3.5 text-gray-400 transition-transform", openSections.template && "rotate-180")} />
-                                        </button>
-                                        {openSections.template && (
-                                            <div className="px-4 pb-3">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded flex-1">
-                                                        {CTA_TEMPLATES[selectedOverlay.template]?.name || selectedOverlay.template}
-                                                    </span>
-                                                    <select
-                                                        value={selectedOverlay.template}
-                                                        onChange={(e) => changeTemplate(selectedId!, e.target.value)}
-                                                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-gray-300"
-                                                    >
-                                                        {(Object.entries(CTA_CATEGORIES) as [CTACategory, string][]).map(([catKey, catLabel]) => (
-                                                            <optgroup key={catKey} label={catLabel}>
-                                                                {Object.entries(CTA_TEMPLATES)
-                                                                    .filter(([, t]) => t.category === catKey)
-                                                                    .map(([id, t]) => (
-                                                                        <option key={id} value={id}>{t.name}</option>
-                                                                    ))}
-                                                            </optgroup>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
 
                                 {/* サイズ（アコーディオン）— テンプレート・カスタム両方表示 */}
                                 <div className="border-b border-gray-200">
@@ -593,14 +576,36 @@ export default function OverlayEditorModal({
                                                         <Hash className="h-3 w-3 inline mr-1" />
                                                         スクロール先
                                                     </label>
-                                                    <input
-                                                        type="text"
-                                                        value={selectedOverlay.action?.url || ''}
-                                                        onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
-                                                        placeholder="#contact"
-                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                                                    />
-                                                    <p className="mt-1 text-[10px] text-gray-400">例: #contact, #form</p>
+                                                    {sectionsList.length > 0 ? (
+                                                        <select
+                                                            value={selectedOverlay.action?.url || ''}
+                                                            onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
+                                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                                                        >
+                                                            <option value="">選択...</option>
+                                                            {sectionsList.map((sec) => {
+                                                                const roleLabels: Record<string, string> = {
+                                                                    hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
+                                                                    pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
+                                                                    cta: 'CTA', footer: 'フッター', other: 'その他',
+                                                                };
+                                                                return (
+                                                                    <option key={sec.id} value={sec.role}>
+                                                                        {roleLabels[sec.role] || sec.role}（#{sec.role}）
+                                                                    </option>
+                                                                );
+                                                            })}
+                                                            <option value="contact">お問い合わせ（#contact）</option>
+                                                        </select>
+                                                    ) : (
+                                                        <input
+                                                            type="text"
+                                                            value={selectedOverlay.action?.url || ''}
+                                                            onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
+                                                            placeholder="#contact"
+                                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                                                        />
+                                                    )}
                                                 </div>
                                             )}
 
@@ -684,31 +689,48 @@ export default function OverlayEditorModal({
                                         <ChevronDown className={clsx("h-3.5 w-3.5 text-gray-400 transition-transform", openSections.position && "rotate-180")} />
                                     </button>
                                     {openSections.position && (
-                                        <div className="px-4 pb-3">
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">X位置 (%)</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="100"
-                                                        value={Math.round(selectedOverlay.x)}
-                                                        onChange={(e) => updateOverlay(selectedId!, { x: parseFloat(e.target.value) })}
-                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">Y位置 (%)</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="100"
-                                                        value={Math.round(selectedOverlay.y)}
-                                                        onChange={(e) => updateOverlay(selectedId!, { y: parseFloat(e.target.value) })}
-                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                                                    />
-                                                </div>
+                                        <div className="px-4 pb-3 space-y-3">
+                                            {/* 配置モード */}
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">配置モード</label>
+                                                <select
+                                                    value={selectedOverlay.positionMode || 'absolute'}
+                                                    onChange={(e) => updateOverlay(selectedId!, { positionMode: e.target.value as any })}
+                                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                                                >
+                                                    <option value="absolute">通常配置</option>
+                                                    <option value="fixed_bottom">画面下部固定</option>
+                                                    <option value="fixed_right">画面右端固定</option>
+                                                    <option value="fixed_left">画面左端固定</option>
+                                                </select>
                                             </div>
+                                            {/* X/Y位置（通常配置の場合のみ表示） */}
+                                            {(!selectedOverlay.positionMode || selectedOverlay.positionMode === 'absolute') && (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">X位置 (%)</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            value={Math.round(selectedOverlay.x)}
+                                                            onChange={(e) => updateOverlay(selectedId!, { x: parseFloat(e.target.value) })}
+                                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">Y位置 (%)</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            value={Math.round(selectedOverlay.y)}
+                                                            onChange={(e) => updateOverlay(selectedId!, { y: parseFloat(e.target.value) })}
+                                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

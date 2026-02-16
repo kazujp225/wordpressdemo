@@ -1,9 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Loader2, Mail, Lock, CheckCircle2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+
+function LottieHero() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let animation: any = null;
+    let cancelled = false;
+
+    Promise.all([
+      import('lottie-web'),
+      fetch('/Marketing.json').then(r => r.json()),
+    ]).then(([lottie, animationData]) => {
+      if (cancelled || !containerRef.current) return;
+      animation = lottie.default.loadAnimation({
+        container: containerRef.current,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        animationData,
+      });
+    }).catch(console.error);
+
+    return () => {
+      cancelled = true;
+      if (animation) {
+        try { animation.destroy(); } catch {}
+      }
+    };
+  }, []);
+
+  return <div ref={containerRef} className="w-full h-full max-w-md mx-auto" />;
+}
 
 type AuthMode = 'login' | 'signup';
 
@@ -154,7 +186,13 @@ export default function LoginPage() {
 
       {/* Auth Form */}
       <main className="flex items-center justify-center min-h-[calc(100vh-73px)] px-4">
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full max-w-5xl flex flex-col md:flex-row items-center gap-8 md:gap-16">
+          {/* Left: Lottie Animation */}
+          <div className="hidden md:flex flex-1 items-center justify-center min-h-[400px]">
+            <LottieHero />
+          </div>
+          {/* Right: Form */}
+          <div className="w-full max-w-md space-y-8 flex-shrink-0">
           {/* Tab Switcher */}
           <div className="flex border-b border-gray-200">
             <button
@@ -366,6 +404,7 @@ export default function LoginPage() {
               </form>
             </>
           )}
+          </div>
         </div>
       </main>
 

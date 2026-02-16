@@ -394,6 +394,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                     {config.overlays && config.overlays.length > 0 && (
                                         <OverlayElements
                                             overlays={config.overlays}
+                                            editorBaseWidth={672}
                                         />
                                     )}
 
