@@ -71,13 +71,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     try {
         const body = await request.json();
-        const { title, category, width, height, presetName, prompt, productInfo, imageId, referenceImageUrl, status, metadata } = body;
+        const { title, category, platform, width, height, presetName, prompt, productInfo, imageId, referenceImageUrl, status, metadata } = body;
+        const resolvedCategory = category || platform;
 
         const thumbnail = await prisma.thumbnail.update({
             where: { id },
             data: {
                 ...(title !== undefined && { title }),
-                ...(category !== undefined && { category }),
+                ...(resolvedCategory !== undefined && { category: resolvedCategory }),
                 ...(width !== undefined && { width: parseInt(width) }),
                 ...(height !== undefined && { height: parseInt(height) }),
                 ...(presetName !== undefined && { presetName }),

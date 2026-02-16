@@ -7,7 +7,7 @@ import {
     ZoomIn, ZoomOut, Hand, Trash2, Plus, Wand2, Sparkles,
     Paintbrush, Type, Box, Image as ImageIcon, PenTool, MessageSquare,
     UserPlus, AlertTriangle, Copy, Check, RefreshCw, LayoutGrid,
-    Eye, ChevronDown, Maximize2, Crop, Move,
+    Eye, ChevronDown, Maximize2, Crop, Move, FolderPlus,
 } from 'lucide-react';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -1330,6 +1330,80 @@ export function BannerEditor({ banner }: BannerEditorProps) {
         setGeneratedImageId(selected.imageId || null);
         toast.success('バリエーションを採用しました');
     }, [selectedVariationIndex, variationResults]);
+
+    // ── Save All Variations ─────────────────────
+    const [isSavingAll, setIsSavingAll] = useState(false);
+    const handleSaveAllVariations = useCallback(async () => {
+        const successResults = variationResults.filter(r => r.status === 'success' && r.imageId);
+        if (successResults.length === 0) return;
+
+        setIsSavingAll(true);
+        try {
+            const results = await Promise.all(
+                successResults.map((result, i) =>
+                    fetch('/api/banners', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: `${title || 'バナー'} バリエーション${i + 1}`,
+                            platform,
+                            width,
+                            height,
+                            presetName: isCustomSize ? null : presetName,
+                            prompt,
+                            productInfo,
+                            imageId: result.imageId,
+                            status: 'saved',
+                            metadata: segment ? { segment } : null,
+                        }),
+                    }).then(res => res.ok)
+                )
+            );
+            const successCount = results.filter(Boolean).length;
+            const failCount = results.length - successCount;
+            if (failCount > 0) {
+                toast.error(`${successCount}件保存、${failCount}件失敗しました`);
+            } else {
+                toast.success(`${successCount}件のバリエーションを保存しました`);
+            }
+        } catch {
+            toast.error('一括保存に失敗しました');
+        } finally {
+            setIsSavingAll(false);
+        }
+    }, [variationResults, title, platform, width, height, presetName, isCustomSize, prompt, productInfo, segment]);
+
+    // ── Download All Variations ──────────────────
+    const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+    const handleDownloadAllVariations = useCallback(async () => {
+        const successResults = variationResults.filter(r => r.status === 'success' && r.imageUrl);
+        if (successResults.length === 0) return;
+
+        setIsDownloadingAll(true);
+        try {
+            for (let i = 0; i < successResults.length; i++) {
+                const result = successResults[i];
+                const response = await fetch(result.imageUrl!);
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${title || 'banner'}-variation-${i + 1}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                if (i < successResults.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            }
+            toast.success(`${successResults.length}件ダウンロードしました`);
+        } catch {
+            toast.error('ダウンロードに失敗しました');
+        } finally {
+            setIsDownloadingAll(false);
+        }
+    }, [variationResults, title]);
 
     // ── Retry Single Variation ───────────────────
     const handleRetryVariation = useCallback(async (index: number) => {
@@ -2800,6 +2874,28 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                             <Check className="h-4 w-4" />
                                             この画像を採用
                                         </button>
+
+                                        {/* Save All + Download All */}
+                                        {variationResults.filter(r => r.status === 'success').length >= 2 && (
+                                            <div className="flex gap-2 mt-2">
+                                                <button
+                                                    onClick={handleSaveAllVariations}
+                                                    disabled={isSavingAll}
+                                                    className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-bold border border-border bg-white text-foreground hover:bg-surface-50 transition-colors disabled:opacity-50"
+                                                >
+                                                    {isSavingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderPlus className="h-3.5 w-3.5" />}
+                                                    全て保存
+                                                </button>
+                                                <button
+                                                    onClick={handleDownloadAllVariations}
+                                                    disabled={isDownloadingAll}
+                                                    className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-bold border border-border bg-white text-foreground hover:bg-surface-50 transition-colors disabled:opacity-50"
+                                                >
+                                                    {isDownloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                                                    全てDL
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

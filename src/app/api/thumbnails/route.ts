@@ -40,9 +40,10 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { title, category, width, height, presetName, prompt, productInfo, imageId, referenceImageUrl, status, metadata } = body;
+        const { title, category, platform, width, height, presetName, prompt, productInfo, imageId, referenceImageUrl, status, metadata } = body;
+        const resolvedCategory = category || platform;
 
-        if (!category || !width || !height) {
+        if (!resolvedCategory || !width || !height) {
             return NextResponse.json({ error: 'category, width, height are required' }, { status: 400 });
         }
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
             data: {
                 userId: user.id,
                 title: title || `サムネイル ${new Date().toLocaleDateString('ja-JP')}`,
-                category,
+                category: resolvedCategory,
                 width: parsedWidth,
                 height: parsedHeight,
                 presetName: presetName || null,

@@ -175,10 +175,14 @@ export function OverlayElements({ overlays }: OverlayElementsProps) {
                     const animClass = template?.animation === 'pulse' ? 'animate-pulse'
                         : template?.animation === 'bounce' ? 'animate-bounce' : undefined;
 
-                    // テンプレートスタイル or カスタムスタイル
+                    // テンプレートスタイル or カスタムスタイル（ユーザーのサイズ変更を反映）
                     const buttonStyle: React.CSSProperties = template
                         ? {
                             ...getTemplateStyle(overlay.template!),
+                            // ユーザーが変更したサイズ系プロパティを上書き
+                            ...(overlay.style?.fontSize != null && { fontSize: overlay.style.fontSize }),
+                            ...(overlay.style?.borderRadius != null && { borderRadius: overlay.style.borderRadius }),
+                            ...(overlay.style?.padding != null && { padding: overlay.style.padding }),
                             ...(isFixedBottom
                                 ? { position: 'fixed', bottom: 0, left: 0, right: 0, width: '100%', zIndex: 50, borderRadius: 0, textAlign: 'center' as const }
                                 : { ...style, width: 'auto' }

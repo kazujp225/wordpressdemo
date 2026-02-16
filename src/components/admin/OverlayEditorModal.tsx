@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Plus, Trash2, Link2, MousePointer, ExternalLink, Hash, MessageCircle, RefreshCw } from 'lucide-react';
+import { X, Plus, Trash2, Link2, MousePointer, ExternalLink, Hash, MessageCircle, RefreshCw, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { CTA_TEMPLATES, CTA_CATEGORIES, getTemplateStyle, type CTACategory } from '@/lib/cta-templates';
@@ -83,6 +83,17 @@ export default function OverlayEditorModal({
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [categoryFilter, setCategoryFilter] = useState<CTACategory | 'all'>('all');
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+        template: true,
+        action: false,
+        size: false,
+        style: false,
+        position: false,
+    });
+
+    const toggleSection = (key: string) => {
+        setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const selectedOverlay = overlays.find(o => o.id === selectedId);
 
@@ -240,10 +251,16 @@ export default function OverlayEditorModal({
         onClose();
     };
 
-    // テンプレートからスタイルを取得
+    // テンプレートからスタイルを取得（ユーザーのサイズ変更を上書き適用）
     const getOverlayStyle = (overlay: OverlayElement): React.CSSProperties => {
         if (overlay.template && CTA_TEMPLATES[overlay.template]) {
-            return getTemplateStyle(overlay.template);
+            const baseStyle = getTemplateStyle(overlay.template);
+            return {
+                ...baseStyle,
+                fontSize: overlay.style.fontSize ?? baseStyle.fontSize,
+                borderRadius: overlay.style.borderRadius ?? baseStyle.borderRadius,
+                padding: overlay.style.padding ?? baseStyle.padding,
+            };
         }
         // カスタムスタイル（テンプレートなし）
         return {
@@ -423,11 +440,10 @@ export default function OverlayEditorModal({
 
                         {/* 選択中の要素の設定 */}
                         {selectedOverlay ? (
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                <h3 className="text-sm font-bold text-gray-900">CTA編集</h3>
-
-                                {/* ラベル */}
-                                <div>
+                            <div className="flex-1 overflow-y-auto">
+                                <div className="p-4 border-b border-gray-200">
+                                    <h3 className="text-sm font-bold text-gray-900 mb-2">CTA編集</h3>
+                                    {/* ラベル */}
                                     <label className="block text-xs font-medium text-gray-600 mb-1">ラベル</label>
                                     <input
                                         type="text"
@@ -437,211 +453,276 @@ export default function OverlayEditorModal({
                                     />
                                 </div>
 
-                                {/* テンプレート変更 */}
+                                {/* テンプレート（アコーディオン） */}
                                 {selectedOverlay.template && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">テンプレート</label>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded flex-1">
-                                                {CTA_TEMPLATES[selectedOverlay.template]?.name || selectedOverlay.template}
-                                            </span>
-                                            <select
-                                                value={selectedOverlay.template}
-                                                onChange={(e) => changeTemplate(selectedId!, e.target.value)}
-                                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-gray-300"
-                                            >
-                                                {(Object.entries(CTA_CATEGORIES) as [CTACategory, string][]).map(([catKey, catLabel]) => (
-                                                    <optgroup key={catKey} label={catLabel}>
-                                                        {Object.entries(CTA_TEMPLATES)
-                                                            .filter(([, t]) => t.category === catKey)
-                                                            .map(([id, t]) => (
-                                                                <option key={id} value={id}>{t.name}</option>
-                                                            ))}
-                                                    </optgroup>
-                                                ))}
-                                            </select>
-                                        </div>
+                                    <div className="border-b border-gray-200">
+                                        <button
+                                            onClick={() => toggleSection('template')}
+                                            className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                                        >
+                                            テンプレート
+                                            <ChevronDown className={clsx("h-3.5 w-3.5 text-gray-400 transition-transform", openSections.template && "rotate-180")} />
+                                        </button>
+                                        {openSections.template && (
+                                            <div className="px-4 pb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded flex-1">
+                                                        {CTA_TEMPLATES[selectedOverlay.template]?.name || selectedOverlay.template}
+                                                    </span>
+                                                    <select
+                                                        value={selectedOverlay.template}
+                                                        onChange={(e) => changeTemplate(selectedId!, e.target.value)}
+                                                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-gray-300"
+                                                    >
+                                                        {(Object.entries(CTA_CATEGORIES) as [CTACategory, string][]).map(([catKey, catLabel]) => (
+                                                            <optgroup key={catKey} label={catLabel}>
+                                                                {Object.entries(CTA_TEMPLATES)
+                                                                    .filter(([, t]) => t.category === catKey)
+                                                                    .map(([id, t]) => (
+                                                                        <option key={id} value={id}>{t.name}</option>
+                                                                    ))}
+                                                            </optgroup>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
-                                {/* アクションタイプ */}
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">アクション</label>
-                                    <div className="grid grid-cols-3 gap-1">
-                                        {ACTION_TYPES.map(type => (
-                                            <button
-                                                key={type.value}
-                                                onClick={() => updateAction(selectedId!, { type: type.value })}
-                                                className={clsx(
-                                                    "p-2 rounded-lg border text-xs transition-all flex flex-col items-center gap-0.5",
-                                                    selectedOverlay.action?.type === type.value
-                                                        ? "border-gray-900 bg-gray-100 text-gray-900"
-                                                        : "border-gray-200 hover:border-gray-300 text-gray-500"
-                                                )}
-                                            >
-                                                <type.icon className="h-3.5 w-3.5" />
-                                                {type.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                                {/* サイズ（アコーディオン）— テンプレート・カスタム両方表示 */}
+                                <div className="border-b border-gray-200">
+                                    <button
+                                        onClick={() => toggleSection('size')}
+                                        className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                                    >
+                                        サイズ
+                                        <ChevronDown className={clsx("h-3.5 w-3.5 text-gray-400 transition-transform", openSections.size && "rotate-180")} />
+                                    </button>
+                                    {openSections.size && (
+                                        <div className="px-4 pb-3 space-y-3">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                    フォントサイズ: {selectedOverlay.style.fontSize || 16}px
+                                                </label>
+                                                <input
+                                                    type="range"
+                                                    min="10"
+                                                    max="48"
+                                                    value={selectedOverlay.style.fontSize || 16}
+                                                    onChange={(e) => updateStyle(selectedId!, { fontSize: parseInt(e.target.value) })}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                    角丸: {selectedOverlay.style.borderRadius || 8}px
+                                                </label>
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="50"
+                                                    value={selectedOverlay.style.borderRadius || 8}
+                                                    onChange={(e) => updateStyle(selectedId!, { borderRadius: parseInt(e.target.value) })}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">パディング</label>
+                                                <input
+                                                    type="text"
+                                                    value={selectedOverlay.style.padding || '12px 24px'}
+                                                    onChange={(e) => updateStyle(selectedId!, { padding: e.target.value })}
+                                                    placeholder="12px 24px"
+                                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* URL入力 */}
-                                {selectedOverlay.action?.type === 'external' && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                            <Link2 className="h-3 w-3 inline mr-1" />
-                                            リンクURL
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={selectedOverlay.action?.url || ''}
-                                            onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
-                                            placeholder="https://example.com"
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                                        />
-                                    </div>
-                                )}
+                                {/* アクション（アコーディオン） */}
+                                <div className="border-b border-gray-200">
+                                    <button
+                                        onClick={() => toggleSection('action')}
+                                        className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                                    >
+                                        アクション
+                                        <ChevronDown className={clsx("h-3.5 w-3.5 text-gray-400 transition-transform", openSections.action && "rotate-180")} />
+                                    </button>
+                                    {openSections.action && (
+                                        <div className="px-4 pb-3 space-y-3">
+                                            <div className="grid grid-cols-3 gap-1">
+                                                {ACTION_TYPES.map(type => (
+                                                    <button
+                                                        key={type.value}
+                                                        onClick={() => updateAction(selectedId!, { type: type.value })}
+                                                        className={clsx(
+                                                            "p-2 rounded-lg border text-xs transition-all flex flex-col items-center gap-0.5",
+                                                            selectedOverlay.action?.type === type.value
+                                                                ? "border-gray-900 bg-gray-100 text-gray-900"
+                                                                : "border-gray-200 hover:border-gray-300 text-gray-500"
+                                                        )}
+                                                    >
+                                                        <type.icon className="h-3.5 w-3.5" />
+                                                        {type.label}
+                                                    </button>
+                                                ))}
+                                            </div>
 
-                                {/* アンカーID入力 */}
-                                {selectedOverlay.action?.type === 'anchor' && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                            <Hash className="h-3 w-3 inline mr-1" />
-                                            スクロール先
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={selectedOverlay.action?.url || ''}
-                                            onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
-                                            placeholder="#contact"
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                                        />
-                                        <p className="mt-1 text-[10px] text-gray-400">例: #contact, #form</p>
-                                    </div>
-                                )}
+                                            {/* URL入力 */}
+                                            {selectedOverlay.action?.type === 'external' && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        <Link2 className="h-3 w-3 inline mr-1" />
+                                                        リンクURL
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={selectedOverlay.action?.url || ''}
+                                                        onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
+                                                        placeholder="https://example.com"
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                                                    />
+                                                </div>
+                                            )}
 
-                                {/* LINE URL */}
-                                {selectedOverlay.action?.type === 'line' && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                            <MessageCircle className="h-3 w-3 inline mr-1" />
-                                            LINE URL
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={selectedOverlay.action?.url || ''}
-                                            onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
-                                            placeholder="https://lin.ee/xxxxx"
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                                        />
-                                        {/* future: line_primary_url from workspace settings */}
-                                    </div>
-                                )}
+                                            {selectedOverlay.action?.type === 'anchor' && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        <Hash className="h-3 w-3 inline mr-1" />
+                                                        スクロール先
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={selectedOverlay.action?.url || ''}
+                                                        onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
+                                                        placeholder="#contact"
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                                                    />
+                                                    <p className="mt-1 text-[10px] text-gray-400">例: #contact, #form</p>
+                                                </div>
+                                            )}
 
-                                {/* カスタムスタイル（テンプレートなしの場合のみ） */}
+                                            {selectedOverlay.action?.type === 'line' && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        <MessageCircle className="h-3 w-3 inline mr-1" />
+                                                        LINE URL
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={selectedOverlay.action?.url || ''}
+                                                        onChange={(e) => updateAction(selectedId!, { url: e.target.value })}
+                                                        placeholder="https://lin.ee/xxxxx"
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* カスタムスタイル（テンプレートなしの場合のみ、アコーディオン） */}
                                 {!selectedOverlay.template && (
-                                    <>
-                                        <div className="pt-2 border-t border-gray-200">
-                                            <h4 className="text-xs font-bold text-gray-500 mb-2">スタイル</h4>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">背景色</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="color"
-                                                    value={selectedOverlay.style.backgroundColor || '#6366f1'}
-                                                    onChange={(e) => updateStyle(selectedId!, { backgroundColor: e.target.value })}
-                                                    className="w-10 h-10 rounded-lg cursor-pointer"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={selectedOverlay.style.backgroundColor || '#6366f1'}
-                                                    onChange={(e) => updateStyle(selectedId!, { backgroundColor: e.target.value })}
-                                                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono"
-                                                />
+                                    <div className="border-b border-gray-200">
+                                        <button
+                                            onClick={() => toggleSection('style')}
+                                            className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                                        >
+                                            スタイル
+                                            <ChevronDown className={clsx("h-3.5 w-3.5 text-gray-400 transition-transform", openSections.style && "rotate-180")} />
+                                        </button>
+                                        {openSections.style && (
+                                            <div className="px-4 pb-3 space-y-3">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">背景色</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            value={selectedOverlay.style.backgroundColor || '#6366f1'}
+                                                            onChange={(e) => updateStyle(selectedId!, { backgroundColor: e.target.value })}
+                                                            className="w-10 h-10 rounded-lg cursor-pointer"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={selectedOverlay.style.backgroundColor || '#6366f1'}
+                                                            onChange={(e) => updateStyle(selectedId!, { backgroundColor: e.target.value })}
+                                                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">文字色</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="color"
+                                                            value={selectedOverlay.style.textColor || '#ffffff'}
+                                                            onChange={(e) => updateStyle(selectedId!, { textColor: e.target.value })}
+                                                            className="w-10 h-10 rounded-lg cursor-pointer"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={selectedOverlay.style.textColor || '#ffffff'}
+                                                            onChange={(e) => updateStyle(selectedId!, { textColor: e.target.value })}
+                                                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono"
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">文字色</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="color"
-                                                    value={selectedOverlay.style.textColor || '#ffffff'}
-                                                    onChange={(e) => updateStyle(selectedId!, { textColor: e.target.value })}
-                                                    className="w-10 h-10 rounded-lg cursor-pointer"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={selectedOverlay.style.textColor || '#ffffff'}
-                                                    onChange={(e) => updateStyle(selectedId!, { textColor: e.target.value })}
-                                                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                フォントサイズ: {selectedOverlay.style.fontSize}px
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="10"
-                                                max="32"
-                                                value={selectedOverlay.style.fontSize || 16}
-                                                onChange={(e) => updateStyle(selectedId!, { fontSize: parseInt(e.target.value) })}
-                                                className="w-full"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                角丸: {selectedOverlay.style.borderRadius}px
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="32"
-                                                value={selectedOverlay.style.borderRadius || 8}
-                                                onChange={(e) => updateStyle(selectedId!, { borderRadius: parseInt(e.target.value) })}
-                                                className="w-full"
-                                            />
-                                        </div>
-                                    </>
+                                        )}
+                                    </div>
                                 )}
 
-                                {/* 位置 */}
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">X位置 (%)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={Math.round(selectedOverlay.x)}
-                                            onChange={(e) => updateOverlay(selectedId!, { x: parseFloat(e.target.value) })}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">Y位置 (%)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={Math.round(selectedOverlay.y)}
-                                            onChange={(e) => updateOverlay(selectedId!, { y: parseFloat(e.target.value) })}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                                        />
-                                    </div>
+                                {/* 位置（アコーディオン） */}
+                                <div className="border-b border-gray-200">
+                                    <button
+                                        onClick={() => toggleSection('position')}
+                                        className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                                    >
+                                        位置
+                                        <ChevronDown className={clsx("h-3.5 w-3.5 text-gray-400 transition-transform", openSections.position && "rotate-180")} />
+                                    </button>
+                                    {openSections.position && (
+                                        <div className="px-4 pb-3">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">X位置 (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={Math.round(selectedOverlay.x)}
+                                                        onChange={(e) => updateOverlay(selectedId!, { x: parseFloat(e.target.value) })}
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">Y位置 (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={Math.round(selectedOverlay.y)}
+                                                        onChange={(e) => updateOverlay(selectedId!, { y: parseFloat(e.target.value) })}
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* 削除 */}
-                                <button
-                                    onClick={() => deleteOverlay(selectedId!)}
-                                    className="w-full py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                    この要素を削除
-                                </button>
+                                <div className="p-4">
+                                    <button
+                                        onClick={() => deleteOverlay(selectedId!)}
+                                        className="w-full py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        この要素を削除
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <div className="flex-1 flex items-center justify-center p-4">
