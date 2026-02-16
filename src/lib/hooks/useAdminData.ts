@@ -77,6 +77,22 @@ export function useBanners() {
     });
 }
 
+// 公開テンプレート一覧フック（ユーザー用）
+export function useTemplates() {
+    return useSWR('/api/templates', fetcher, {
+        ...swrConfig,
+        revalidateOnMount: true,
+    });
+}
+
+// 管理者テンプレート一覧フック
+export function useAdminTemplates() {
+    return useSWR('/api/admin/templates', fetcher, {
+        ...swrConfig,
+        revalidateOnMount: true,
+    });
+}
+
 // プリフェッチ関数（Sidebar用）
 export async function prefetchAdminData() {
     const urls = [

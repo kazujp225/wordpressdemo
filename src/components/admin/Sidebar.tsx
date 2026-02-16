@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle, Presentation, Sparkles, MessageSquare, Image as ImageIcon } from 'lucide-react';
+import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle, Presentation, Sparkles, MessageSquare, Image as ImageIcon, Library } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
@@ -21,6 +21,7 @@ const navItems = [
     { name: '履歴', href: '/admin/import-history', icon: History, prefetchUrl: null, adminOnly: false },
     { name: '説明動画', href: '/admin/tutorials', icon: PlayCircle, prefetchUrl: null, adminOnly: false },
     { name: '設定', href: '/admin/settings', icon: Settings, prefetchUrl: '/api/admin/settings', adminOnly: false },
+    { name: 'LPテンプレート', href: '/admin/templates', icon: Library, prefetchUrl: '/api/admin/templates', adminOnly: true },
     { name: 'お問い合わせ', href: '/admin/inquiries', icon: MessageSquare, prefetchUrl: null, adminOnly: true },
     { name: 'ユーザー管理', href: '/admin/users', icon: Shield, prefetchUrl: null, adminOnly: true },
 ] as const;

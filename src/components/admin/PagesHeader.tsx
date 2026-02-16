@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Plus, Globe, Loader2, X, Layout, Monitor, Smartphone, Copy, Palette, Download, RefreshCw, Settings, PenTool, Sparkles, Lock } from 'lucide-react';
+import { Plus, Globe, Loader2, X, Layout, Monitor, Smartphone, Copy, Palette, Download, RefreshCw, Settings, PenTool, Sparkles, Lock, Library } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { TextBasedLPGenerator } from '@/components/lp-builder/TextBasedLPGenerator';
+import { TemplateGallery } from '@/components/admin/TemplateGallery';
 import { useUserSettings } from '@/lib/hooks/useAdminData';
 import { getPlan } from '@/lib/plans';
 
@@ -48,7 +49,7 @@ export function PagesHeader() {
     const [isImporting, setIsImporting] = useState(false);
     const [importUrl, setImportUrl] = useState('');
     const [showSelection, setShowSelection] = useState(false);
-    const [mode, setMode] = useState<'select' | 'import'>('select');
+    const [mode, setMode] = useState<'select' | 'import' | 'template'>('select');
     const [device, setDevice] = useState<'desktop' | 'mobile' | 'dual'>('desktop');
     const [importMode, setImportMode] = useState<'faithful' | 'light' | 'heavy'>('faithful');
     const [style, setStyle] = useState('sampling');
@@ -414,14 +415,14 @@ export function PagesHeader() {
                         <div className="p-4 sm:p-8 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
                             <div className="flex items-center justify-between mb-8">
                                 <h2 className="text-xl font-bold text-foreground tracking-tight"><span>新規ページ作成</span></h2>
-                                <button onClick={() => setShowSelection(false)} className="text-muted-foreground hover:text-foreground transition-colors" disabled={isImporting}>
+                                <button onClick={() => { setShowSelection(false); setMode('select'); }} className="text-muted-foreground hover:text-foreground transition-colors" disabled={isImporting}>
                                     <X className="h-5 w-5" />
                                 </button>
                             </div>
 
                             {mode === 'select' ? (
                                 <div className="space-y-4">
-                                    {/* メインの選択肢 */}
+                                    {/* 4つの選択肢 - 統一デザイン */}
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <button
                                             onClick={() => router.push('/admin/pages/new')}
@@ -448,44 +449,66 @@ export function PagesHeader() {
                                                 <span>LPを作成する場合はこちらがおすすめです。</span>
                                             </p>
                                         </button>
-                                    </div>
 
-                                    {/* テキストベースLP作成 */}
-                                    <button
-                                        onClick={() => {
-                                            if (!canAIGenerate) {
-                                                toast.error('AI機能は有料プランのみご利用いただけます');
-                                                return;
-                                            }
-                                            setShowSelection(false);
-                                            setIsTextLPModalOpen(true);
-                                        }}
-                                        className={"group w-full flex items-center gap-4 rounded-lg border-2 border-dashed p-6 text-left transition-all " + (
-                                            canAIGenerate
-                                                ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 hover:border-green-400 hover:from-green-100 hover:to-emerald-100'
-                                                : 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
-                                        )}
-                                    >
-                                        <div className="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-3.5 text-white shadow-lg shadow-green-500/20 group-hover:shadow-green-500/40 transition-all">
-                                            <PenTool className="h-6 w-6" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h3 className="text-base font-bold text-gray-900">テキストからLPを作成</h3>
+                                        {/* テキストベースLP作成 */}
+                                        <button
+                                            onClick={() => {
+                                                if (!canAIGenerate) {
+                                                    toast.error('AI機能は有料プランのみご利用いただけます');
+                                                    return;
+                                                }
+                                                setShowSelection(false);
+                                                setIsTextLPModalOpen(true);
+                                            }}
+                                            className={"group flex flex-col items-start rounded-lg border p-6 text-left transition-all " + (
+                                                canAIGenerate
+                                                    ? 'border-border hover:border-primary hover:bg-surface-50'
+                                                    : 'border-border opacity-60 cursor-not-allowed'
+                                            )}
+                                        >
+                                            <div className="mb-4 flex items-center gap-2">
+                                                <div className="rounded-md bg-secondary p-3 text-secondary-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                                                    <PenTool className="h-6 w-6" />
+                                                </div>
                                                 <span className="px-2 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
                                                     Beta
                                                 </span>
                                             </div>
-                                            <p className="text-xs font-medium text-gray-600 leading-relaxed">
-                                                商材情報を入力するだけで、最適なLPを自動生成します。<br />
-                                                <span className="text-green-600 font-semibold">スクリーンショット不要・ゼロから作成</span>
+                                            <h3 className="text-base font-bold text-foreground mb-1">テキストからLPを作成</h3>
+                                            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+                                                商材情報を入力するだけで、最適なLPを自動生成します。
                                             </p>
-                                        </div>
-                                        <div className="text-green-500 group-hover:translate-x-1 transition-transform">
-                                            <Sparkles className="h-5 w-5" />
-                                        </div>
-                                    </button>
+                                            {!canAIGenerate && (
+                                                <span className="mt-2 text-[10px] font-bold text-amber-600">有料プランで利用可能</span>
+                                            )}
+                                        </button>
+
+                                        {/* テンプレートから作成 */}
+                                        <button
+                                            onClick={() => setMode('template')}
+                                            className="group flex flex-col items-start rounded-lg border border-border p-6 text-left transition-all hover:border-primary hover:bg-surface-50"
+                                        >
+                                            <div className="mb-4 flex items-center gap-2">
+                                                <div className="rounded-md bg-secondary p-3 text-secondary-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                                                    <Library className="h-6 w-6" />
+                                                </div>
+                                                <span className="px-2 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
+                                                    Beta
+                                                </span>
+                                            </div>
+                                            <h3 className="text-base font-bold text-foreground mb-1">テンプレートから作成</h3>
+                                            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+                                                プロ仕様のテンプレートを選んでカスタマイズできます。
+                                                <span className="text-muted-foreground/60 ml-1">デスクトップ版のみ</span>
+                                            </p>
+                                        </button>
+                                    </div>
                                 </div>
+                            ) : mode === 'template' ? (
+                                <TemplateGallery
+                                    onBack={() => setMode('select')}
+                                    onClose={() => setShowSelection(false)}
+                                />
                             ) : (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
                                     <div>

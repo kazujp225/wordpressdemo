@@ -61,10 +61,12 @@ model MediaImage {
   sourceUrl       String?
   sourceType      String?
   createdAt       DateTime      @default(now())
-  desktopSections PageSection[] @relation("DesktopImage")
-  mobileSections  PageSection[] @relation("MobileImage")
-  banners         Banner[]      @relation("BannerImage")
-  thumbnails      Thumbnail[]   @relation("ThumbnailImage")
+  desktopSections         PageSection[]         @relation("DesktopImage")
+  mobileSections          PageSection[]         @relation("MobileImage")
+  banners                 Banner[]              @relation("BannerImage")
+  thumbnails              Thumbnail[]           @relation("ThumbnailImage")
+  templateDesktopSections LpTemplateSection[]   @relation("TemplateDesktopImage")
+  templateMobileSections  LpTemplateSection[]   @relation("TemplateMobileImage")
 
   @@index([userId])
   @@index([sourceUrl])
@@ -365,6 +367,42 @@ model CreditPackage {
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
+}
+
+// LPテンプレート（ナレッジ）管理
+model LpTemplate {
+  id               Int                 @id @default(autoincrement())
+  title            String
+  description      String?
+  category         String              @default("general")
+  thumbnailUrl     String?
+  sourceUrl        String?
+  isPublished      Boolean             @default(false)
+  headerConfig     String              @default("{}")
+  formConfig       String              @default("{}")
+  designDefinition String?
+  createdBy        String
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  sections         LpTemplateSection[]
+
+  @@index([isPublished])
+  @@index([category])
+}
+
+model LpTemplateSection {
+  id                   Int         @id @default(autoincrement())
+  templateId           Int
+  order                Int
+  role                 String
+  imageId              Int?
+  mobileImageId        Int?
+  config               String?
+  boundaryOffsetBottom Int         @default(0)
+  boundaryOffsetTop    Int         @default(0)
+  image                MediaImage? @relation("TemplateDesktopImage", fields: [imageId], references: [id])
+  mobileImage          MediaImage? @relation("TemplateMobileImage", fields: [mobileImageId], references: [id])
+  template             LpTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
 }
 
 // Stripeサブスクリプション管理

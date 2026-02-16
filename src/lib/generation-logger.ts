@@ -35,7 +35,8 @@ export type GenerationType =
   | 'suggest-benefits'
   | 'extract-background-color'
   | 'outpaint'
-  | 'banner-generate';
+  | 'banner-generate'
+  | 'template-gen';
 
 export interface LogGenerationParams {
   userId?: string | null;
