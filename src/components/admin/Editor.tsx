@@ -4385,12 +4385,19 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                         className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white"
                                                     >
                                                         <option value="">選択...</option>
-                                                        {sections.map((section: any) => (
-                                                            <option key={section.id} value={`#${section.role}`}>
-                                                                #{section.role}
-                                                            </option>
-                                                        ))}
-                                                        <option value="#contact">#contact</option>
+                                                        {sections.map((section: any) => {
+                                                            const roleLabels: Record<string, string> = {
+                                                                hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
+                                                                pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
+                                                                footer: 'フッター', other: 'その他',
+                                                            };
+                                                            return (
+                                                                <option key={section.id} value={`#${section.role}`}>
+                                                                    {roleLabels[section.role] || section.role}（#{section.role}）
+                                                                </option>
+                                                            );
+                                                        })}
+                                                        <option value="#contact">お問い合わせ（#contact）</option>
                                                         <option value="__custom__">カスタムURL</option>
                                                     </select>
                                                     {isCustom && (
