@@ -4353,18 +4353,18 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('cta') ? 'rotate-180' : ''}`} />
                                     </button>
                                     {headerOpenSections.has('cta') && (
-                                <div className="flex gap-2 pt-1 pb-2">
-                                    <div className="flex-1">
+                                <div className="space-y-2 pt-1 pb-2">
+                                    <div>
                                         <label className="block text-xs font-medium text-gray-600 mb-1">CTAテキスト</label>
                                         <input
                                             type="text"
                                             value={headerConfig.ctaText || ''}
                                             onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaText: e.target.value }))}
                                             placeholder="お問い合わせ"
-                                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                         />
                                     </div>
-                                    <div className="flex-1">
+                                    <div>
                                         {(() => {
                                             const ctaVal = headerConfig.ctaLink || '';
                                             const sectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
