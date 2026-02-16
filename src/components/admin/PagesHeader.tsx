@@ -472,8 +472,8 @@ export function PagesHeader() {
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <h3 className="text-base font-bold text-gray-900">テキストからLPを作成</h3>
-                                                <span className="px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
-                                                    New
+                                                <span className="px-2 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
+                                                    Beta
                                                 </span>
                                             </div>
                                             <p className="text-xs font-medium text-gray-600 leading-relaxed">
