@@ -1184,7 +1184,25 @@ export function BannerEditor({ banner }: BannerEditorProps) {
             if (uploadData.id) {
                 setGeneratedImageId(uploadData.id);
             }
-            toast.success('画像をカットしました');
+            // バナーが既にDBに保存済みの場合、画像を自動保存
+            if (bannerId && uploadData.id) {
+                try {
+                    const saveRes = await fetch(`/api/banners/${bannerId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ imageId: uploadData.id }),
+                    });
+                    if (saveRes.ok) {
+                        toast.success('クロップ画像を保存しました');
+                    } else {
+                        toast.success('画像をカットしました（手動で保存してください）');
+                    }
+                } catch {
+                    toast.success('画像をカットしました（手動で保存してください）');
+                }
+            } else {
+                toast.success('画像をカットしました');
+            }
             // 編集モードに切り替え
             setEditorMode('edit');
         } catch (error: any) {
@@ -1193,7 +1211,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
         } finally {
             setIsCropApplying(false);
         }
-    }, [cropSourceImage, cropArea, width, height]);
+    }, [cropSourceImage, cropArea, width, height, bannerId]);
 
     // ── Mode Change ──────────────────────────────
     const handleModeChange = useCallback((newMode: EditorMode) => {
