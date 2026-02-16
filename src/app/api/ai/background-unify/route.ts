@@ -336,7 +336,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // ログ記録
+        // ログ記録（解像度に応じたコスト計算）
         const logResult = await logGeneration({
             userId: user.id,
             type: 'background-unify',
@@ -346,6 +346,7 @@ export async function POST(request: NextRequest) {
             imageCount: 1,
             status: 'succeeded',
             startTime,
+            resolution,
         });
 
         // クレジット消費（自分のAPIキー使用時はスキップ）

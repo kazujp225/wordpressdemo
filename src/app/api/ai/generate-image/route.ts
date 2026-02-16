@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
         }, { status: 429 });
     }
 
-    // クレジット残高チェック（先にチェックのみ）
-    const limitCheck = await checkImageGenerationLimit(user.id, modelUsed, 1);
+    // クレジット残高チェック（先にチェックのみ）- 4K生成のため4K料金で計算
+    const limitCheck = await checkImageGenerationLimit(user.id, modelUsed, 1, undefined, '4K');
     if (!limitCheck.allowed) {
         if (limitCheck.needApiKey) {
             return NextResponse.json({
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     skipCreditConsumption = limitCheck.skipCreditConsumption || false;
-    const estimatedCost = estimateImageCost(modelUsed, 1);
+    const estimatedCost = estimateImageCost(modelUsed, 1, '4K');
 
     // ★ 先払い方式: API呼び出し前にクレジットを原子的に減算
     if (!skipCreditConsumption) {

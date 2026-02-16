@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Sparkles, RefreshCw, Palette, DollarSign, Crown, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
-import { GEMINI_PRICING } from '@/lib/ai-costs';
+import { estimateImageCost } from '@/lib/ai-costs';
 import { usdToTokens, formatTokens } from '@/lib/plans';
 
 interface ColorPalette {
@@ -123,7 +123,7 @@ export default function ColorPaletteModal({
     if (!isOpen) return null;
 
     const imageCount = sections.filter(s => s.image?.filePath).length;
-    const estimatedCost = imageCount * GEMINI_PRICING['gemini-3-pro-image-preview'].perImage;
+    const estimatedCost = estimateImageCost('gemini-3-pro-image-preview', imageCount);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">

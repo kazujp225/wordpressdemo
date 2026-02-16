@@ -7,20 +7,20 @@ import {
     ZoomIn, ZoomOut, Hand, Trash2, Plus, Wand2, Sparkles,
     Paintbrush, Type, Box, Image as ImageIcon, PenTool, MessageSquare,
     UserPlus, AlertTriangle, Copy, Check, RefreshCw, LayoutGrid,
-    Eye, ChevronDown, Maximize2, Crop, Move,
+    Eye, ChevronDown, Maximize2,
 } from 'lucide-react';
 import Link from 'next/link';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { BANNER_PLATFORMS, type BannerSizePreset } from '@/lib/banner-presets';
-import type { Banner, BannerPlatform } from '@/types/banner';
+import { THUMBNAIL_CATEGORIES, type ThumbnailSizePreset } from '@/lib/thumbnail-presets';
+import type { Thumbnail, ThumbnailCategory } from '@/types/thumbnail';
 import { usdToTokens, formatTokens } from '@/lib/plans';
 import { useUserSettings } from '@/lib/hooks/useAdminData';
 import { UpgradeBanner } from './UpgradeBanner';
 
 // ── Types ──────────────────────────────────────────
-interface BannerEditorProps {
-    banner: Banner | null; // null = new banner
+interface ThumbnailEditorProps {
+    thumbnail: Thumbnail | null; // null = new thumbnail
 }
 
 interface SelectionRect {
@@ -31,7 +31,7 @@ interface SelectionRect {
     height: number;
 }
 
-type EditorMode = 'edit' | 'crop' | 'variations';
+type EditorMode = 'edit' | 'variations';
 type EditType = 'color' | 'text' | 'object' | 'person' | 'background' | 'style' | 'custom';
 type CanvasTool = 'select' | 'pan';
 
@@ -121,26 +121,26 @@ const editTypeConfig: Record<EditType, {
 };
 
 // ── Component ──────────────────────────────────────
-export function BannerEditor({ banner }: BannerEditorProps) {
+export function ThumbnailEditor({ thumbnail }: ThumbnailEditorProps) {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadFileInputRef = useRef<HTMLInputElement>(null);
 
     // ── Shared State ─────────────────────────────
-    const [title, setTitle] = useState(banner?.title || '');
-    const [platform, setPlatform] = useState<BannerPlatform>(banner?.platform || 'google-display');
-    const [width, setWidth] = useState(banner?.width || 300);
-    const [height, setHeight] = useState(banner?.height || 250);
-    const [presetName, setPresetName] = useState(banner?.presetName || 'Medium Rectangle');
-    const [isCustomSize, setIsCustomSize] = useState(banner?.platform === 'custom');
-    const [prompt, setPrompt] = useState(banner?.prompt || '');
-    const [productInfo, setProductInfo] = useState(banner?.productInfo || '');
-    const [segment, setSegment] = useState(banner?.metadata?.segment || '');
+    const [title, setTitle] = useState(thumbnail?.title || '');
+    const [platform, setPlatform] = useState<ThumbnailCategory>(thumbnail?.category || 'youtube');
+    const [width, setWidth] = useState(thumbnail?.width || 1280);
+    const [height, setHeight] = useState(thumbnail?.height || 720);
+    const [presetName, setPresetName] = useState(thumbnail?.presetName || 'サムネイル');
+    const [isCustomSize, setIsCustomSize] = useState(thumbnail?.category === 'custom');
+    const [prompt, setPrompt] = useState(thumbnail?.prompt || '');
+    const [productInfo, setProductInfo] = useState(thumbnail?.productInfo || '');
+    const [segment, setSegment] = useState<string>(String(thumbnail?.metadata?.segment || ''));
     const [referenceImageBase64, setReferenceImageBase64] = useState<string | null>(null);
-    const [referencePreview, setReferencePreview] = useState<string | null>(banner?.referenceImageUrl || null);
-    const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(banner?.image?.filePath || null);
-    const [generatedImageId, setGeneratedImageId] = useState<number | null>(banner?.imageId || null);
-    const [bannerId, setBannerId] = useState<number | null>(banner?.id || null);
+    const [referencePreview, setReferencePreview] = useState<string | null>(thumbnail?.referenceImageUrl || null);
+    const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(thumbnail?.image?.filePath || null);
+    const [generatedImageId, setGeneratedImageId] = useState<number | null>(thumbnail?.imageId || null);
+    const [thumbnailId, setThumbnailId] = useState<number | null>(thumbnail?.id || null);
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -151,8 +151,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     const [showSegmentInput, setShowSegmentInput] = useState(false);
 
     // ── Mode State ───────────────────────────────
-    const hasExistingImage = !!(banner?.image?.filePath);
-    const [editorMode, setEditorMode] = useState<EditorMode>(hasExistingImage ? 'edit' : 'crop');
+    const hasExistingImage = !!(thumbnail?.image?.filePath);
+    const [editorMode, setEditorMode] = useState<EditorMode>('edit');
 
     // ── Edit Mode State ──────────────────────────
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -189,19 +189,6 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     const variationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const variationResultsRef = useRef<HTMLDivElement>(null);
     const [hoveredVariationIndex, setHoveredVariationIndex] = useState<number | null>(null);
-
-    // ── Crop Mode State ───────────────────────────
-    const [cropSourceImage, setCropSourceImage] = useState<HTMLImageElement | null>(null);
-    const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
-    const cropCanvasRef = useRef<HTMLCanvasElement>(null);
-    const cropContainerRef = useRef<HTMLDivElement>(null);
-    const [cropArea, setCropArea] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-    const [isCropDragging, setIsCropDragging] = useState(false);
-    const [cropDragMode, setCropDragMode] = useState<'move' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'resize-se' | null>(null);
-    const [cropDragStart, setCropDragStart] = useState<{ x: number; y: number } | null>(null);
-    const [cropDragStartArea, setCropDragStartArea] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-    const [isCropApplying, setIsCropApplying] = useState(false);
-    const cropFileInputRef = useRef<HTMLInputElement>(null);
 
     // ── Plan Check ─────────────────────────────
     const { data: userSettings } = useUserSettings();
@@ -681,11 +668,11 @@ export function BannerEditor({ banner }: BannerEditorProps) {
     }, []);
 
     // ── Generate Mode Helpers (existing) ─────────
-    const platformConfig = BANNER_PLATFORMS.find((p) => p.id === platform);
+    const platformConfig = THUMBNAIL_CATEGORIES.find((p) => p.id === platform);
 
-    const handlePlatformChange = useCallback((newPlatform: BannerPlatform) => {
+    const handlePlatformChange = useCallback((newPlatform: ThumbnailCategory) => {
         setPlatform(newPlatform);
-        const config = BANNER_PLATFORMS.find((p) => p.id === newPlatform);
+        const config = THUMBNAIL_CATEGORIES.find((p) => p.id === newPlatform);
         if (newPlatform === 'custom') {
             setIsCustomSize(true);
             setPresetName(null as any);
@@ -698,7 +685,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
         }
     }, []);
 
-    const handlePresetChange = useCallback((preset: BannerSizePreset) => {
+    const handlePresetChange = useCallback((preset: ThumbnailSizePreset) => {
         setWidth(preset.width);
         setHeight(preset.height);
         setPresetName(preset.name);
@@ -845,14 +832,14 @@ export function BannerEditor({ banner }: BannerEditorProps) {
             };
 
             let res: Response;
-            if (bannerId) {
-                res = await fetch(`/api/banners/${bannerId}`, {
+            if (thumbnailId) {
+                res = await fetch(`/api/thumbnails/${thumbnailId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
             } else {
-                res = await fetch('/api/banners', {
+                res = await fetch('/api/thumbnails', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
@@ -866,10 +853,10 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                 return;
             }
 
-            const savedBanner = data.banner || data;
-            if (!bannerId && savedBanner.id) {
-                setBannerId(savedBanner.id);
-                window.history.replaceState(null, '', `/admin/banners/${savedBanner.id}`);
+            const saved = data.thumbnail || data;
+            if (!thumbnailId && saved.id) {
+                setThumbnailId(saved.id);
+                window.history.replaceState(null, '', `/admin/thumbnails/${saved.id}`);
             }
 
             toast.success('保存しました');
@@ -879,7 +866,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
         } finally {
             setIsSaving(false);
         }
-    }, [title, platform, width, height, presetName, isCustomSize, prompt, productInfo, generatedImageId, bannerId, segment, uploadReferenceImage]);
+    }, [title, platform, width, height, presetName, isCustomSize, prompt, productInfo, generatedImageId, thumbnailId, segment, uploadReferenceImage]);
 
     // ── Download ─────────────────────────────────
     const handleDownload = useCallback(async () => {
@@ -900,312 +887,11 @@ export function BannerEditor({ banner }: BannerEditorProps) {
         }
     }, [generatedImageUrl, title, width, height]);
 
-    // ── Crop Mode Logic ────────────────────────────
-    const handleCropImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            const dataUrl = reader.result as string;
-            setCropSourceUrl(dataUrl);
-            const img = new Image();
-            img.onload = () => {
-                setCropSourceImage(img);
-                // 初期クロップ範囲をアスペクト比に合わせて中央に配置
-                const targetAspect = width / height;
-                const imgAspect = img.width / img.height;
-                let cropW: number, cropH: number, cropX: number, cropY: number;
-                if (imgAspect > targetAspect) {
-                    // 画像の方が横長 → 高さ基準
-                    cropH = img.height;
-                    cropW = cropH * targetAspect;
-                    cropX = (img.width - cropW) / 2;
-                    cropY = 0;
-                } else {
-                    // 画像の方が縦長 → 幅基準
-                    cropW = img.width;
-                    cropH = cropW / targetAspect;
-                    cropX = 0;
-                    cropY = (img.height - cropH) / 2;
-                }
-                setCropArea({ x: cropX, y: cropY, w: cropW, h: cropH });
-            };
-            img.src = dataUrl;
-        };
-        reader.readAsDataURL(file);
-        e.target.value = '';
-    }, [width, height]);
-
-    // マウス座標をCanvas画像座標に変換するヘルパー
-    const getCropMousePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (!cropSourceImage || !cropCanvasRef.current) return null;
-        const canvas = cropCanvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = cropSourceImage.width / rect.width;
-        const scaleY = cropSourceImage.height / rect.height;
-        return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
-    }, [cropSourceImage]);
-
-    // コーナーハンドル判定（画像座標の許容範囲）
-    const getCropHandle = useCallback((mx: number, my: number): 'resize-nw' | 'resize-ne' | 'resize-sw' | 'resize-se' | 'move' | null => {
-        if (!cropArea || !cropSourceImage || !cropCanvasRef.current) return null;
-        const canvas = cropCanvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        // ハンドルの許容範囲（CSS px → 画像座標に換算）
-        const handlePx = 16;
-        const hx = handlePx * (cropSourceImage.width / rect.width);
-        const hy = handlePx * (cropSourceImage.height / rect.height);
-        const { x, y, w, h } = cropArea;
-        // 四隅チェック
-        if (Math.abs(mx - x) < hx && Math.abs(my - y) < hy) return 'resize-nw';
-        if (Math.abs(mx - (x + w)) < hx && Math.abs(my - y) < hy) return 'resize-ne';
-        if (Math.abs(mx - x) < hx && Math.abs(my - (y + h)) < hy) return 'resize-sw';
-        if (Math.abs(mx - (x + w)) < hx && Math.abs(my - (y + h)) < hy) return 'resize-se';
-        // 枠内 → 移動
-        if (mx >= x && mx <= x + w && my >= y && my <= y + h) return 'move';
-        return null;
-    }, [cropArea, cropSourceImage]);
-
-    const handleCropDragStart = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-        const pos = getCropMousePos(e);
-        if (!pos || !cropArea) return;
-        const handle = getCropHandle(pos.x, pos.y);
-        if (!handle) return;
-        setIsCropDragging(true);
-        setCropDragMode(handle);
-        setCropDragStart(pos);
-        setCropDragStartArea({ ...cropArea });
-    }, [getCropMousePos, getCropHandle, cropArea]);
-
-    const handleCropDragMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-        // カーソル制御（ドラッグ中でなくてもhoverで変える）
-        if (!isCropDragging) {
-            const pos = getCropMousePos(e);
-            if (!pos || !cropCanvasRef.current) return;
-            const handle = getCropHandle(pos.x, pos.y);
-            const canvas = cropCanvasRef.current;
-            if (handle === 'resize-nw' || handle === 'resize-se') canvas.style.cursor = 'nwse-resize';
-            else if (handle === 'resize-ne' || handle === 'resize-sw') canvas.style.cursor = 'nesw-resize';
-            else if (handle === 'move') canvas.style.cursor = 'move';
-            else canvas.style.cursor = 'default';
-            return;
-        }
-        if (!cropDragStart || !cropDragStartArea || !cropSourceImage || !cropDragMode) return;
-        const pos = getCropMousePos(e);
-        if (!pos) return;
-        const dx = pos.x - cropDragStart.x;
-        const dy = pos.y - cropDragStart.y;
-        const aspect = width / height;
-        const sa = cropDragStartArea;
-
-        if (cropDragMode === 'move') {
-            let newX = sa.x + dx;
-            let newY = sa.y + dy;
-            newX = Math.max(0, Math.min(cropSourceImage.width - sa.w, newX));
-            newY = Math.max(0, Math.min(cropSourceImage.height - sa.h, newY));
-            setCropArea({ x: newX, y: newY, w: sa.w, h: sa.h });
-        } else {
-            // リサイズ（アスペクト比ロック）
-            let newX = sa.x, newY = sa.y, newW = sa.w, newH = sa.h;
-            if (cropDragMode === 'resize-se') {
-                newW = Math.max(40, sa.w + dx);
-                newH = newW / aspect;
-            } else if (cropDragMode === 'resize-nw') {
-                newW = Math.max(40, sa.w - dx);
-                newH = newW / aspect;
-                newX = sa.x + sa.w - newW;
-                newY = sa.y + sa.h - newH;
-            } else if (cropDragMode === 'resize-ne') {
-                newW = Math.max(40, sa.w + dx);
-                newH = newW / aspect;
-                newY = sa.y + sa.h - newH;
-            } else if (cropDragMode === 'resize-sw') {
-                newW = Math.max(40, sa.w - dx);
-                newH = newW / aspect;
-                newX = sa.x + sa.w - newW;
-            }
-            // 境界制限
-            if (newX < 0) { newW += newX; newH = newW / aspect; newX = 0; }
-            if (newY < 0) { newH += newY; newW = newH * aspect; newY = 0; }
-            if (newX + newW > cropSourceImage.width) { newW = cropSourceImage.width - newX; newH = newW / aspect; }
-            if (newY + newH > cropSourceImage.height) { newH = cropSourceImage.height - newY; newW = newH * aspect; }
-            if (newW > 40 && newH > 40) {
-                setCropArea({ x: newX, y: newY, w: newW, h: newH });
-            }
-        }
-    }, [isCropDragging, cropDragStart, cropDragStartArea, cropSourceImage, cropDragMode, getCropMousePos, getCropHandle, width, height]);
-
-    const handleCropDragEnd = useCallback(() => {
-        setIsCropDragging(false);
-        setCropDragMode(null);
-        setCropDragStart(null);
-        setCropDragStartArea(null);
-    }, []);
-
-    // クロップCanvasの描画
-    useEffect(() => {
-        if (!cropSourceImage || !cropCanvasRef.current || !cropArea) return;
-        const canvas = cropCanvasRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        canvas.width = cropSourceImage.width;
-        canvas.height = cropSourceImage.height;
-        const { x, y, w, h } = cropArea;
-
-        // 元画像を描画
-        ctx.drawImage(cropSourceImage, 0, 0);
-
-        // クロップ範囲外を暗くする
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // クロップ範囲を切り抜き表示
-        ctx.clearRect(x, y, w, h);
-        ctx.drawImage(cropSourceImage, x, y, w, h, x, y, w, h);
-
-        // 白枠線（太め）
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x, y, w, h);
-
-        // 三分割グリッドライン
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-        ctx.lineWidth = 1;
-        for (let i = 1; i <= 2; i++) {
-            // 縦線
-            ctx.beginPath();
-            ctx.moveTo(x + (w * i) / 3, y);
-            ctx.lineTo(x + (w * i) / 3, y + h);
-            ctx.stroke();
-            // 横線
-            ctx.beginPath();
-            ctx.moveTo(x, y + (h * i) / 3);
-            ctx.lineTo(x + w, y + (h * i) / 3);
-            ctx.stroke();
-        }
-
-        // コーナーハンドル（太い白L字）
-        const cornerLen = Math.min(w, h) * 0.08;
-        const cornerW = 4;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
-        ctx.lineWidth = cornerW;
-        ctx.lineCap = 'square';
-        // 左上
-        ctx.beginPath(); ctx.moveTo(x, y + cornerLen); ctx.lineTo(x, y); ctx.lineTo(x + cornerLen, y); ctx.stroke();
-        // 右上
-        ctx.beginPath(); ctx.moveTo(x + w - cornerLen, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cornerLen); ctx.stroke();
-        // 左下
-        ctx.beginPath(); ctx.moveTo(x, y + h - cornerLen); ctx.lineTo(x, y + h); ctx.lineTo(x + cornerLen, y + h); ctx.stroke();
-        // 右下
-        ctx.beginPath(); ctx.moveTo(x + w - cornerLen, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - cornerLen); ctx.stroke();
-        ctx.lineCap = 'butt';
-    }, [cropSourceImage, cropArea]);
-
-    // cropモード切替時にgeneratedImageUrlがあれば自動ロード
-    useEffect(() => {
-        if (editorMode !== 'crop') return;
-        if (cropSourceImage) return; // 既にソース画像がある場合はスキップ
-        if (!generatedImageUrl) return;
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-            setCropSourceImage(img);
-            setCropSourceUrl(generatedImageUrl);
-            // 初期クロップ範囲をアスペクト比に合わせて中央に配置
-            const targetAspect = width / height;
-            const imgAspect = img.width / img.height;
-            let cropW: number, cropH: number, cropX: number, cropY: number;
-            if (imgAspect > targetAspect) {
-                cropH = img.height;
-                cropW = cropH * targetAspect;
-                cropX = (img.width - cropW) / 2;
-                cropY = 0;
-            } else {
-                cropW = img.width;
-                cropH = cropW / targetAspect;
-                cropX = 0;
-                cropY = (img.height - cropH) / 2;
-            }
-            setCropArea({ x: cropX, y: cropY, w: cropW, h: cropH });
-        };
-        img.src = generatedImageUrl;
-    }, [editorMode, generatedImageUrl, cropSourceImage, width, height]);
-
-    // サイズ変更時にクロップ範囲を再計算
-    useEffect(() => {
-        if (!cropSourceImage) return;
-        const targetAspect = width / height;
-        const imgAspect = cropSourceImage.width / cropSourceImage.height;
-        let cropW: number, cropH: number, cropX: number, cropY: number;
-        if (imgAspect > targetAspect) {
-            cropH = cropSourceImage.height;
-            cropW = cropH * targetAspect;
-            cropX = (cropSourceImage.width - cropW) / 2;
-            cropY = 0;
-        } else {
-            cropW = cropSourceImage.width;
-            cropH = cropW / targetAspect;
-            cropX = 0;
-            cropY = (cropSourceImage.height - cropH) / 2;
-        }
-        setCropArea({ x: cropX, y: cropY, w: cropW, h: cropH });
-    }, [width, height, cropSourceImage]);
-
-    const handleCropApply = useCallback(async () => {
-        if (!cropSourceImage || !cropArea) return;
-        setIsCropApplying(true);
-        try {
-            // Canvasでクロップを実行
-            const offscreen = document.createElement('canvas');
-            offscreen.width = width;
-            offscreen.height = height;
-            const ctx = offscreen.getContext('2d');
-            if (!ctx) throw new Error('Canvas context error');
-            ctx.drawImage(
-                cropSourceImage,
-                cropArea.x, cropArea.y, cropArea.w, cropArea.h,
-                0, 0, width, height
-            );
-            // Blobに変換
-            const blob = await new Promise<Blob>((resolve, reject) => {
-                offscreen.toBlob((b) => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png');
-            });
-            // Supabaseにアップロード
-            const formData = new FormData();
-            formData.append('file', blob, `cropped-${Date.now()}.png`);
-            const uploadRes = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData,
-            });
-            if (!uploadRes.ok) throw new Error('アップロードに失敗しました');
-            const uploadData = await uploadRes.json();
-            // 生成画像として設定
-            setGeneratedImageUrl(uploadData.filePath);
-            if (uploadData.id) {
-                setGeneratedImageId(uploadData.id);
-            }
-            toast.success('画像をカットしました');
-            // 編集モードに切り替え
-            setEditorMode('edit');
-        } catch (error: any) {
-            console.error('Crop error:', error);
-            toast.error(error.message || 'カットに失敗しました');
-        } finally {
-            setIsCropApplying(false);
-        }
-    }, [cropSourceImage, cropArea, width, height]);
-
     // ── Mode Change ──────────────────────────────
     const handleModeChange = useCallback((newMode: EditorMode) => {
         setEditorMode(newMode);
         if (newMode !== 'variations') {
             setSelectedVariationIndex(null);
-        }
-        if (newMode === 'crop') {
-            // cropソースをリセットして最新のgeneratedImageUrlを自動ロード
-            setCropSourceImage(null);
-            setCropSourceUrl(null);
-            setCropArea(null);
         }
     }, []);
 
@@ -1429,7 +1115,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
             <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-background">
                 <div className="flex items-center gap-3">
                     <Link
-                        href="/admin/banners"
+                        href={'/admin/thumbnails'}
                         className="rounded-md p-2 text-muted-foreground hover:bg-surface-100 hover:text-foreground transition-colors"
                     >
                         <ArrowLeft className="h-5 w-5" />
@@ -1585,16 +1271,9 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                         ドラッグ&ドロップまたはクリック
                                     </p>
                                 </div>
-                                <input
-                                    ref={uploadFileInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleEditImageUpload}
-                                    className="hidden"
-                                />
                             </div>
                         )
-                    ) : editorMode === 'variations' ? (
+                    ) : (
                         // Variations: canvas for selection (no results) or grid (with results)
                         variationResults.length > 0 ? (
                             <div className="w-full flex flex-col">
@@ -1879,79 +1558,24 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                     </div>
                                     <p className="text-sm font-bold text-foreground">元画像が必要です</p>
                                     <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                                        先に「画像カット」または「画像編集」タブで<br />画像を作成してください
+                                        「画像編集」タブで画像をアップロードしてください
                                     </p>
                                 </div>
                             )
                         )
-                    ) : (
-                        // Crop mode preview
-                        <>
-                            {cropSourceImage && cropArea ? (
-                                <div className="w-full flex flex-col items-center">
-                                    <div
-                                        ref={cropContainerRef}
-                                        className="relative bg-surface-100 rounded-lg overflow-hidden border border-border shadow-sm"
-                                        style={{
-                                            width: '100%',
-                                            maxWidth: `${Math.min(cropSourceImage.width, 800)}px`,
-                                            aspectRatio: `${cropSourceImage.width} / ${cropSourceImage.height}`,
-                                            maxHeight: 'calc(100vh - 220px)',
-                                        }}
-                                    >
-                                        <canvas
-                                            ref={cropCanvasRef}
-                                            className="w-full h-full"
-                                            onMouseDown={handleCropDragStart}
-                                            onMouseMove={handleCropDragMove}
-                                            onMouseUp={handleCropDragEnd}
-                                            onMouseLeave={handleCropDragEnd}
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-3 mt-3">
-                                        <p className="text-xs text-muted-foreground font-mono">
-                                            元画像: {cropSourceImage.width} × {cropSourceImage.height} px
-                                        </p>
-                                        <span className="text-muted-foreground">→</span>
-                                        <p className="text-xs text-blue-600 font-bold font-mono">
-                                            出力: {width} × {height} px
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    className="relative bg-white border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-all"
-                                    style={{
-                                        width: `min(100%, ${Math.min(width, 500)}px)`,
-                                        aspectRatio: `${width} / ${height}`,
-                                        maxHeight: 'calc(100vh - 200px)',
-                                        minHeight: '200px',
-                                    }}
-                                    onClick={() => cropFileInputRef.current?.click()}
-                                >
-                                    <div className="flex flex-col items-center text-muted-foreground/60 p-8 text-center">
-                                        <div className="w-16 h-16 rounded-full bg-surface-100 flex items-center justify-center mb-3">
-                                            <Crop className="h-8 w-8" />
-                                        </div>
-                                        <p className="text-sm font-bold text-foreground/70">画像をアップロード</p>
-                                        <p className="text-xs mt-1">クリックまたはドラッグ&ドロップで画像を選択</p>
-                                        <p className="text-xs text-blue-500 mt-2 font-mono font-bold">{width} × {height} px にカット</p>
-                                    </div>
-                                </div>
-                            )}
-                            <input
-                                ref={cropFileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={handleCropImageUpload}
-                                className="hidden"
-                            />
-                        </>
                     )}
                 </div>
 
                 {/* Right Panel */}
                 <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border bg-background overflow-y-auto p-4 lg:p-5 space-y-6">
+                    {/* Hidden file input for upload (always in DOM) */}
+                    <input
+                        ref={uploadFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditImageUpload}
+                        className="hidden"
+                    />
                     {/* Mode Tabs */}
                     {/* Free Banner Edit Counter */}
                     {isFreePlan && freeBannerEditLimit > 0 && (
@@ -1993,18 +1617,6 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                         >
                             <Wand2 className="h-3.5 w-3.5" />
                             画像編集
-                        </button>
-                        <button
-                            onClick={() => handleModeChange('crop')}
-                            className={clsx(
-                                'flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-bold transition-all',
-                                editorMode === 'crop'
-                                    ? 'bg-background text-foreground shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            )}
-                        >
-                            <Crop className="h-3.5 w-3.5" />
-                            画像カット
                         </button>
                         <button
                             onClick={() => !isFreeBannerLimitReached && handleModeChange('variations')}
@@ -2072,6 +1684,15 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                     {editorMode === 'edit' ? (
                         // ── Edit Mode Controls ──
                         <>
+                            {/* Upload / Replace Image */}
+                            <button
+                                onClick={() => uploadFileInputRef.current?.click()}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-md border border-border bg-white text-sm font-medium text-foreground hover:bg-surface-50 hover:border-primary/30 transition-colors"
+                            >
+                                <Upload className="h-4 w-4 text-muted-foreground" />
+                                {generatedImageUrl ? '画像を差し替え' : '画像をアップロード'}
+                            </button>
+
                             {/* Edit Type Selector - Grid */}
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
@@ -2382,7 +2003,7 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                             </button>
 
                         </>
-                    ) : editorMode === 'variations' ? (
+                    ) : (
                         // ── Variations Mode Controls ──
                         <>
                             {/* Selected Regions */}
@@ -2803,209 +2424,6 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                                     </div>
                                 </div>
                             )}
-                        </>
-                    ) : (
-                        // ── Crop Mode Controls ──
-                        <>
-                            {/* Source Info + Upload */}
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                                        元画像
-                                    </label>
-                                    {cropSourceImage && (
-                                        <span className="text-[10px] text-muted-foreground font-mono">
-                                            {cropSourceImage.width} × {cropSourceImage.height} px
-                                        </span>
-                                    )}
-                                </div>
-                                <button
-                                    onClick={() => cropFileInputRef.current?.click()}
-                                    className="w-full rounded-lg border border-dashed border-border bg-surface-50 hover:bg-surface-100 hover:border-blue-300 transition-all py-2.5 flex items-center justify-center gap-2"
-                                >
-                                    <Upload className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <span className="text-xs font-medium text-foreground">
-                                        {cropSourceImage ? '別の画像を選択' : '画像をアップロード'}
-                                    </span>
-                                </button>
-                            </div>
-
-                            {/* Aspect Ratio Presets */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    アスペクト比
-                                </label>
-                                <div className="grid grid-cols-2 gap-1">
-                                    {[
-                                        { label: '1:1 (正方形)', w: 1, h: 1 },
-                                        { label: '16:9 (YouTube)', w: 16, h: 9 },
-                                        { label: '9:16 (ストーリー)', w: 9, h: 16 },
-                                        { label: '4:3 (標準)', w: 4, h: 3 },
-                                        { label: '3:4 (ポートレート)', w: 3, h: 4 },
-                                        { label: '21:9 (ウルトラワイド)', w: 21, h: 9 },
-                                        { label: '2:1 (パノラマ)', w: 2, h: 1 },
-                                    ].map((preset) => {
-                                        const isActive = !isCustomSize && Math.abs(width / height - preset.w / preset.h) < 0.01;
-                                        return (
-                                            <button
-                                                key={preset.label}
-                                                onClick={() => {
-                                                    const newW = Math.round(Math.max(height * (preset.w / preset.h), 1));
-                                                    setWidth(Math.min(newW, 4096));
-                                                    setHeight(height);
-                                                    setIsCustomSize(false);
-                                                    setPresetName('');
-                                                }}
-                                                className={clsx(
-                                                    'px-2 py-1.5 text-[10px] font-medium rounded-md border transition-all text-center',
-                                                    isActive
-                                                        ? 'bg-blue-600 text-white border-blue-600'
-                                                        : 'bg-white text-muted-foreground border-border hover:bg-surface-50 hover:text-foreground'
-                                                )}
-                                            >
-                                                {preset.label}
-                                            </button>
-                                        );
-                                    })}
-                                    <button
-                                        onClick={() => setIsCustomSize(true)}
-                                        className={clsx(
-                                            'px-2 py-1.5 text-[10px] font-medium rounded-md border transition-all text-center',
-                                            isCustomSize
-                                                ? 'bg-blue-600 text-white border-blue-600'
-                                                : 'bg-white text-muted-foreground border-border hover:bg-surface-50 hover:text-foreground'
-                                        )}
-                                    >
-                                        カスタム
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Platform / Size Presets */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    プラットフォーム別プリセット
-                                </label>
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                    <div className="relative" data-dropdown>
-                                        <button
-                                            onClick={() => { setShowPlatformDropdown(!showPlatformDropdown); setShowSizeDropdown(false); }}
-                                            className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-50 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-100 transition-colors"
-                                        >
-                                            {platformConfig?.shortName || 'Platform'}
-                                            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                        </button>
-                                        {showPlatformDropdown && (
-                                            <div className="absolute top-full left-0 mt-1 z-50 min-w-[160px] rounded-lg border border-border bg-background shadow-lg py-1">
-                                                {BANNER_PLATFORMS.map((p) => (
-                                                    <button
-                                                        key={p.id}
-                                                        onClick={() => { handlePlatformChange(p.id); setShowPlatformDropdown(false); }}
-                                                        className={clsx(
-                                                            'w-full text-left px-3 py-2 text-xs transition-colors',
-                                                            platform === p.id
-                                                                ? 'bg-primary/10 text-primary font-bold'
-                                                                : 'text-foreground hover:bg-surface-100'
-                                                        )}
-                                                    >
-                                                        {p.name}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="relative" data-dropdown>
-                                        <button
-                                            onClick={() => { setShowSizeDropdown(!showSizeDropdown); setShowPlatformDropdown(false); }}
-                                            className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-50 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-100 transition-colors"
-                                        >
-                                            {isCustomSize ? `${width}×${height}` : (presetName || `${width}×${height}`)}
-                                            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                        </button>
-                                        {showSizeDropdown && (
-                                            <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] max-h-[280px] overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
-                                                {platformConfig && platformConfig.presets.map((preset) => (
-                                                    <button
-                                                        key={preset.name}
-                                                        onClick={() => { handlePresetChange(preset); setShowSizeDropdown(false); }}
-                                                        className={clsx(
-                                                            'w-full text-left px-3 py-2 text-xs transition-colors',
-                                                            !isCustomSize && presetName === preset.name
-                                                                ? 'bg-primary/10 text-primary font-bold'
-                                                                : 'text-foreground hover:bg-surface-100'
-                                                        )}
-                                                    >
-                                                        <span className="font-medium">{preset.name}</span>
-                                                        <span className="ml-2 text-muted-foreground">{preset.label}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Crop Size */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                    クロップ範囲
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex-1">
-                                        <label className="text-[10px] text-muted-foreground mb-0.5 block">幅</label>
-                                        <input
-                                            type="number"
-                                            value={width}
-                                            onChange={(e) => setWidth(Math.max(1, Math.min(4096, parseInt(e.target.value) || 1)))}
-                                            className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-mono"
-                                            min={1}
-                                            max={4096}
-                                        />
-                                    </div>
-                                    <span className="text-muted-foreground text-xs mt-4">×</span>
-                                    <div className="flex-1">
-                                        <label className="text-[10px] text-muted-foreground mb-0.5 block">高さ</label>
-                                        <input
-                                            type="number"
-                                            value={height}
-                                            onChange={(e) => setHeight(Math.max(1, Math.min(4096, parseInt(e.target.value) || 1)))}
-                                            className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-mono"
-                                            min={1}
-                                            max={4096}
-                                        />
-                                    </div>
-                                    <span className="text-[10px] text-muted-foreground mt-4">px</span>
-                                </div>
-                                {cropSourceImage && (
-                                    <p className="text-[10px] text-blue-600 mt-1.5">
-                                        ドラッグで範囲を指定してください
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Crop Apply Button */}
-                            <button
-                                onClick={handleCropApply}
-                                disabled={!cropSourceImage || !cropArea || isCropApplying}
-                                className="w-full rounded-lg py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {isCropApplying ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        カット中...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check className="h-4 w-4" />
-                                        クロップを適用
-                                    </>
-                                )}
-                            </button>
-
-                            <p className="text-[10px] text-muted-foreground text-center">
-                                クレジット消費なし（ローカル処理）
-                            </p>
                         </>
                     )}
                 </div>

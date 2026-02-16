@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // クレジット残高チェック
-    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1);
+    // クレジット残高チェック（4K出力のため4K料金で計算）
+    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1, undefined, '4K');
     if (!limitCheck.allowed) {
         if (limitCheck.needApiKey) {
             return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
@@ -200,7 +200,7 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
 
         const data = await response.json();
         const modelUsed = 'gemini-3-pro-image-preview';
-        const estimatedCost = estimateImageCost(modelUsed, 1);
+        const estimatedCost = estimateImageCost(modelUsed, 1, '4K');
         const durationMs = Date.now() - startTime;
 
         // 画像データを抽出
@@ -262,7 +262,7 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
             },
         });
 
-        // ログ記録
+        // ログ記録（4K出力のためresolution指定）
         const logResult = await logGeneration({
             userId: user.id,
             type: 'text-fix',
@@ -271,7 +271,8 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
             inputPrompt: textFixPrompt,
             imageCount: 1,
             status: 'succeeded',
-            startTime
+            startTime,
+            resolution: '4K',
         });
 
         // クレジット消費

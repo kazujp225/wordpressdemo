@@ -32,6 +32,15 @@ const RESOLUTION_OPTIONS: { value: Resolution; label: string; desc: string }[] =
     { value: '4K', label: '4K', desc: '最高品質' },
 ];
 
+// 解像度別の1枚あたりクレジット数（USD→クレジット変換済み）
+// 1K/2K: $0.134 × 10000 ≈ 1,340 → 表示上1,300
+// 4K: $0.24 × 10000 ≈ 2,400
+const CREDITS_PER_IMAGE: Record<Resolution, number> = {
+    '1K': 1300,
+    '2K': 1300,
+    '4K': 2400,
+};
+
 export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, onSuccess, canAIGenerate = true }: Props) {
     const [step, setStep] = useState<Step>('select-reference');
     const [referenceSectionId, setReferenceSectionId] = useState<string | null>(null);
@@ -531,11 +540,11 @@ export function BackgroundUnifyModal({ sections, selectedSectionIds, onClose, on
                                 <div className="flex items-center gap-2">
                                     <Sparkles className="h-4 w-4 text-indigo-600" />
                                     <span className="text-xs font-bold text-indigo-800">
-                                        消費クレジット: 約{(selectedSections.filter(s => s.id !== referenceSectionId).length * 1300).toLocaleString()}クレジット
+                                        消費クレジット: 約{(selectedSections.filter(s => s.id !== referenceSectionId).length * CREDITS_PER_IMAGE[resolution]).toLocaleString()}クレジット
                                     </span>
                                 </div>
                                 <p className="text-[10px] text-indigo-600 mt-1 ml-6">
-                                    {selectedSections.filter(s => s.id !== referenceSectionId).length}件 × 1,300クレジット/枚
+                                    {selectedSections.filter(s => s.id !== referenceSectionId).length}件 × {CREDITS_PER_IMAGE[resolution].toLocaleString()}クレジット/枚
                                 </p>
                             </div>
                         )}

@@ -1,5 +1,16 @@
 // Gemini API Pricing (per 1M tokens / per image)
 // Source: https://ai.google.dev/pricing
+// Image pricing: 1K/2K = 1120 tokens × $120/1M = $0.134, 4K = 2000 tokens × $120/1M = $0.24
+
+// 画像出力解像度の型定義
+export type ImageResolution = '1K' | '2K' | '4K';
+
+// 解像度別の画像生成コスト（USD/枚）
+const IMAGE_COST_BY_RESOLUTION: Record<ImageResolution, number> = {
+  '1K': 0.134,  // 1120 tokens × $120/1M
+  '2K': 0.134,  // 1120 tokens × $120/1M（1Kと同額）
+  '4K': 0.24,   // 2000 tokens × $120/1M
+};
 
 export const AI_COSTS = {
   'veo-2.0-generate-001': {
@@ -24,9 +35,9 @@ export const GEMINI_PRICING = {
     output: 0.30,
     type: 'text' as const
   },
-  // Image Models (per image)
+  // Image Models (per image, resolution-dependent)
   'gemini-3-pro-image-preview': {
-    perImage: 0.134, // $0.134 per 1K/2K image (768x1376 = 9:16 aspect ratio)
+    perImage: IMAGE_COST_BY_RESOLUTION,
     type: 'image' as const
   },
   // Video Models (per second)
@@ -34,7 +45,7 @@ export const GEMINI_PRICING = {
     perSecond: 0.35, // $0.35 per second of video
     type: 'video' as const
   }
-} as const;
+};
 
 // Claude API Pricing (per 1M tokens)
 // Source: https://docs.anthropic.com/en/docs/about-claude/pricing
@@ -72,11 +83,12 @@ export function estimateTextCost(
          (outputTokens / 1_000_000) * pricing.output;
 }
 
-export function estimateImageCost(model: string, imageCount: number): number {
+export function estimateImageCost(model: string, imageCount: number, resolution: ImageResolution = '1K'): number {
   const pricing = GEMINI_PRICING[model as ModelName];
   if (!pricing || pricing.type !== 'image') return 0;
 
-  return imageCount * pricing.perImage;
+  const costPerImage = pricing.perImage[resolution] ?? pricing.perImage['1K'];
+  return imageCount * costPerImage;
 }
 
 export function estimateVideoCost(model: string, durationSeconds: number): number {

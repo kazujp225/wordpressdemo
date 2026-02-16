@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { estimateTextCost, estimateImageCost, estimateTokens, estimateClaudeCost } from './ai-costs';
+import { estimateTextCost, estimateImageCost, estimateTokens, estimateClaudeCost, type ImageResolution } from './ai-costs';
 
 export type GenerationType =
   | 'copy'
@@ -48,6 +48,7 @@ export interface LogGenerationParams {
   status: 'succeeded' | 'failed';
   errorMessage?: string | null;
   startTime?: number; // Date.now() at start
+  resolution?: ImageResolution; // 画像出力解像度（コスト計算用）
 }
 
 // Color log helper for console
@@ -75,7 +76,8 @@ export async function logGeneration(params: LogGenerationParams): Promise<LogGen
     imageCount = 0,
     status,
     errorMessage,
-    startTime
+    startTime,
+    resolution
   } = params;
 
   // Estimate tokens for text-based models
@@ -85,7 +87,7 @@ export async function logGeneration(params: LogGenerationParams): Promise<LogGen
   // Calculate cost based on model type
   let estimatedCost = 0;
   if (imageCount > 0) {
-    estimatedCost = estimateImageCost(model, imageCount);
+    estimatedCost = estimateImageCost(model, imageCount, resolution);
   } else if (model.startsWith('claude-')) {
     estimatedCost = estimateClaudeCost(model, inputTokens, outputTokens);
   } else {

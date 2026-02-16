@@ -64,6 +64,7 @@ model MediaImage {
   desktopSections PageSection[] @relation("DesktopImage")
   mobileSections  PageSection[] @relation("MobileImage")
   banners         Banner[]      @relation("BannerImage")
+  thumbnails      Thumbnail[]   @relation("ThumbnailImage")
 
   @@index([userId])
   @@index([sourceUrl])
@@ -89,6 +90,29 @@ model Banner {
 
   @@index([userId])
   @@index([platform])
+  @@index([userId, updatedAt])
+}
+
+model Thumbnail {
+  id                Int        @id @default(autoincrement())
+  userId            String
+  title             String
+  category          String     // youtube, blog, sns, custom
+  width             Int
+  height            Int
+  presetName        String?
+  prompt            String?    @db.Text
+  productInfo       String?    @db.Text
+  imageId           Int?
+  image             MediaImage? @relation("ThumbnailImage", fields: [imageId], references: [id])
+  referenceImageUrl String?
+  status            String     @default("draft") // draft, generated, saved
+  metadata          String?    @db.Text
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([category])
   @@index([userId, updatedAt])
 }
 

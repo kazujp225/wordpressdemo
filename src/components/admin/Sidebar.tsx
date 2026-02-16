@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle, Presentation, Sparkles, MessageSquare } from 'lucide-react';
+import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle, Presentation, Sparkles, MessageSquare, Image as ImageIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
@@ -15,6 +15,7 @@ import { PLANS, type PlanType } from '@/lib/plans';
 const navItems = [
     { name: 'ページ一覧', href: '/admin/pages', icon: FileText, prefetchUrl: '/api/pages', adminOnly: false },
     { name: 'バナー編集', href: '/admin/banners', icon: Presentation, prefetchUrl: '/api/banners', adminOnly: false },
+    { name: 'サムネイル編集', href: '/admin/thumbnails', icon: ImageIcon, prefetchUrl: '/api/thumbnails', adminOnly: false },
     { name: 'メディア', href: '/admin/media', icon: Images, prefetchUrl: '/api/media', adminOnly: false },
     { name: 'API利用状況', href: '/admin/api-usage', icon: BarChart3, prefetchUrl: '/api/admin/stats?days=30', adminOnly: false },
     { name: '履歴', href: '/admin/import-history', icon: History, prefetchUrl: null, adminOnly: false },

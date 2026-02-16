@@ -8,14 +8,28 @@ const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444'
 const TYPE_LABELS: Record<string, string> = {
     'copy': 'コピー生成',
     'image': '画像生成',
+    '画像生成': '画像生成',
     'inpaint': 'インペイント',
+    'インペイント': 'インペイント',
     'edit-image': '画像編集',
+    'gemini-edit-code': 'コード編集(Gemini)',
+    'gemini-generate': '画像生成(Gemini)',
+    'claude-edit-code': 'コード編集(Claude)',
+    'claude-generate': '生成(Claude)',
+    'background-unify': '背景統一',
+    'design-analysis': 'デザイン解析',
+    'import-arrange': 'インポート整理',
+    'lp-generate-text-based': 'LP生成(テキスト)',
+    'lp-generate': 'LP生成',
+    'ocr': 'テキスト読取(OCR)',
+    'seo-llmo-combined': 'SEO/LLMO最適化',
+    'suggest-benefits': 'ベネフィット提案',
+    'text-fix': 'テキスト修正',
     'prompt-copilot': 'プロンプト補助',
     'review': 'コピーレビュー',
     'image-to-prompt': '画像解析',
     'generate-nav': 'ナビ生成',
     'chat-edit': 'チャット編集',
-    'lp-generate': 'LP生成'
 };
 
 interface TypeData {
@@ -40,13 +54,13 @@ export function TypeBreakdownChart({ data }: { data: TypeData[] }) {
                 <h3 className="text-base font-bold text-gray-900">種類別使用量</h3>
             </div>
 
-            <div className="h-64">
+            <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
                             data={formattedData}
                             cx="50%"
-                            cy="45%"
+                            cy="50%"
                             innerRadius={40}
                             outerRadius={65}
                             paddingAngle={2}
@@ -71,15 +85,21 @@ export function TypeBreakdownChart({ data }: { data: TypeData[] }) {
                                 ];
                             }}
                         />
-                        <Legend
-                            verticalAlign="bottom"
-                            height={36}
-                            formatter={(value) => (
-                                <span className="text-xs text-gray-500">{value}</span>
-                            )}
-                        />
                     </PieChart>
                 </ResponsiveContainer>
+            </div>
+            {/* 凡例 - 2列グリッド */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-4">
+                {formattedData.map((entry, index) => (
+                    <div key={index} className="flex items-center gap-1.5 min-w-0">
+                        <span
+                            className="shrink-0 w-2.5 h-2.5 rounded-sm"
+                            style={{ backgroundColor: entry.color }}
+                        />
+                        <span className="text-xs text-gray-500 truncate">{entry.name}</span>
+                        <span className="text-xs text-gray-400 shrink-0">{entry.value}</span>
+                    </div>
+                ))}
             </div>
         </div>
     );

@@ -11,7 +11,7 @@ import {
   getCurrentBalance,
   InsufficientCreditError,
 } from '@/lib/credits';
-import { AI_COSTS, estimateImageCost, estimateTextCost } from '@/lib/ai-costs';
+import { AI_COSTS, estimateImageCost, estimateTextCost, type ImageResolution } from '@/lib/ai-costs';
 import { getGoogleApiKeyWithInfo } from '@/lib/apiKeys';
 
 export interface UsageStats {
@@ -228,9 +228,10 @@ export async function checkImageGenerationLimit(
   userId: string,
   model: string = 'gemini-3-pro-image-preview',
   imageCount: number = 1,
-  context?: { isBannerEdit?: boolean }
+  context?: { isBannerEdit?: boolean },
+  resolution?: ImageResolution
 ): Promise<UsageLimitCheck> {
-  const estimatedCost = estimateImageCost(model, imageCount);
+  const estimatedCost = estimateImageCost(model, imageCount, resolution);
   return checkGenerationLimit(userId, estimatedCost, context);
 }
 

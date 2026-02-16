@@ -376,11 +376,80 @@ export async function POST(request: NextRequest) {
         const isPortrait = aspectRatio < 1;
         const orientationText = isPortrait ? 'PORTRAIT (vertical/tall)' : (aspectRatio > 1 ? 'LANDSCAPE (horizontal/wide)' : 'SQUARE');
 
-        // ★ 超シンプルなプロンプト（400エラー調査用）
-        inpaintPrompt = `Edit this image: ${prompt}`;
+        // マスク画像を生成（選択範囲がある場合）
+        let maskBase64: string | null = null;
+        if (allMasks.length > 0 && originalWidth && originalHeight) {
+            try {
+                // sharpで黒背景にマスク領域を白く塗ったPNG画像を生成
+                const imgWidth = resizeResult.newSize?.width || originalWidth;
+                const imgHeight = resizeResult.newSize?.height || originalHeight;
 
-        // ★ Nano Banana Pro (Gemini 3 Pro Image) - 最新モデル
-        // 複数画像でのスタイル転送をサポート
+                // SVGでマスクを描画
+                const rects = allMasks.map(m => {
+                    const x = Math.round(m.x * imgWidth);
+                    const y = Math.round(m.y * imgHeight);
+                    const w = Math.round(m.width * imgWidth);
+                    const h = Math.round(m.height * imgHeight);
+                    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="white"/>`;
+                }).join('');
+
+                const svgMask = `<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100%" height="100%" fill="black"/>
+                    ${rects}
+                </svg>`;
+
+                const maskBuffer = await sharp(Buffer.from(svgMask))
+                    .png()
+                    .toBuffer();
+
+                maskBase64 = maskBuffer.toString('base64');
+                console.log(`[INPAINT] Mask image generated: ${imgWidth}x${imgHeight}, ${allMasks.length} region(s)`);
+            } catch (maskError) {
+                console.error('[INPAINT] Failed to generate mask image:', maskError);
+                // マスク生成に失敗してもテキスト指示で続行
+            }
+        }
+
+        // プロンプト構築
+        const hasMask = maskBase64 !== null;
+        const hasReference = !!referenceImageBase64;
+
+        if (hasReference && hasMask) {
+            inpaintPrompt = `I'm providing 3 images:
+1. The original image to edit
+2. A black-and-white mask image - white areas indicate where to make changes, black areas MUST remain completely unchanged
+3. A reference photo of a person/object
+
+CRITICAL RULES:
+- ONLY modify the white areas of the mask. The black areas must be pixel-perfect identical to the original.
+- Replace the person/object in the white masked area with the person/object from the reference photo.
+- Preserve all text, graphics, layout, and design elements in the black areas exactly as they are.
+- Match the lighting, style, and perspective of the original image.
+
+User instruction: ${prompt}`;
+        } else if (hasMask) {
+            inpaintPrompt = `I'm providing 2 images:
+1. The original image to edit
+2. A black-and-white mask image - white areas indicate where to make changes, black areas MUST remain completely unchanged
+
+CRITICAL RULES:
+- ONLY modify the white areas of the mask. The black areas must be pixel-perfect identical to the original.
+- Preserve all text, graphics, layout, and design elements in the black areas exactly as they are.
+- Do NOT change anything outside the white masked region.
+
+User instruction: ${prompt}`;
+        } else if (hasReference) {
+            inpaintPrompt = `I'm providing 2 images:
+1. The original image to edit
+2. A reference photo of a person/object
+
+Replace the person/object in the first image with the person/object shown in the reference photo. Keep the same pose, position, and composition. Preserve all text, graphics, and layout elements.
+
+User instruction: ${prompt}`;
+        } else {
+            inpaintPrompt = `Edit this image: ${prompt}`;
+        }
+
         const MODEL_ID = 'gemini-3-pro-image-preview';
 
         // リクエストのpartsを構築
@@ -391,10 +460,15 @@ export async function POST(request: NextRequest) {
             inlineData: { mimeType: 'image/png', data: base64Data }
         });
 
-        // 2. 参考デザイン画像がある場合は追加（スタイル転送用）
-        // ★ 一時的に無効化: 400エラー調査中
-        // TODO: 調査完了後に有効化
-        /*
+        // 2. マスク画像（選択範囲がある場合）
+        if (maskBase64) {
+            requestParts.push({
+                inlineData: { mimeType: 'image/png', data: maskBase64 }
+            });
+            console.log(`[INPAINT] Mask image added to request`);
+        }
+
+        // 3. 参照画像がある場合は追加（人物/オブジェクト差し替え用）
         if (referenceImageBase64) {
             const refBase64 = referenceImageBase64.replace(/^data:image\/\w+;base64,/, '');
             let refMimeType = 'image/png';
@@ -402,15 +476,40 @@ export async function POST(request: NextRequest) {
                 refMimeType = 'image/jpeg';
             } else if (refBase64.startsWith('iVBORw0KGgo')) {
                 refMimeType = 'image/png';
+            } else if (refBase64.startsWith('UklGR')) {
+                refMimeType = 'image/webp';
             }
-            requestParts.push({
-                inlineData: { mimeType: refMimeType, data: refBase64 }
-            });
-            console.log(`[INPAINT] Reference image added: ${refMimeType}, length: ${refBase64.length}`);
-        }
-        */
 
-        // 3. プロンプト
+            // 参照画像を元画像と同じサイズにリサイズ（サイズ不一致によるGeminiの混乱を防止）
+            const refBuffer = Buffer.from(refBase64, 'base64');
+            const refMeta = await sharp(refBuffer).metadata();
+            const targetWidth = resizeResult.newSize?.width || (originalWidth || refMeta.width || 512);
+            const targetHeight = resizeResult.newSize?.height || (originalHeight || refMeta.height || 512);
+
+            let refFinalBase64 = refBase64;
+            let refFinalMimeType = refMimeType;
+
+            if (refMeta.width && refMeta.height && (refMeta.width !== targetWidth || refMeta.height !== targetHeight)) {
+                const resizedRefBuffer = await sharp(refBuffer)
+                    .resize(targetWidth, targetHeight, {
+                        fit: 'contain',
+                        background: { r: 255, g: 255, b: 255, alpha: 1 },
+                        kernel: sharp.kernel.lanczos3
+                    })
+                    .png()
+                    .toBuffer();
+                refFinalBase64 = resizedRefBuffer.toString('base64');
+                refFinalMimeType = 'image/png';
+                console.log(`[INPAINT] Reference image resized: ${refMeta.width}x${refMeta.height} → ${targetWidth}x${targetHeight}`);
+            }
+
+            requestParts.push({
+                inlineData: { mimeType: refFinalMimeType, data: refFinalBase64 }
+            });
+            console.log(`[INPAINT] Reference image added: ${refFinalMimeType}, length: ${refFinalBase64.length}`);
+        }
+
+        // 4. プロンプト
         requestParts.push({ text: inpaintPrompt });
 
         console.log(`[INPAINT] Using model: ${MODEL_ID}`);
@@ -464,7 +563,7 @@ export async function POST(request: NextRequest) {
             historyData
         );
 
-        // ログ記録（成功）
+        // ログ記録（成功）- generationConfigにimageSize未設定のためデフォルト1K
         await logGeneration({
             userId: user.id,
             type: 'inpaint',
@@ -473,7 +572,8 @@ export async function POST(request: NextRequest) {
             inputPrompt: inpaintPrompt,
             imageCount: 1,
             status: 'succeeded',
-            startTime
+            startTime,
+            resolution: '1K',
         });
 
         // クレジットは先払い済みなので、成功時は何もしない

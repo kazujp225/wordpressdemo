@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Loader2, Wand2, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, Plus, DollarSign, Clock, Check, History, Link, MousePointer, ImagePlus, Palette, Sparkles, Monitor, Smartphone, Scissors, Type, Paintbrush, Box, Image as ImageIcon, PenTool, MessageSquare, AlertTriangle } from 'lucide-react';
+import { X, Loader2, Wand2, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, Plus, DollarSign, Clock, Check, History, Link, MousePointer, ImagePlus, Palette, Sparkles, Monitor, Smartphone, Scissors, Type, Paintbrush, Box, Image as ImageIcon, PenTool, MessageSquare, AlertTriangle, UserPlus, Upload, Maximize2 } from 'lucide-react';
 import { InpaintHistoryPanel } from './InpaintHistoryPanel';
 import { TextFixModule } from './TextFixModule';
 import type { ClickableArea, FormFieldConfig, ViewportType } from '@/types';
@@ -111,7 +111,7 @@ export function ImageInpaintEditor({
     const [isLoading, setIsLoading] = useState(false);
 
     // スロット型プロンプト用state
-    type EditType = 'color' | 'text' | 'object' | 'background' | 'style' | 'custom';
+    type EditType = 'color' | 'text' | 'object' | 'person' | 'background' | 'style' | 'custom';
     const [editType, setEditType] = useState<EditType>('color');
     const [slotBefore, setSlotBefore] = useState('');
     const [slotAfter, setSlotAfter] = useState('');
@@ -143,6 +143,13 @@ export function ImageInpaintEditor({
             afterPlaceholder: '例: 削除して背景で埋める',
             examples: ['削除', '別の画像に', '移動']
         },
+        person: {
+            label: '人物',
+            Icon: UserPlus,
+            beforePlaceholder: '例: なし',
+            afterPlaceholder: '例: スーツの男性を追加',
+            examples: ['男性を追加', '女性を追加', '削除']
+        },
         background: {
             label: '背景',
             Icon: ImageIcon,
@@ -168,9 +175,7 @@ export function ImageInpaintEditor({
 
     // スロットからプロンプトを生成
     const generatePromptFromSlots = (): string => {
-        if (editType === 'custom') {
-            return prompt;
-        }
+        if (editType === 'custom' || editType === 'person' || editType === 'object') return prompt;
         if (!slotBefore.trim() && !slotAfter.trim()) {
             return '';
         }
@@ -259,11 +264,14 @@ export function ImageInpaintEditor({
         }
     }, [activeViewport, mobileImage]);
 
-    // 参考デザイン画像機能
+    // 参考画像機能（直接base64送信 - BannerEditorと同じ方式）
     const [referenceImage, setReferenceImage] = useState<string | null>(null);
     const [referenceDesign, setReferenceDesign] = useState<DesignDefinition | null>(null);
     const [isAnalyzingDesign, setIsAnalyzingDesign] = useState(false);
     const referenceInputRef = useRef<HTMLInputElement>(null);
+
+    // 高画質化
+    const [isUpscaling, setIsUpscaling] = useState(false);
 
     // Editor mode state
     const [editorMode, setEditorMode] = useState<EditorMode>(initialMode);
@@ -1293,40 +1301,14 @@ export function ImageInpaintEditor({
     };
 
     // 参考デザイン画像のアップロード処理
-    const handleReferenceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleReferenceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // ファイルをBase64に変換
         const reader = new FileReader();
-        reader.onload = async (event) => {
+        reader.onload = (event) => {
             const base64 = event.target?.result as string;
             setReferenceImage(base64);
-
-            // デザイン解析を実行
-            setIsAnalyzingDesign(true);
-            setError(null);
-
-            try {
-                const response = await fetch('/api/ai/analyze-design', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ imageUrl: base64 })
-                });
-
-                if (!response.ok) {
-                    throw new Error('デザイン解析に失敗しました');
-                }
-
-                const designData = await response.json();
-                setReferenceDesign(designData);
-            } catch (err: any) {
-                // 解析失敗でも参考画像は保持（AIに直接送信できるため）
-                console.warn('デザイン解析失敗:', err.message);
-                // エラーは表示しない（参考画像自体は使用可能）
-            } finally {
-                setIsAnalyzingDesign(false);
-            }
         };
         reader.readAsDataURL(file);
 
@@ -1341,6 +1323,29 @@ export function ImageInpaintEditor({
         setReferenceImage(null);
         setReferenceDesign(null);
     };
+
+    // 高画質化
+    const handleUpscale = useCallback(async () => {
+        if (!imageUrl || isUpscaling) return;
+        setIsUpscaling(true);
+        try {
+            const response = await fetch('/api/ai/upscale', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageUrl, scale: 2, useAI: true }),
+            });
+            const data = await response.json();
+            if (response.ok && data.success && data.media?.filePath) {
+                onSave(data.media.filePath);
+            } else {
+                setError(data.error || '高画質化に失敗しました');
+            }
+        } catch (err: any) {
+            setError('高画質化中にエラーが発生しました');
+        } finally {
+            setIsUpscaling(false);
+        }
+    }, [imageUrl, isUpscaling, onSave]);
 
     // 画像をリサイズする（最大サイズを制限）
     const resizeImageForUpload = (base64: string, maxSize: number = 1024): Promise<string> => {
@@ -1706,14 +1711,17 @@ export function ImageInpaintEditor({
                                     );
                                 })()}
 
-                                {/* Reference Design Image */}
+                                {/* 参照写真アップロード（人物・オブジェクト用） */}
                                 <div className="mb-6">
                                     <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-3">
                                         <div className="flex items-center gap-2">
-                                            <Palette className="w-3.5 h-3.5" />
-                                            参考デザイン（任意）
+                                            <Upload className="w-3.5 h-3.5" />
+                                            参照写真（任意）
                                         </div>
                                     </label>
+                                    <p className="text-[10px] text-muted-foreground mb-2">
+                                        差し替えたい人物・オブジェクトの写真をアップロード
+                                    </p>
 
                                     <input
                                         ref={referenceInputRef}
@@ -1724,102 +1732,58 @@ export function ImageInpaintEditor({
                                     />
 
                                     {!referenceImage ? (
-                                        <button
+                                        <div
                                             onClick={() => referenceInputRef.current?.click()}
-                                            disabled={isAnalyzingDesign}
-                                            className="w-full p-4 border-2 border-dashed border-border rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center gap-2 group"
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                const file = e.dataTransfer.files[0];
+                                                if (file && file.type.startsWith('image/')) {
+                                                    const reader = new FileReader();
+                                                    reader.onload = (ev) => {
+                                                        const result = ev.target?.result as string;
+                                                        setReferenceImage(result);
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                }
+                                            }}
+                                            onDragOver={(e) => e.preventDefault()}
+                                            className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-surface-50 py-6 cursor-pointer hover:border-primary/50 hover:bg-surface-100 transition-colors"
                                         >
-                                            <div className="w-10 h-10 rounded-full bg-surface-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-                                                <ImagePlus className="w-5 h-5 text-muted-foreground group-hover:text-primary" />
-                                            </div>
-                                            <span className="text-xs text-muted-foreground group-hover:text-foreground">
-                                                参考画像をアップロード
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground">
-                                                デザインスタイルを自動解析します
-                                            </span>
-                                        </button>
+                                            <UserPlus className="w-6 h-6 text-muted-foreground/40 mb-2" />
+                                            <p className="text-[11px] font-medium text-muted-foreground">
+                                                写真をアップロード
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                                ドラッグ&ドロップまたはクリック
+                                            </p>
+                                        </div>
                                     ) : (
-                                        <div className="relative">
-                                            {/* 参考画像プレビュー */}
-                                            <div className="relative rounded-lg overflow-hidden border border-border">
+                                        <div className="relative group">
+                                            <div className="rounded-lg overflow-hidden border border-border bg-surface-50">
                                                 <img
                                                     src={referenceImage}
-                                                    alt="参考デザイン"
-                                                    className="w-full h-24 object-cover"
+                                                    alt="参照画像"
+                                                    className="w-full h-24 object-contain"
                                                 />
-                                                {isAnalyzingDesign && (
-                                                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                                                        <div className="flex items-center gap-2 text-primary">
-                                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                                            <span className="text-xs font-medium">解析中...</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                <button
-                                                    onClick={clearReferenceDesign}
-                                                    className="absolute top-2 right-2 p-1.5 bg-background/90 rounded-full hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
-                                                >
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
                                             </div>
-
-                                            {/* デザイン解析結果 */}
-                                            {referenceDesign ? (
-                                                <div className="mt-3 p-3 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg border border-primary/10">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <Sparkles className="w-3.5 h-3.5 text-primary" />
-                                                        <span className="text-xs font-bold text-foreground">解析済みスタイル</span>
-                                                    </div>
-
-                                                    {/* カラーパレット */}
-                                                    <div className="flex items-center gap-1 mb-2">
-                                                        {Object.entries(referenceDesign.colorPalette).map(([key, color]) => (
-                                                            <div
-                                                                key={key}
-                                                                className="w-5 h-5 rounded-full border border-white shadow-sm"
-                                                                style={{ backgroundColor: color }}
-                                                                title={`${key}: ${color}`}
-                                                            />
-                                                        ))}
-                                                    </div>
-
-                                                    {/* Vibe タグ */}
-                                                    <div className="flex flex-wrap gap-1 mb-2">
-                                                        {referenceDesign.vibe.split(/[,、\s]+/).filter(Boolean).slice(0, 4).map((tag, i) => (
-                                                            <span
-                                                                key={i}
-                                                                className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-medium rounded-full"
-                                                            >
-                                                                {tag.trim()}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-
-                                                    {/* 説明 */}
-                                                    <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
-                                                        {referenceDesign.description}
-                                                    </p>
-                                                </div>
-                                            ) : !isAnalyzingDesign && (
-                                                <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                                                    <p className="text-[10px] text-amber-700">
-                                                        スタイル解析はスキップされましたが、画像はAIに送信されます
-                                                    </p>
-                                                </div>
-                                            )}
+                                            <button
+                                                onClick={clearReferenceDesign}
+                                                className="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Slot-based Prompt Input */}
                                 <div className="mb-6 mt-auto space-y-4">
-                                    {/* Edit Type Selector */}
+                                    {/* Edit Type Selector - Grid */}
                                     <div>
                                         <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-2">
-                                            何をしたい？
+                                            編集メニュー
                                         </label>
-                                        <div className="flex flex-wrap gap-1.5">
+                                        <div className="grid grid-cols-4 gap-1">
                                             {(Object.keys(editTypeConfig) as EditType[]).map((type) => {
                                                 const { Icon } = editTypeConfig[type];
                                                 return (
@@ -1830,31 +1794,47 @@ export function ImageInpaintEditor({
                                                             setSlotBefore('');
                                                             setSlotAfter('');
                                                         }}
-                                                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+                                                        className={`flex flex-col items-center gap-1 py-2.5 px-1 text-[10px] font-medium rounded-lg border transition-all ${
                                                             editType === type
-                                                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                                                : 'bg-surface-100 text-muted-foreground hover:bg-surface-200 hover:text-foreground'
+                                                                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                                                                : 'bg-white text-muted-foreground border-border hover:bg-surface-50 hover:border-primary/30 hover:text-foreground'
                                                         }`}
                                                     >
-                                                        <Icon className="h-3 w-3" />
+                                                        <Icon className="h-4 w-4" />
                                                         {editTypeConfig[type].label}
                                                     </button>
                                                 );
                                             })}
+                                            {/* 高画質化 */}
+                                            <button
+                                                onClick={handleUpscale}
+                                                disabled={isUpscaling || !imageUrl}
+                                                className={`flex flex-col items-center gap-1 py-2.5 px-1 text-[10px] font-medium rounded-lg border transition-all bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed`}
+                                            >
+                                                {isUpscaling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Maximize2 className="h-4 w-4" />}
+                                                {isUpscaling ? '処理中' : '高画質化'}
+                                            </button>
                                         </div>
                                     </div>
 
                                     {/* Before/After Inputs */}
-                                    {editType === 'custom' ? (
+                                    {editType === 'custom' || editType === 'person' || editType === 'object' ? (
                                         <div>
                                             <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-2">
-                                                自由プロンプト
+                                                {editType === 'person' ? '人物の変更指示' : editType === 'object' ? 'オブジェクトの変更指示' : '自由プロンプト'}
                                             </label>
                                             <textarea
                                                 value={prompt}
                                                 onChange={(e) => setPrompt(e.target.value)}
-                                                placeholder="例: テキストを消す、背景を青空にする..."
-                                                className="w-full h-24 px-4 py-3 rounded-md border border-input bg-background text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none shadow-sm"
+                                                placeholder={
+                                                    editType === 'person'
+                                                        ? '例: この人物を添付した写真の人物に差し替えて...'
+                                                        : editType === 'object'
+                                                            ? '例: 左のロゴを添付した画像に差し替えて...'
+                                                            : '例: テキストを消す、背景を青空にする...'
+                                                }
+                                                rows={4}
+                                                className="w-full px-4 py-3 rounded-md border border-input bg-background text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none shadow-sm"
                                             />
                                         </div>
                                     ) : (
@@ -1914,10 +1894,10 @@ export function ImageInpaintEditor({
                                         </div>
                                     )}
 
-                                    {referenceDesign && (
+                                    {referenceImage && (
                                         <p className="text-[10px] text-primary flex items-center gap-1">
                                             <Sparkles className="w-3 h-3" />
-                                            参考デザインに寄せて仕上げます
+                                            参照写真を反映して仕上げます
                                         </p>
                                     )}
                                 </div>
@@ -1948,7 +1928,7 @@ export function ImageInpaintEditor({
                                 <div className="space-y-3 pt-6 border-t border-border">
                                     <button
                                         onClick={handleInpaint}
-                                        disabled={isLoading || isAnalyzingDesign || isLoadingCredit || hasInsufficientCredit || (selections.length === 0 && mobileSelections.length === 0) || !generatePromptFromSlots().trim()}
+                                        disabled={isLoading || isLoadingCredit || hasInsufficientCredit || (selections.length === 0 && mobileSelections.length === 0) || !generatePromptFromSlots().trim()}
                                         className="w-full py-3 px-4 bg-primary text-primary-foreground font-bold text-sm rounded-md hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                                     >
                                         {isLoadingCredit ? (
@@ -1967,11 +1947,6 @@ export function ImageInpaintEditor({
                                                 {isDualMode && selections.length > 0 && mobileSelections.length > 0
                                                     ? '両方を生成中...'
                                                     : '生成中...'}
-                                            </>
-                                        ) : isAnalyzingDesign ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                デザイン解析中...
                                             </>
                                         ) : (
                                             <>
