@@ -72,6 +72,10 @@ export function TemplateGallery({ onBack, onClose }: TemplateGalleryProps) {
     const [targetAudience, setTargetAudience] = useState('');
     const [colorScheme, setColorScheme] = useState('blue');
 
+    // ヘッダー設定
+    const [ctaText, setCtaText] = useState('お問い合わせ');
+    const [ctaLink, setCtaLink] = useState('#contact');
+
     useEffect(() => {
         fetch('/api/templates')
             .then(res => res.json())
@@ -111,6 +115,8 @@ export function TemplateGallery({ onBack, onClose }: TemplateGalleryProps) {
                     priceInfo,
                     targetAudience,
                     colorScheme,
+                    ctaText,
+                    ctaLink,
                 }),
             });
 
@@ -295,6 +301,34 @@ export function TemplateGallery({ onBack, onClose }: TemplateGalleryProps) {
                                 </button>
                             ))}
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-foreground mb-1">
+                            CTAボタンのテキスト
+                        </label>
+                        <input
+                            type="text"
+                            value={ctaText}
+                            onChange={e => setCtaText(e.target.value)}
+                            placeholder="例: 無料で始める"
+                            disabled={creating}
+                            className="w-full px-3 py-2.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-foreground mb-1">
+                            CTAボタンのリンク先
+                        </label>
+                        <input
+                            type="text"
+                            value={ctaLink}
+                            onChange={e => setCtaLink(e.target.value)}
+                            placeholder="例: https://example.com や #contact"
+                            disabled={creating}
+                            className="w-full px-3 py-2.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
+                        />
                     </div>
 
                     <div>

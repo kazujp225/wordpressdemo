@@ -135,7 +135,7 @@ export async function POST(
             // bodyなしでもOK
         }
 
-        const { productName, productDescription, tone, priceInfo, targetAudience, colorScheme } = body;
+        const { productName, productDescription, tone, priceInfo, targetAudience, colorScheme, ctaText, ctaLink } = body;
 
         // テンプレート取得（公開済みのみ）
         const template = await prisma.lpTemplate.findFirst({
@@ -154,6 +154,16 @@ export async function POST(
 
         const pageTitle = productName ? `${productName} - LP` : template.title;
 
+        // ヘッダー設定をマージ（ユーザー入力で上書き）
+        let mergedHeaderConfig = template.headerConfig || '{}';
+        try {
+            const parsed = JSON.parse(mergedHeaderConfig);
+            if (productName) parsed.logoText = productName;
+            if (ctaText) parsed.ctaText = ctaText;
+            if (ctaLink) parsed.ctaLink = ctaLink;
+            mergedHeaderConfig = JSON.stringify(parsed);
+        } catch {}
+
         // 商材情報がある場合はGeminiでテキスト差し替え
         const hasProductInfo = productName && productName.trim();
 
@@ -165,7 +175,7 @@ export async function POST(
                     title: pageTitle,
                     slug: `page-${Date.now()}`,
                     status: 'draft',
-                    headerConfig: template.headerConfig,
+                    headerConfig: mergedHeaderConfig,
                     formConfig: template.formConfig,
                     designDefinition: template.designDefinition,
                     sections: {
@@ -384,7 +394,7 @@ export async function POST(
                             title: pageTitle,
                             slug: `page-${Date.now()}`,
                             status: 'draft',
-                            headerConfig: template.headerConfig,
+                            headerConfig: mergedHeaderConfig,
                             formConfig: template.formConfig,
                             designDefinition: template.designDefinition,
                             sections: {
