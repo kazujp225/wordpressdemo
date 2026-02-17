@@ -175,10 +175,10 @@ export async function GET(
   </style>
 </head>
 <body>
-  <header class="header">
+  ${headerConfig.headerHtml ? headerConfig.headerHtml : `<header class="header">
     <div class="header-logo">${escapeHtml(headerConfig.logoText)}</div>
     <a href="${escapeHtml(headerConfig.ctaLink)}" class="header-cta">${escapeHtml(headerConfig.ctaText)}</a>
-  </header>
+  </header>`}
   <main class="main-content">
     ${sectionsHtml.join('\n    ')}
   </main>

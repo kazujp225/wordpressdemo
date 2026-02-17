@@ -22,6 +22,7 @@ interface HeaderConfig {
     sticky?: boolean;
     headerHeight?: string;
     logoSize?: string;
+    headerHtml?: string;
 }
 
 interface PageData {
@@ -141,6 +142,9 @@ export default function PagePreviewPage() {
                 >
                     {/* Header */}
                     {pageData.headerConfig && (
+                        pageData.headerConfig.headerHtml ? (
+                            <div className={`${pageData.headerConfig.sticky !== false ? 'sticky top-0' : 'relative'} z-40`} dangerouslySetInnerHTML={{ __html: pageData.headerConfig.headerHtml }} />
+                        ) : (
                         <header
                             className={`${pageData.headerConfig.sticky !== false ? 'sticky top-0' : 'relative'} z-40 flex items-center justify-between bg-white/95 px-4 shadow-sm backdrop-blur-md ${viewMode === 'mobile' ? 'px-3' : 'md:px-8'}`}
                             style={{ height: ({ sm: 40, md: 56, lg: 72, xl: 88 } as Record<string, number>)[pageData.headerConfig.headerHeight || 'md'] || 56 }}
@@ -175,6 +179,7 @@ export default function PagePreviewPage() {
                                 {pageData.headerConfig.ctaText || 'お問い合わせ'}
                             </a>
                         </header>
+                        )
                     )}
 
                     {pageData.sections.map((section) => {

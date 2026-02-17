@@ -169,15 +169,15 @@ export default async function PublicPage({ params }: { params: { slug: string } 
         if (globalNav) globalNavValue = JSON.parse(globalNav.value);
     } catch { /* GlobalConfig table may not exist yet */ }
 
-    let headerConfig = {
+    let headerConfig: Record<string, any> = {
         title: page.title,
         logoText: globalNavValue?.logoText || page.title,
         sticky: globalNavValue?.sticky ?? true,
         ctaText: globalNavValue?.ctaText || 'お問い合わせ',
         ctaLink: globalNavValue?.ctaLink || '#contact',
         navItems: globalNavValue?.navItems || [] as any[],
-        headerHeight: 'md' as string,
-        logoSize: 'md' as string,
+        headerHeight: 'md',
+        logoSize: 'md',
     };
 
     // If individual page has specific header config, merge it (individual overrides global if desired, but here we prioritize global for B2B consistency or vice versa)
@@ -240,6 +240,9 @@ export default async function PublicPage({ params }: { params: { slug: string } 
             )}
 
             {/* Dynamic Header */}
+            {headerConfig.headerHtml ? (
+                <div className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50`} dangerouslySetInnerHTML={{ __html: headerConfig.headerHtml }} />
+            ) : (
             <header
                 className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex items-center justify-between bg-white/90 px-3 md:px-8 shadow-sm backdrop-blur-md gap-2`}
                 style={{ height: ({ sm: 40, md: 56, lg: 72, xl: 88 } as Record<string, number>)[headerConfig.headerHeight] || 56 }}
@@ -264,6 +267,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                     {headerConfig.ctaText}
                 </a>
             </header>
+            )}
 
             {/* Main Content: フル幅表示 */}
             <main className="w-full bg-white">

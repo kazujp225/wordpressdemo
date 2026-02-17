@@ -297,6 +297,11 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [showColorPaletteModal, setShowColorPaletteModal] = useState(false);
     const [isColorPaletteRegenerating, setIsColorPaletteRegenerating] = useState(false);
 
+    // AIヘッダー生成
+    const [isGeneratingHeader, setIsGeneratingHeader] = useState(false);
+    const [aiHeaderStyle, setAiHeaderStyle] = useState('professional');
+    const [aiHeaderColor, setAiHeaderColor] = useState('#2563eb');
+
     // モバイル最適化モーダル
     const [showMobileOptimizeModal, setShowMobileOptimizeModal] = useState(false);
 
@@ -4645,6 +4650,98 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <label htmlFor="header-sticky" className="text-xs text-gray-600">
                                             スクロール時にヘッダーを固定
                                         </label>
+                                    </div>
+                                    )}
+                                </div>
+                                {/* AIでヘッダーを作成 */}
+                                <div className="border-t border-gray-100 pt-1">
+                                    <button
+                                        onClick={() => toggleHeaderSection('aiHeader')}
+                                        className="flex items-center justify-between w-full cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
+                                    >
+                                        <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" />AIでヘッダーを作成</span>
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('aiHeader') ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {headerOpenSections.has('aiHeader') && (
+                                    <div className="space-y-2 pt-1 pb-2">
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">スタイル</label>
+                                            <div className="grid grid-cols-2 gap-1">
+                                                {([['professional', 'プロフェッショナル'], ['casual', 'カジュアル'], ['modern', 'モダン'], ['minimal', 'ミニマル']] as const).map(([val, label]) => (
+                                                    <button
+                                                        key={val}
+                                                        onClick={() => setAiHeaderStyle(val)}
+                                                        className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${aiHeaderStyle === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">メインカラー</label>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="color"
+                                                    value={aiHeaderColor}
+                                                    onChange={(e) => setAiHeaderColor(e.target.value)}
+                                                    className="w-8 h-8 rounded border border-gray-200 cursor-pointer"
+                                                />
+                                                <span className="text-xs text-gray-500">{aiHeaderColor}</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                setIsGeneratingHeader(true);
+                                                try {
+                                                    const res = await fetch('/api/ai/generate-header', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({
+                                                            serviceName: headerConfig.logoText || 'My Brand',
+                                                            style: aiHeaderStyle,
+                                                            color: aiHeaderColor,
+                                                            ctaText: headerConfig.ctaText || 'お問い合わせ',
+                                                            ctaLink: headerConfig.ctaLink || '#contact',
+                                                            navItems: headerConfig.navItems || [],
+                                                        }),
+                                                    });
+                                                    if (!res.ok) {
+                                                        const err = await res.json();
+                                                        throw new Error(err.message || err.error || 'ヘッダー生成に失敗');
+                                                    }
+                                                    const data = await res.json();
+                                                    setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, headerHtml: data.headerHtml }));
+                                                    toast.success('ヘッダーを生成しました');
+                                                } catch (err: any) {
+                                                    toast.error(err.message || 'ヘッダー生成に失敗しました');
+                                                } finally {
+                                                    setIsGeneratingHeader(false);
+                                                }
+                                            }}
+                                            disabled={isGeneratingHeader || !headerConfig.logoText}
+                                            className="w-full py-2 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                                        >
+                                            {isGeneratingHeader ? (
+                                                <><Loader2 className="h-3 w-3 animate-spin" />生成中...</>
+                                            ) : (
+                                                <><Sparkles className="h-3 w-3" />AIでヘッダーを生成</>
+                                            )}
+                                        </button>
+                                        {headerConfig.headerHtml && (
+                                            <button
+                                                onClick={() => {
+                                                    setHeaderConfig((prev: typeof headerConfig) => {
+                                                        const { headerHtml, ...rest } = prev;
+                                                        return rest as typeof headerConfig;
+                                                    });
+                                                    toast.success('デフォルトヘッダーに戻しました');
+                                                }}
+                                                className="w-full py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                                            >
+                                                デフォルトに戻す
+                                            </button>
+                                        )}
                                     </div>
                                     )}
                                 </div>
