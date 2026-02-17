@@ -246,16 +246,10 @@ export async function POST(request: NextRequest) {
 
         const deviceConfig = DEVICE_PRESETS[device as keyof typeof DEVICE_PRESETS] || DEVICE_PRESETS.desktop;
 
-        // Launch Puppeteer
+        // Launch Puppeteer（システムChromium優先 - 日本語フォント対応）
         log.info('Launching Puppeteer...');
-        const executablePath = await chromium.executablePath();
-        log.info(`Chromium path: ${executablePath}`);
-
-        const browser = await puppeteer.launch({
-            args: chromium.args,
-            executablePath,
-            headless: true,
-        });
+        const { launchBrowser } = await import('@/lib/puppeteer');
+        const browser = await launchBrowser();
         const page = await browser.newPage();
 
         await page.setViewport({

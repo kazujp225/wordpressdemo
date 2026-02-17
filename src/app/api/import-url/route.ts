@@ -430,16 +430,48 @@ export async function POST(request: NextRequest) {
             launchArgs = ['--no-sandbox', '--disable-setuid-sandbox'];
             log.info('Using local Chrome for development');
         } else {
-            // 本番環境: @sparticuz/chromiumを使用（メモリ最適化）
-            executablePath = await chromium.executablePath();
-            launchArgs = [
-                ...chromium.args,
-                '--disable-dev-shm-usage', // /dev/shm使用を無効化（メモリ節約）
-                '--disable-gpu', // GPU無効化
-                '--single-process', // シングルプロセスモード
-                '--no-zygote', // Zygoteプロセス無効化
+            // 本番環境: システムChromiumを優先（Docker/Render - 日本語フォント対応）
+            // @sparticuz/chromiumはフォール バック（サーバーレス環境用）
+            const systemChromePaths = [
+                process.env.PUPPETEER_EXECUTABLE_PATH, // Docker/Render環境（Dockerfile設定）
+                '/usr/bin/chromium',        // Docker (Debian)
+                '/usr/bin/chromium-browser', // Linux Chromium
+                '/usr/bin/google-chrome',    // Linux Chrome
             ];
-            log.info(`Using serverless Chromium: ${executablePath}`);
+
+            let systemChromePath: string | undefined;
+            for (const p of systemChromePaths) {
+                if (!p) continue;
+                try {
+                    if (fs.existsSync(p)) {
+                        systemChromePath = p;
+                        break;
+                    }
+                } catch {}
+            }
+
+            if (systemChromePath) {
+                // システムChromium使用（日本語フォント利用可能）
+                executablePath = systemChromePath;
+                launchArgs = [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                ];
+                log.info(`Using system Chromium: ${executablePath}`);
+            } else {
+                // フォールバック: @sparticuz/chromium（サーバーレス環境）
+                executablePath = await chromium.executablePath();
+                launchArgs = [
+                    ...chromium.args,
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--single-process',
+                    '--no-zygote',
+                ];
+                log.info(`Using serverless Chromium: ${executablePath}`);
+            }
         }
 
         let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;

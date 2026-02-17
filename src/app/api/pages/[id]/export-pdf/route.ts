@@ -33,13 +33,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // Puppeteerでブラウザを起動
-        const executablePath = await chromium.executablePath();
-        const browser = await puppeteer.launch({
-            args: chromium.args,
-            executablePath,
-            headless: true,
-        });
+        // Puppeteerでブラウザを起動（システムChromium優先 - 日本語フォント対応）
+        const { launchBrowser } = await import('@/lib/puppeteer');
+        const browser = await launchBrowser();
 
         try {
             const browserPage = await browser.newPage();
