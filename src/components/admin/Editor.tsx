@@ -92,9 +92,11 @@ interface EditorProps {
     initialSlug: string;
     initialStatus?: string;
     initialDesignDefinition?: any | null;
+    saveUrl?: string; // カスタム保存URL（テンプレート編集用）
+    backUrl?: string; // カスタム戻りURL
 }
 
-export default function Editor({ pageId, initialSections, initialHeaderConfig, initialSlug, initialStatus = 'draft', initialDesignDefinition = null }: EditorProps) {
+export default function Editor({ pageId, initialSections, initialHeaderConfig, initialSlug, initialStatus = 'draft', initialDesignDefinition = null, saveUrl, backUrl }: EditorProps) {
     const router = useRouter();
     const [sections, setSections] = useState(initialSections);
     const [headerConfig, setHeaderConfig] = useState(() => {
@@ -1773,7 +1775,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         setIsSaving(true);
         try {
             const method = pageId === 'new' ? 'POST' : 'PUT';
-            const url = pageId === 'new' ? '/api/pages' : `/api/pages/${pageId}`;
+            const url = saveUrl || (pageId === 'new' ? '/api/pages' : `/api/pages/${pageId}`);
 
             const res = await fetch(url, {
                 method: method,

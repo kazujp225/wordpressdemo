@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Eye, EyeOff, Trash2, Globe, Loader2, X, ExternalLink, ArrowLeft, Image as ImageIcon, Save } from 'lucide-react';
+import { Plus, Eye, EyeOff, Trash2, Globe, Loader2, X, ExternalLink, ArrowLeft, Image as ImageIcon, Save, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { TemplateImportModal } from './TemplateImportModal';
@@ -161,17 +161,26 @@ export function TemplatesContainer({ initialTemplates }: TemplatesContainerProps
                             </span>
                         </div>
                     </div>
-                    {detailTemplate.sourceUrl && (
-                        <a
-                            href={detailTemplate.sourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    <div className="flex items-center gap-3 shrink-0">
+                        <button
+                            onClick={() => router.push(`/admin/templates/${detailTemplate.id}`)}
+                            className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
                         >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            元URL
-                        </a>
-                    )}
+                            <Pencil className="h-4 w-4" />
+                            エディタで編集
+                        </button>
+                        {detailTemplate.sourceUrl && (
+                            <a
+                                href={detailTemplate.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                元URL
+                            </a>
+                        )}
+                    </div>
                 </div>
 
                 {/* ヘッダー設定 */}
