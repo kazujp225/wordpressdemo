@@ -70,7 +70,7 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { title, description, category, isPublished } = body;
+        const { title, description, category, isPublished, headerConfig } = body;
 
         const template = await prisma.lpTemplate.update({
             where: { id: parseInt(id) },
@@ -79,6 +79,7 @@ export async function PUT(
                 ...(description !== undefined && { description }),
                 ...(category !== undefined && { category }),
                 ...(isPublished !== undefined && { isPublished }),
+                ...(headerConfig !== undefined && { headerConfig: typeof headerConfig === 'string' ? headerConfig : JSON.stringify(headerConfig) }),
             }
         });
 

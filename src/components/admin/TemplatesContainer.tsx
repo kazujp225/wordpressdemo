@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Eye, EyeOff, Trash2, Globe, Loader2, X, ExternalLink, ArrowLeft, Image as ImageIcon } from 'lucide-react';
+import { Plus, Eye, EyeOff, Trash2, Globe, Loader2, X, ExternalLink, ArrowLeft, Image as ImageIcon, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { TemplateImportModal } from './TemplateImportModal';
@@ -21,6 +21,7 @@ interface TemplateDetail {
     category: string;
     sourceUrl: string | null;
     isPublished: boolean;
+    headerConfig: string | null;
     sections: TemplateSection[];
 }
 
@@ -62,6 +63,7 @@ export function TemplatesContainer({ initialTemplates }: TemplatesContainerProps
     const [togglingId, setTogglingId] = useState<number | null>(null);
     const [detailTemplate, setDetailTemplate] = useState<TemplateDetail | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
+    const [savingHeader, setSavingHeader] = useState(false);
 
     const categories = ['all', ...new Set(templates.map(t => t.category))];
 
@@ -171,6 +173,91 @@ export function TemplatesContainer({ initialTemplates }: TemplatesContainerProps
                         </a>
                     )}
                 </div>
+
+                {/* ヘッダー設定 */}
+                {(() => {
+                    let hc: Record<string, any> = {};
+                    try { hc = JSON.parse(detailTemplate.headerConfig || '{}'); } catch {}
+                    const updateHc = (key: string, value: string | boolean) => {
+                        const updated = { ...hc, [key]: value };
+                        setDetailTemplate(prev => prev ? { ...prev, headerConfig: JSON.stringify(updated) } : prev);
+                    };
+                    const handleSaveHeader = async () => {
+                        setSavingHeader(true);
+                        try {
+                            let parsed: Record<string, any> = {};
+                            try { parsed = JSON.parse(detailTemplate.headerConfig || '{}'); } catch {}
+                            const res = await fetch(`/api/admin/templates/${detailTemplate.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ headerConfig: parsed }),
+                            });
+                            if (!res.ok) throw new Error('保存に失敗');
+                            toast.success('ヘッダー設定を保存しました');
+                        } catch {
+                            toast.error('ヘッダー設定の保存に失敗しました');
+                        } finally {
+                            setSavingHeader(false);
+                        }
+                    };
+                    return (
+                        <div className="rounded-lg border border-border p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-foreground">ヘッダー設定</h3>
+                                <button
+                                    onClick={handleSaveHeader}
+                                    disabled={savingHeader}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                                >
+                                    {savingHeader ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                    保存
+                                </button>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-muted-foreground mb-1">ロゴテキスト</label>
+                                    <input
+                                        type="text"
+                                        value={hc.logoText || ''}
+                                        onChange={e => updateHc('logoText', e.target.value)}
+                                        placeholder="サービス名"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-muted-foreground mb-1">CTAテキスト</label>
+                                    <input
+                                        type="text"
+                                        value={hc.ctaText || ''}
+                                        onChange={e => updateHc('ctaText', e.target.value)}
+                                        placeholder="お問い合わせ"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-muted-foreground mb-1">CTAリンク先</label>
+                                    <input
+                                        type="text"
+                                        value={hc.ctaLink || ''}
+                                        onChange={e => updateHc('ctaLink', e.target.value)}
+                                        placeholder="#contact"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2 self-end pb-1">
+                                    <input
+                                        type="checkbox"
+                                        id="tpl-sticky"
+                                        checked={hc.sticky !== false}
+                                        onChange={e => updateHc('sticky', e.target.checked)}
+                                        className="w-4 h-4 text-primary border-border rounded"
+                                    />
+                                    <label htmlFor="tpl-sticky" className="text-xs text-muted-foreground">スクロール時に固定</label>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* セクション画像一覧 */}
                 {detailTemplate.sections.length === 0 ? (
