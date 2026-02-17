@@ -559,20 +559,20 @@ export async function POST(request: NextRequest) {
         // Navigate to URL
         send({ type: 'progress', step: 'navigate', message: 'ページを読み込み中...' });
         log.info('Navigating to URL...');
-        // 本番環境では短いタイムアウト＆早めの完了条件を使用（Renderの制限対策）
-        // モバイルはさらに短く
-        const navigationTimeout = isDev ? 60000 : (device === 'mobile' ? 15000 : 20000);
-        const waitUntilOption = isDev ? 'networkidle2' : 'domcontentloaded';
+        // 本番環境でもnetworkidle2を使用（domcontentloadedだとJSリダイレクトが完了前に処理が進む）
+        const navigationTimeout = isDev ? 60000 : (device === 'mobile' ? 20000 : 25000);
         try {
-            await page.goto(url, { waitUntil: waitUntilOption as any, timeout: navigationTimeout });
+            await page.goto(url, { waitUntil: 'networkidle2', timeout: navigationTimeout });
         } catch (navError: any) {
             // タイムアウトでも続行を試みる（一部コンテンツは読み込まれている可能性）
-            if (navError.message?.includes('timeout')) {
+            if (navError.message?.includes('timeout') || navError.message?.includes('Timeout')) {
                 log.info('Navigation timeout, but continuing with partial content...');
             } else {
                 throw navError;
             }
         }
+        // JSリダイレクトが完了するまで少し待機
+        await new Promise(resolve => setTimeout(resolve, isDev ? 500 : 300));
 
         // 本番環境でモバイル時：CSS注入でアニメーション停止（処理高速化）
         if (!isDev && device === 'mobile') {
@@ -650,7 +650,11 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        await page.evaluate(() => window.scrollTo(0, 0));
+        try {
+            await page.evaluate(() => window.scrollTo(0, 0));
+        } catch (e: any) {
+            log.info(`Scroll to top skipped: ${e.message}`);
+        }
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Force load ALL images (including lazy-loaded ones)
@@ -697,88 +701,96 @@ export async function POST(request: NextRequest) {
 
         // Remove popups - LESS AGGRESSIVE to avoid removing legitimate content
         log.info('Removing popups...');
-        await page.evaluate(() => {
-            // Only target very specific popup/modal patterns
-            const modalSelectors = [
-                '[class*="cookie"]', '[class*="Cookie"]',
-                '[class*="consent"]', '[class*="gdpr"]', '[class*="GDPR"]',
-                '[role="dialog"]', '[role="alertdialog"]',
-                '[class*="newsletter-popup"]', '[class*="subscribe-popup"]',
-                '[id*="cookie"]', '[id*="consent"]',
-            ];
+        try {
+            await page.evaluate(() => {
+                // Only target very specific popup/modal patterns
+                const modalSelectors = [
+                    '[class*="cookie"]', '[class*="Cookie"]',
+                    '[class*="consent"]', '[class*="gdpr"]', '[class*="GDPR"]',
+                    '[role="dialog"]', '[role="alertdialog"]',
+                    '[class*="newsletter-popup"]', '[class*="subscribe-popup"]',
+                    '[id*="cookie"]', '[id*="consent"]',
+                ];
 
-            modalSelectors.forEach(selector => {
-                try {
-                    document.querySelectorAll(selector).forEach(el => {
-                        const element = el as HTMLElement;
-                        const computedStyle = window.getComputedStyle(element);
-                        const zIndex = parseInt(computedStyle.zIndex) || 0;
-                        // Only remove if it's a high z-index overlay (likely a popup)
-                        if (zIndex > 1000) {
-                            console.log(`[IMPORT] Removing popup: ${element.tagName}.${element.className}`);
-                            element.remove();
-                        }
-                    });
-                } catch (e) { }
+                modalSelectors.forEach(selector => {
+                    try {
+                        document.querySelectorAll(selector).forEach(el => {
+                            const element = el as HTMLElement;
+                            const computedStyle = window.getComputedStyle(element);
+                            const zIndex = parseInt(computedStyle.zIndex) || 0;
+                            // Only remove if it's a high z-index overlay (likely a popup)
+                            if (zIndex > 1000) {
+                                console.log(`[IMPORT] Removing popup: ${element.tagName}.${element.className}`);
+                                element.remove();
+                            }
+                        });
+                    } catch (e) { }
+                });
+
+                document.body.style.overflow = 'auto';
+                document.documentElement.style.overflow = 'auto';
             });
-
-            document.body.style.overflow = 'auto';
-            document.documentElement.style.overflow = 'auto';
-        });
+        } catch (popupError: any) {
+            log.info(`Popup removal skipped (navigation detected): ${popupError.message}`);
+        }
 
         await new Promise(resolve => setTimeout(resolve, isDev ? 500 : 50));
 
         // Fix fixed/sticky elements for proper fullPage screenshot
         // These elements repeat at every viewport position, corrupting the final image
         log.info('Disabling fixed/sticky elements to prevent repetition...');
-        await page.evaluate(() => {
-            // Collect ALL fixed/sticky elements in document order
-            const fixedElements: HTMLElement[] = [];
-            const allElements = document.querySelectorAll('*');
+        try {
+            await page.evaluate(() => {
+                // Collect ALL fixed/sticky elements in document order
+                const fixedElements: HTMLElement[] = [];
+                const allElements = document.querySelectorAll('*');
 
-            allElements.forEach(el => {
-                const element = el as HTMLElement;
-                const computedStyle = window.getComputedStyle(element);
-                const position = computedStyle.position;
+                allElements.forEach(el => {
+                    const element = el as HTMLElement;
+                    const computedStyle = window.getComputedStyle(element);
+                    const position = computedStyle.position;
 
-                if (position === 'fixed' || position === 'sticky') {
-                    fixedElements.push(element);
-                }
+                    if (position === 'fixed' || position === 'sticky') {
+                        fixedElements.push(element);
+                    }
+                });
+
+                console.log(`[IMPORT] Found ${fixedElements.length} fixed/sticky elements`);
+
+                // COMPLETELY REMOVE fixed elements from DOM
+                fixedElements.forEach((element) => {
+                    console.log(`[IMPORT] Removing from DOM: ${element.tagName}.${element.className}`);
+                    element.remove();
+                });
+
+                // Inject global CSS to hide any remaining fixed/sticky elements
+                // This catches elements that might be dynamically added or have inline styles
+                const style = document.createElement('style');
+                style.id = 'import-fix-fixed';
+                style.textContent = `
+                    [style*="position: fixed"],
+                    [style*="position:fixed"],
+                    [style*="position: sticky"],
+                    [style*="position:sticky"] {
+                        display: none !important;
+                        visibility: hidden !important;
+                        opacity: 0 !important;
+                    }
+                `;
+                document.head.appendChild(style);
+                console.log('[IMPORT] Injected global CSS to hide fixed elements');
+
+                // Force body/html settings
+                document.body.style.overflow = 'visible';
+                document.body.style.overflowX = 'hidden';
+                document.body.style.position = 'static';
+                document.documentElement.style.overflow = 'visible';
+                document.documentElement.style.overflowX = 'hidden';
+                document.documentElement.style.position = 'static';
             });
-
-            console.log(`[IMPORT] Found ${fixedElements.length} fixed/sticky elements`);
-
-            // COMPLETELY REMOVE fixed elements from DOM
-            fixedElements.forEach((element) => {
-                console.log(`[IMPORT] Removing from DOM: ${element.tagName}.${element.className}`);
-                element.remove();
-            });
-
-            // Inject global CSS to hide any remaining fixed/sticky elements
-            // This catches elements that might be dynamically added or have inline styles
-            const style = document.createElement('style');
-            style.id = 'import-fix-fixed';
-            style.textContent = `
-                [style*="position: fixed"],
-                [style*="position:fixed"],
-                [style*="position: sticky"],
-                [style*="position:sticky"] {
-                    display: none !important;
-                    visibility: hidden !important;
-                    opacity: 0 !important;
-                }
-            `;
-            document.head.appendChild(style);
-            console.log('[IMPORT] Injected global CSS to hide fixed elements');
-
-            // Force body/html settings
-            document.body.style.overflow = 'visible';
-            document.body.style.overflowX = 'hidden';
-            document.body.style.position = 'static';
-            document.documentElement.style.overflow = 'visible';
-            document.documentElement.style.overflowX = 'hidden';
-            document.documentElement.style.position = 'static';
-        });
+        } catch (fixedError: any) {
+            log.info(`Fixed element removal skipped (navigation detected): ${fixedError.message}`);
+        }
 
         await new Promise(resolve => setTimeout(resolve, isDev ? 300 : 100));
 
