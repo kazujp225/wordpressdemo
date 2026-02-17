@@ -1,15 +1,19 @@
 FROM node:20-slim
 
-# Install Chromium dependencies
+# Install Chromium dependencies + Japanese fonts
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-ipafont-gothic \
+    fonts-ipafont-mincho \
+    fonts-noto-cjk \
     fonts-wqy-zenhei \
     fonts-thai-tlwg \
     fonts-kacst \
     fonts-freefont-ttf \
+    fontconfig \
     libxss1 \
     --no-install-recommends \
+    && fc-cache -fv \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Puppeteer to skip Chromium download (we use system Chromium)
