@@ -58,6 +58,8 @@ export const headerConfigSchema = z.object({
         label: z.string(),
         href: z.string(),
     })).default([]),
+    headerHeight: z.enum(['sm', 'md', 'lg', 'xl']).default('md'),
+    logoSize: z.enum(['sm', 'md', 'lg', 'xl']).default('md'),
 });
 
 export type HeaderConfigInput = z.infer<typeof headerConfigSchema>;

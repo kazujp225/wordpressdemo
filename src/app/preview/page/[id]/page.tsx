@@ -20,6 +20,8 @@ interface HeaderConfig {
     ctaText?: string;
     ctaLink?: string;
     sticky?: boolean;
+    headerHeight?: string;
+    logoSize?: string;
 }
 
 interface PageData {
@@ -140,9 +142,10 @@ export default function PagePreviewPage() {
                     {/* Header */}
                     {pageData.headerConfig && (
                         <header
-                            className={`${pageData.headerConfig.sticky !== false ? 'sticky top-0' : 'relative'} z-40 flex h-14 items-center justify-between bg-white/95 px-4 shadow-sm backdrop-blur-md ${viewMode === 'mobile' ? 'px-3' : 'md:px-8'}`}
+                            className={`${pageData.headerConfig.sticky !== false ? 'sticky top-0' : 'relative'} z-40 flex items-center justify-between bg-white/95 px-4 shadow-sm backdrop-blur-md ${viewMode === 'mobile' ? 'px-3' : 'md:px-8'}`}
+                            style={{ height: ({ sm: 40, md: 56, lg: 72, xl: 88 } as Record<string, number>)[pageData.headerConfig.headerHeight || 'md'] || 56 }}
                         >
-                            <div className={`font-bold text-gray-900 ${viewMode === 'mobile' ? 'text-base' : 'text-xl'}`}>
+                            <div className={`font-bold text-gray-900 ${viewMode === 'mobile' ? 'text-base' : ({ sm: 'text-base', md: 'text-xl', lg: 'text-2xl', xl: 'text-3xl' } as Record<string, string>)[pageData.headerConfig.logoSize || 'md'] || 'text-xl'}`}>
                                 {pageData.headerConfig.logoText || pageData.title || 'My Brand'}
                             </div>
                             {viewMode !== 'mobile' && (

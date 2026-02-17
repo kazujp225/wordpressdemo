@@ -175,7 +175,9 @@ export default async function PublicPage({ params }: { params: { slug: string } 
         sticky: globalNavValue?.sticky ?? true,
         ctaText: globalNavValue?.ctaText || 'お問い合わせ',
         ctaLink: globalNavValue?.ctaLink || '#contact',
-        navItems: globalNavValue?.navItems || [] as any[]
+        navItems: globalNavValue?.navItems || [] as any[],
+        headerHeight: 'md' as string,
+        logoSize: 'md' as string,
     };
 
     // If individual page has specific header config, merge it (individual overrides global if desired, but here we prioritize global for B2B consistency or vice versa)
@@ -238,8 +240,11 @@ export default async function PublicPage({ params }: { params: { slug: string } 
             )}
 
             {/* Dynamic Header */}
-            <header className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex h-14 md:h-16 items-center justify-between bg-white/90 px-3 md:px-8 shadow-sm backdrop-blur-md gap-2`}>
-                <div className="text-sm md:text-xl font-bold text-blue-600 truncate max-w-[40%] md:max-w-none">
+            <header
+                className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex items-center justify-between bg-white/90 px-3 md:px-8 shadow-sm backdrop-blur-md gap-2`}
+                style={{ height: ({ sm: 40, md: 56, lg: 72, xl: 88 } as Record<string, number>)[headerConfig.headerHeight] || 56 }}
+            >
+                <div className={`${({ sm: 'text-xs md:text-base', md: 'text-sm md:text-xl', lg: 'text-base md:text-2xl', xl: 'text-lg md:text-3xl' } as Record<string, string>)[headerConfig.logoSize] || 'text-sm md:text-xl'} font-bold text-blue-600 truncate max-w-[40%] md:max-w-none`}>
                     {headerConfig.logoText}
                 </div>
                 <nav className="hidden md:flex gap-6">

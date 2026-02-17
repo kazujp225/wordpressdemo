@@ -103,7 +103,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             sticky: true,
             ctaText: '',
             ctaLink: '#contact',
-            navItems: [] as { id: string; label: string; href: string }[]
+            navItems: [] as { id: string; label: string; href: string }[],
+            headerHeight: 'md' as 'sm' | 'md' | 'lg' | 'xl',
+            logoSize: 'md' as 'sm' | 'md' | 'lg' | 'xl',
         };
         if (!initialHeaderConfig) return base;
         return { ...base, ...initialHeaderConfig, navItems: initialHeaderConfig.navItems || base.navItems };
@@ -4338,6 +4340,48 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                             placeholder="サイト名"
                                             className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                         />
+                                    </div>
+                                    )}
+                                </div>
+                                {/* サイズ設定 */}
+                                <div className="border-t border-gray-100 pt-1">
+                                    <button
+                                        onClick={() => toggleHeaderSection('size')}
+                                        className="flex items-center justify-between w-full cursor-pointer text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
+                                    >
+                                        <span>サイズ</span>
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('size') ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {headerOpenSections.has('size') && (
+                                    <div className="space-y-3 pt-1 pb-2">
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">ヘッダーの高さ</label>
+                                            <div className="grid grid-cols-4 gap-1">
+                                                {([['sm', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大']] as const).map(([val, label]) => (
+                                                    <button
+                                                        key={val}
+                                                        onClick={() => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, headerHeight: val }))}
+                                                        className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${(headerConfig.headerHeight || 'md') === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">ロゴの文字サイズ</label>
+                                            <div className="grid grid-cols-4 gap-1">
+                                                {([['sm', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大']] as const).map(([val, label]) => (
+                                                    <button
+                                                        key={val}
+                                                        onClick={() => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoSize: val }))}
+                                                        className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${(headerConfig.logoSize || 'md') === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                     )}
                                 </div>

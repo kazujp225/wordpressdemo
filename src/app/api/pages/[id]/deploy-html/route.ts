@@ -46,12 +46,14 @@ export async function GET(
     if (globalNav) globalNavValue = JSON.parse(globalNav.value);
   } catch { /* GlobalConfig table may not exist yet */ }
 
-  let headerConfig = {
+  let headerConfig: Record<string, any> = {
     logoText: globalNavValue?.logoText || page.title,
     sticky: globalNavValue?.sticky ?? true,
     ctaText: globalNavValue?.ctaText || 'お問い合わせ',
     ctaLink: globalNavValue?.ctaLink || '#contact',
     navItems: globalNavValue?.navItems || [] as any[],
+    headerHeight: 'md',
+    logoSize: 'md',
   };
 
   try {
@@ -164,8 +166,8 @@ export async function GET(
   <style>${cssContent}
   ${mobileMediaQuery}
   body { margin: 0; font-family: 'Noto Sans JP', sans-serif; background: #f9fafb; }
-  .header { ${headerConfig.sticky ? 'position:sticky;top:0;' : 'position:relative;'} z-index:50; display:flex; height:64px; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.9); padding:0 32px; box-shadow:0 1px 3px rgba(0,0,0,0.1); backdrop-filter:blur(8px); }
-  .header-logo { font-size:1.25rem; font-weight:700; color:#2563eb; }
+  .header { ${headerConfig.sticky ? 'position:sticky;top:0;' : 'position:relative;'} z-index:50; display:flex; height:${({ sm: 40, md: 64, lg: 80, xl: 96 } as Record<string, number>)[headerConfig.headerHeight] || 64}px; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.9); padding:0 32px; box-shadow:0 1px 3px rgba(0,0,0,0.1); backdrop-filter:blur(8px); }
+  .header-logo { font-size:${({ sm: '1rem', md: '1.25rem', lg: '1.5rem', xl: '1.875rem' } as Record<string, string>)[headerConfig.logoSize] || '1.25rem'}; font-weight:700; color:#2563eb; }
   .header-cta { display:inline-block; background:#2563eb; color:#fff; padding:8px 24px; border-radius:9999px; font-size:0.875rem; font-weight:700; text-decoration:none; box-shadow:0 4px 6px rgba(37,99,235,0.3); transition:transform 0.15s; }
   .header-cta:hover { transform:scale(1.05); }
   .main-content { max-width:768px; margin:0 auto; background:#fff; box-shadow:0 25px 50px -12px rgba(0,0,0,0.15); }
