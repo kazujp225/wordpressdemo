@@ -212,8 +212,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         resize: { title: '画像をリサイズ', keywords: ['リサイズ', 'サイズ変更', 'アスペクト比', '16:9', '1:1', 'バナー', 'SNS', 'AI拡張', 'outpaint'] },
         overlay: { title: 'ボタン・文字を重ねる', keywords: ['オーバーレイ', 'テキスト', 'ボタン'] },
         delete: { title: 'ブロックを削除', keywords: ['削除', '消す', 'remove'] },
-        background: { title: '背景色をそろえる', keywords: ['背景', '色', 'カラー'] },
-        colorPalette: { title: '色の組み合わせ', keywords: ['配色', 'パレット', 'テーマ'] },
         copyEdit: { title: '文字を修正', keywords: ['テキスト', 'AI', 'コピー', '編集', '文字', '修正', 'OCR'] },
         cta: { title: 'ボタンのリンク先', keywords: ['URL', 'リンク', 'ボタン', 'CTA'] },
         video: { title: '動画を埋め込む', keywords: ['YouTube', '動画', 'ビデオ', 'video'] },
@@ -4611,7 +4609,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     </EditorMenuSection>
 
                     {/* 見た目を調整する */}
-                    {isSectionVisible(['crop', 'resize', 'overlay', 'delete', 'background', 'colorPalette']) && (
+                    {isSectionVisible(['crop', 'resize', 'overlay', 'delete']) && (
                         <EditorMenuSection title="見た目を調整する" color="indigo">
                             {/* 画像を切り取る */}
                             {isMenuItemVisible('crop') && (
@@ -4774,69 +4772,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 </EditorMenuItem>
                             )}
 
-                            {/* 背景色をそろえる */}
-                            {isMenuItemVisible('background') && (
-                                <EditorMenuItem
-                                    icon={<Palette className="h-3.5 w-3.5" />}
-                                    title="背景色をそろえる"
-                                    description="全体の背景を同じ色に"
-                                    tooltip="選択したブロックの背景色を統一します"
-                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
-                                    action={
-                                        <EditorActionButton
-                                            onClick={() => {
-                                                if (planLimits?.canAIGenerate === false) {
-                                                    toast.error('有料プランにアップグレードしてご利用ください');
-                                                    return;
-                                                }
-                                                setBackgroundUnifyMode(true);
-                                                setBatchRegenerateMode(false);
-                                                setBoundaryFixMode(false);
-                                            }}
-                                            disabled={planLimits?.canAIGenerate === false || sections.filter(s => s.image?.filePath).length === 0}
-                                        >
-                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : 'ブロックを選ぶ'}
-                                        </EditorActionButton>
-                                    }
-                                />
-                            )}
-
-                            {/* 色の組み合わせ */}
-                            {isMenuItemVisible('colorPalette') && (
-                                <EditorMenuItem
-                                    icon={<Droplet className="h-3.5 w-3.5" />}
-                                    title="色の組み合わせ"
-                                    description="ページ全体の色を選ぶ"
-                                    tooltip="ページ全体の配色テーマを変更できます"
-                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
-                                    action={planLimits?.canAIGenerate === false ? (
-                                        <EditorActionButton
-                                            onClick={() => toast.error('有料プランにアップグレードしてご利用ください')}
-                                            disabled
-                                        >
-                                            アップグレード
-                                        </EditorActionButton>
-                                    ) : undefined}
-                                    open={planLimits?.canAIGenerate === false ? false : expandedTools.has('color-palette')}
-                                    onOpenChange={planLimits?.canAIGenerate === false ? undefined : (open) => {
-                                        if (open) {
-                                            setExpandedTools(prev => new Set([...prev, 'color-palette']));
-                                        } else {
-                                            setExpandedTools(prev => {
-                                                const next = new Set(prev);
-                                                next.delete('color-palette');
-                                                return next;
-                                            });
-                                        }
-                                    }}
-                                >
-                                    {planLimits?.canAIGenerate !== false && (
-                                        <EditorActionButton onClick={() => setShowColorPaletteModal(true)}>
-                                            色を選ぶ
-                                        </EditorActionButton>
-                                    )}
-                                </EditorMenuItem>
-                            )}
                         </EditorMenuSection>
                     )}
 
