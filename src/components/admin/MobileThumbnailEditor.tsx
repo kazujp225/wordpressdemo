@@ -176,7 +176,12 @@ export default function MobileThumbnailEditor({
             <div className="bg-white border-b px-4 py-3 flex items-center justify-between shrink-0">
                 <div>
                     <h2 className="text-base font-bold text-gray-900">サムネイル編集</h2>
-                    <p className="text-xs text-gray-500">画像の変更・AI変換</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-xs text-gray-500">画像の変更・AI変換</p>
+                        <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">
+                            出力: 1280×720px 固定
+                        </span>
+                    </div>
                 </div>
                 <button
                     onClick={() => { resetState(); onClose(); }}
@@ -206,8 +211,8 @@ export default function MobileThumbnailEditor({
                                         key={section.id}
                                         onClick={() => { setSelectedSectionId(section.id); setResultImage(''); }}
                                         className={`relative rounded-xl overflow-hidden border-2 transition-all aspect-[9/16] ${selectedSectionId === section.id
-                                                ? 'border-blue-500 ring-2 ring-blue-200 shadow-lg'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-blue-500 ring-2 ring-blue-200 shadow-lg'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <img
@@ -241,8 +246,8 @@ export default function MobileThumbnailEditor({
                                 <button
                                     onClick={() => setUploadMode('replace')}
                                     className={`p-3 rounded-xl border-2 text-center transition-all ${uploadMode === 'replace'
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-200 bg-white'
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-200 bg-white'
                                         }`}
                                 >
                                     <Upload className={`w-5 h-5 mx-auto mb-1.5 ${uploadMode === 'replace' ? 'text-blue-600' : 'text-gray-400'}`} />
@@ -254,8 +259,8 @@ export default function MobileThumbnailEditor({
                                 <button
                                     onClick={() => setUploadMode('transform')}
                                     className={`p-3 rounded-xl border-2 text-center transition-all ${uploadMode === 'transform'
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-200 bg-white'
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-200 bg-white'
                                         }`}
                                 >
                                     <RefreshCw className={`w-5 h-5 mx-auto mb-1.5 ${uploadMode === 'transform' ? 'text-blue-600' : 'text-gray-400'}`} />
