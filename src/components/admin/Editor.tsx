@@ -25,6 +25,7 @@ import SectionCropModal from '@/components/admin/SectionCropModal';
 import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
 import { CTA_TEMPLATES, getTemplateStyle } from '@/lib/cta-templates';
 import ThumbnailTransformModal from '@/components/admin/ThumbnailTransformModal';
+import MobileThumbnailEditor from '@/components/admin/MobileThumbnailEditor';
 import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
 import ClaudeCodeGeneratorModal from '@/components/admin/ClaudeCodeGeneratorModal';
 import HtmlCodeEditModal from '@/components/admin/HtmlCodeEditModal';
@@ -318,6 +319,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // 画像変換モーダル
     const [showThumbnailModal, setShowThumbnailModal] = useState(false);
     const [showDocumentModal, setShowDocumentModal] = useState(false);
+    const [showMobileThumbnailEditor, setShowMobileThumbnailEditor] = useState(false);
+    const [dismissedPCBanner, setDismissedPCBanner] = useState(false);
 
     // AIコード生成モーダル
     const [showClaudeGeneratorModal, setShowClaudeGeneratorModal] = useState(false);
@@ -2435,6 +2438,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         <span>プレビュー</span>
                     </button>
 
+                    {/* サムネイル編集（モバイル専用） */}
+                    <button
+                        onClick={() => setShowMobileThumbnailEditor(true)}
+                        className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2.5 rounded-lg text-xs font-bold transition-all min-h-[44px]"
+                    >
+                        <ImageIcon className="h-4 w-4" />
+                        <span>サムネ</span>
+                    </button>
+
                     {/* HD（Business/Enterpriseプランのみ） */}
                     {planLimits?.canUpscale4K && (
                         <button
@@ -2470,6 +2482,23 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 onChange={handleFileUpload}
                 className="hidden"
             />
+
+            {/* PC推奨バナー（モバイル表示時のみ） */}
+            {!dismissedPCBanner && (
+                <div className="lg:hidden mx-3 mt-3 mb-1 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                    <Monitor className="w-4 h-4 text-amber-600 shrink-0" />
+                    <p className="text-xs text-amber-700 flex-1">
+                        <span className="font-bold">本格編集はPCがおすすめです。</span>
+                        <span className="text-amber-600"> スマホではサムネイル変更が可能です。</span>
+                    </p>
+                    <button
+                        onClick={() => setDismissedPCBanner(true)}
+                        className="p-1 hover:bg-amber-100 rounded-md transition-colors shrink-0"
+                    >
+                        <X className="w-3.5 h-3.5 text-amber-500" />
+                    </button>
+                </div>
+            )}
 
             {/* 完全LPプレビュー - メインビュー */}
             <div className="flex justify-center pt-4 pb-24 lg:py-20 px-2 sm:px-4">
@@ -6925,6 +6954,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                 isOpen={showThumbnailModal}
                 onClose={() => setShowThumbnailModal(false)}
                 sections={sections}
+            />
+
+            {/* モバイル用サムネイル編集 */}
+            <MobileThumbnailEditor
+                isOpen={showMobileThumbnailEditor}
+                onClose={() => setShowMobileThumbnailEditor(false)}
+                sections={sections}
+                onSectionImageUpdate={(sectionId, newImageUrl) => {
+                    setSections(prev => prev.map(s =>
+                        String(s.id) === String(sectionId)
+                            ? { ...s, image: { ...s.image, filePath: newImageUrl } }
+                            : s
+                    ));
+                }}
             />
 
             {/* 資料化モーダル */}
