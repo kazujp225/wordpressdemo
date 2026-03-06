@@ -123,7 +123,7 @@ export default function ColorPaletteModal({
     if (!isOpen) return null;
 
     const imageCount = sections.filter(s => s.image?.filePath).length;
-    const estimatedCost = estimateImageCost('gemini-3-pro-image-preview', imageCount);
+    const estimatedCost = estimateImageCost('gemini-3.1-flash-image-preview', imageCount);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">

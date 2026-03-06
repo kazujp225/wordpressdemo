@@ -21,10 +21,10 @@ const MODELS = {
     // テキスト生成
     TEXT: 'gemini-2.5-flash',
     // 画像生成: Gemini 3 Pro Image (Nano Banana Pro) - 高品質・日本語指示に強い
-    IMAGE: 'gemini-3-pro-image-preview',
+    IMAGE: 'gemini-3.1-flash-image-preview',
 } as const;
 
-// 9:16の解像度（gemini-3-pro-image-preview）
+// 9:16の解像度（gemini-3.1-flash-image-preview）
 const IMAGE_DIMENSIONS = {
     width: 768,
     height: 1376,

@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
     const isBannerEdit = request.headers.get('x-source') === 'banner';
 
     // クレジット残高チェック（先にチェックのみ）
-    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1, { isBannerEdit });
+    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3.1-flash-image-preview', 1, { isBannerEdit });
     if (!limitCheck.allowed) {
         if (limitCheck.needApiKey) {
             return NextResponse.json({
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
     }
 
     skipCreditConsumption = limitCheck.skipCreditConsumption || false;
-    const estimatedCost = estimateImageCost('gemini-3-pro-image-preview', 1);
+    const estimatedCost = estimateImageCost('gemini-3.1-flash-image-preview', 1);
 
     // ★ 先払い方式: API呼び出し前にクレジットを原子的に減算
     if (!skipCreditConsumption) {
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
             user.id,
             estimatedCost,
             requestId,
-            'API使用: gemini-3-pro-image-preview (inpaint)'
+            'API使用: gemini-3.1-flash-image-preview (inpaint)'
         );
 
         if (!deductResult.success) {
@@ -450,7 +450,7 @@ User instruction: ${prompt}`;
             inpaintPrompt = `Edit this image: ${prompt}`;
         }
 
-        const MODEL_ID = 'gemini-3-pro-image-preview';
+        const MODEL_ID = 'gemini-3.1-flash-image-preview';
 
         // リクエストのpartsを構築
         const requestParts: any[] = [];
@@ -546,7 +546,7 @@ User instruction: ${prompt}`;
         }
 
         const data = await response.json();
-        const modelUsed = 'gemini-3-pro-image-preview';
+        const modelUsed = 'gemini-3.1-flash-image-preview';
         const durationMs = Date.now() - startTime;
 
         // 履歴用データを準備
@@ -628,7 +628,7 @@ User instruction: ${prompt}`;
             userId: user.id,
             type: 'inpaint',
             endpoint: '/api/ai/inpaint',
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-3.1-flash-image-preview',
             inputPrompt: inpaintPrompt || 'Error before prompt',
             status: 'failed',
             errorMessage: error.message,

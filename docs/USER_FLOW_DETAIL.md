@@ -599,15 +599,15 @@ INSERT INTO media_images (user_id, file_path, width, height, prompt, source_type
 VALUES ('uuid-xxx', 'images/xxx/123.png', 750, 400, 'パーソナルジム...', 'generated');
 
 -- CreditBalance
-UPDATE credit_balances SET balance_usd = balance_usd - 0.134 WHERE user_id = 'uuid-xxx';
+UPDATE credit_balances SET balance_usd = balance_usd - 0.067 WHERE user_id = 'uuid-xxx';
 
 -- CreditTransaction
 INSERT INTO credit_transactions (user_id, type, amount_usd, generation_run_id)
-VALUES ('uuid-xxx', 'api_usage', -0.134, 'run-xxx');
+VALUES ('uuid-xxx', 'api_usage', -0.067, 'run-xxx');
 
 -- GenerationRun
 INSERT INTO generation_runs (user_id, type, model, input_prompt, estimated_cost, status)
-VALUES ('uuid-xxx', 'section_generate', 'gemini-3-pro-image', '...', 0.134, 'succeeded');
+VALUES ('uuid-xxx', 'section_generate', 'gemini-3.1-flash-image-preview', '...', 0.067, 'succeeded');
 ```
 
 ### 6-3. セクション設定保存

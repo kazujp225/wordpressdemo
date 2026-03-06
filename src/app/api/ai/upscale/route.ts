@@ -23,7 +23,7 @@ interface UpscaleRequest {
 }
 
 const ENDPOINT = '/api/ai/upscale';
-const MODEL = 'gemini-3-pro-image-preview';
+const MODEL = 'gemini-3.1-flash-image-preview';
 
 export async function POST(request: NextRequest) {
     const startTime = createTimer();

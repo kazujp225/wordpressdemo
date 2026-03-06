@@ -42,12 +42,12 @@ const PAGE_ID = 49;
 
 // モデル定義
 const MODELS = {
-    IMAGE_PRIMARY: 'gemini-3-pro-image-preview',
+    IMAGE_PRIMARY: 'gemini-3.1-flash-image-preview',
     IMAGE_FALLBACK: 'gemini-2.5-flash-image',
 };
 
 const IMAGE_DIMENSIONS: Record<string, { width: number; height: number }> = {
-    'gemini-3-pro-image-preview': { width: 768, height: 1376 },
+    'gemini-3.1-flash-image-preview': { width: 768, height: 1376 },
     'gemini-2.5-flash-image': { width: 768, height: 1344 },
 };
 

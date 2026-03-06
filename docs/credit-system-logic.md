@@ -72,20 +72,21 @@ description: '${planName}プラン月間クレジット付与'
 #### 画像生成・編集（Gemini） — 解像度別料金
 | モデル | 解像度 | トークン数 | コスト |
 |--------|--------|-----------|--------|
-| gemini-3-pro-image-preview | 1K/2K (〜2048px) | 1,120 | **$0.134/画像** |
-| gemini-3-pro-image-preview | 4K (〜4096px) | 2,000 | **$0.24/画像** |
+| gemini-3.1-flash-image-preview | 1K (〜1024px) | 1,120 | **$0.067/画像** |
+| gemini-3.1-flash-image-preview | 2K (〜2048px) | 1,680 | **$0.101/画像** |
+| gemini-3.1-flash-image-preview | 4K (〜4096px) | 2,520 | **$0.151/画像** |
 
 **解像度別適用ルート:**
 | APIルート | 出力解像度 | 適用コスト |
 |-----------|-----------|-----------|
-| `/api/ai/generate-image` | 4K（ハードコード） | $0.24 |
-| `/api/ai/text-fix` | 4K（ハードコード） | $0.24 |
+| `/api/ai/generate-image` | 4K（ハードコード） | $0.151 |
+| `/api/ai/text-fix` | 4K（ハードコード） | $0.151 |
 | `/api/ai/background-unify` | ユーザー指定(1K/2K/4K) | 解像度に応じて変動 |
-| `/api/ai/inpaint` | デフォルト(1K) | $0.134 |
-| `/api/ai/upscale` | デフォルト(1K) | $0.134 |
-| `/api/ai/generate-banner` | デフォルト(1K) | $0.134 |
-| `/api/ai/edit-image` | デフォルト(1K) | $0.134 |
-| `/api/ai/outpaint` | デフォルト(1K) | $0.134 |
+| `/api/ai/inpaint` | デフォルト(1K) | $0.067 |
+| `/api/ai/upscale` | デフォルト(1K) | $0.067 |
+| `/api/ai/generate-banner` | デフォルト(1K) | $0.067 |
+| `/api/ai/edit-image` | デフォルト(1K) | $0.067 |
+| `/api/ai/outpaint` | デフォルト(1K) | $0.067 |
 
 #### テキスト生成（Gemini）
 | モデル | 入力(1Mトークン) | 出力(1Mトークン) |
@@ -192,8 +193,9 @@ adminId: 操作した管理者のID
 
 | 操作 | 単価 | 月間回数目安 |
 |------|------|-------------|
-| 画像生成 1K/2K (Gemini) | $0.134 | 約622回 |
-| 画像生成 4K (Gemini) | $0.24 | 約347回 |
+| 画像生成 1K (Gemini) | $0.067 | 約1,243回 |
+| 画像生成 2K (Gemini) | $0.101 | 約825回 |
+| 画像生成 4K (Gemini) | $0.151 | 約552回 |
 | テキスト生成 (Gemini Flash) | 約$0.0004/1K tokens | 約208,000回(1Kトークン) |
 | テキスト生成 (Claude Sonnet) | 約$0.018/1K tokens | 約4,600回(1Kトークン) |
 | 動画生成 (5秒) | $1.75 | 約47回 |
@@ -230,5 +232,5 @@ createdAt: DateTime
 
 ---
 
-*最終更新: 2026-02-16（解像度別料金対応済み）*
+*最終更新: 2026-03-06（gemini-3.1-flash-image-preview移行・解像度別料金更新）*
 *ソースコード: `src/lib/plans.ts`, `src/lib/credits.ts`, `src/lib/ai-costs.ts`, `src/lib/usage.ts`*

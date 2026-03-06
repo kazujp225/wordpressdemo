@@ -219,7 +219,7 @@ export async function POST(
                     const totalSections = sectionsWithImages.length;
 
                     // クレジット上限チェック（2K解像度 × セクション数）
-                    const creditCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', totalSections, undefined, '2K');
+                    const creditCheck = await checkImageGenerationLimit(user.id, 'gemini-3.1-flash-image-preview', totalSections, undefined, '2K');
                     if (!creditCheck.allowed) {
                         send({ type: 'error', error: creditCheck.reason || 'クレジットが不足しています。設定からクレジットを追加してください。' });
                         controller.close();
@@ -271,7 +271,7 @@ export async function POST(
                             // Gemini API でテキスト差し替え
                             const startTime = createTimer();
                             const geminiRes = await fetch(
-                                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
                                 {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -347,7 +347,7 @@ export async function POST(
                                     userId: user.id,
                                     type: 'template-gen',
                                     endpoint: '/api/templates/copy',
-                                    model: 'gemini-3-pro-image-preview',
+                                    model: 'gemini-3.1-flash-image-preview',
                                     inputPrompt: prompt.substring(0, 500),
                                     imageCount: 1,
                                     status: 'succeeded',
@@ -357,7 +357,7 @@ export async function POST(
 
                                 if (logResult) {
                                     await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
-                                        model: 'gemini-3-pro-image-preview',
+                                        model: 'gemini-3.1-flash-image-preview',
                                         imageCount: 1,
                                     });
                                 }

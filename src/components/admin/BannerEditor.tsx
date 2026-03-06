@@ -57,7 +57,7 @@ const VARIATION_ANGLES = [
     { label: '背景違い', suffix: '背景デザインを変えたバージョン' },
 ];
 
-const INPAINT_COST_USD = 0.134;
+const INPAINT_COST_USD = 0.134; // 据え置き
 
 const SELECTION_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'];
 const SELECTION_BG_COLORS = ['bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-violet-500'];

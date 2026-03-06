@@ -19,7 +19,7 @@ const ENDPOINT = '/api/ai/edit-image';
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
     let editPrompt = '';
-    const modelUsed = 'gemini-3-pro-image-preview';
+    const modelUsed = 'gemini-3.1-flash-image-preview';
 
     // ユーザー認証を確認
     const supabaseClient = await createClient();
@@ -202,7 +202,7 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             try {
                 console.log(`[EDIT-IMAGE] Attempt ${attempt}/${maxRetries}...`);
                 response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

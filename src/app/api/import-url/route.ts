@@ -224,7 +224,7 @@ ${additionalInstructions}
         parts.push({ text: hasStyleReference ? `↑ 処理対象画像\n\n${prompt}` : prompt });
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -263,7 +263,7 @@ ${additionalInstructions}
                     userId,
                     type: 'import-arrange',
                     endpoint: '/api/import-url',
-                    model: 'gemini-3-pro-image-preview',
+                    model: 'gemini-3.1-flash-image-preview',
                     inputPrompt: prompt,
                     imageCount: 1,
                     status: 'succeeded',
@@ -273,7 +273,7 @@ ${additionalInstructions}
                 // クレジット消費（自分のAPIキー使用時はスキップ）
                 if (logResult && userId && !skipCreditConsumption) {
                     await recordApiUsage(userId, logResult.id, logResult.estimatedCost, {
-                        model: 'gemini-3-pro-image-preview',
+                        model: 'gemini-3.1-flash-image-preview',
                         imageCount: 1,
                     });
                     log.info(`[AI] Credit consumed: $${logResult.estimatedCost.toFixed(6)}`);
@@ -293,7 +293,7 @@ ${additionalInstructions}
             userId,
             type: 'import-arrange',
             endpoint: '/api/import-url',
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-3.1-flash-image-preview',
             inputPrompt: prompt,
             status: 'failed',
             errorMessage: error.message,

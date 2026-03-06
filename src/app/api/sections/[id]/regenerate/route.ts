@@ -549,7 +549,7 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
 
         // Gemini API呼び出し
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${googleApiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${googleApiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -628,7 +628,7 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
             userId: user.id,
             type: 'import-arrange',
             endpoint: '/api/sections/[id]/regenerate',
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-3.1-flash-image-preview',
             inputPrompt: prompt,
             imageCount: 1,
             status: 'succeeded',

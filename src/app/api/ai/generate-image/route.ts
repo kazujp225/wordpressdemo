@@ -52,7 +52,7 @@ const ASPECT_RATIOS: Record<string, { width: number; height: number; prompt: str
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
     let imagePrompt = '';
-    const modelUsed = 'gemini-3-pro-image-preview';
+    const modelUsed = 'gemini-3.1-flash-image-preview';
 
     // リクエストIDを生成（冪等性キー）
     // クライアントから送られてきた場合はそれを使用、なければ生成
@@ -284,7 +284,7 @@ Generate the image to EXACTLY match this visual style and color palette.
             try {
                 console.log(`[GENERATE-IMAGE] Attempt ${attempt}/${maxRetries}...`);
                 response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

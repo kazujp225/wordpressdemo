@@ -133,7 +133,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
 
         // Gemini API呼び出し
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -270,7 +270,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
             userId: user.id,
             type: 'design-unify',
             endpoint: '/api/ai/design-unify',
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-3.1-flash-image-preview',
             inputPrompt: unifyPrompt,
             imageCount: 1,
             status: 'succeeded',
@@ -280,7 +280,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
         // クレジット消費（自分のAPIキー使用時はスキップ）
         if (logResult && !limitCheck.skipCreditConsumption) {
             await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
-                model: 'gemini-3-pro-image-preview',
+                model: 'gemini-3.1-flash-image-preview',
                 imageCount: 1,
             });
             log.info(`Credit consumed: $${logResult.estimatedCost.toFixed(6)}`);

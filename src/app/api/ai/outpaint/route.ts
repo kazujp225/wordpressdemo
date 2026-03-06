@@ -17,7 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
 export const maxDuration = 60;
 
 const ENDPOINT = '/api/ai/outpaint';
-const MODEL = 'gemini-3-pro-image-preview';
+const MODEL = 'gemini-3.1-flash-image-preview';
 
 export async function POST(request: NextRequest) {
     const supabase = await createClient();
@@ -179,7 +179,7 @@ ${prompt ? `【追加指示】\n${prompt}` : '【拡張内容】\n周囲の背�
         let response: Response;
         try {
             response = await fetchWithRetry(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

@@ -14,13 +14,13 @@
 
 | エンドポイント | トリガーとなるアクション | 使用モデル | 推定コスト |
 |--------------|----------------------|-----------|----------|
-| `/api/ai/generate-image` | 新規画像生成 | gemini-3-pro-image-preview | $0.04 / 60トークン |
-| `/api/ai/edit-image` | 画像編集・リブランディング | gemini-3-pro-image-preview | $0.04 / 60トークン |
-| `/api/ai/inpaint` | 画像の部分修正（インペイント） | gemini-3-pro-image-preview | $0.04 / 60トークン |
-| `/api/ai/text-fix` | 画像内テキストの文字化け修正 | gemini-3-pro-image-preview | $0.04 / 60トークン |
-| `/api/ai/background-unify` | 背景色の統一 | gemini-3-pro-image-preview | $0.04 / 60トークン |
-| `/api/ai/design-unify` | デザインスタイルの統一 | gemini-3-pro-image-preview | $0.04 / 60トークン |
-| `/api/ai/image-transform` | サムネイル変換・資料化 | gemini-3-pro-image-preview | $0.04 / 60トークン |
+| `/api/ai/generate-image` | 新規画像生成 | gemini-3.1-flash-image-preview | $0.151(4K) / 約227トークン |
+| `/api/ai/edit-image` | 画像編集・リブランディング | gemini-3.1-flash-image-preview | $0.067(1K) / 約101トークン |
+| `/api/ai/inpaint` | 画像の部分修正（インペイント） | gemini-3.1-flash-image-preview | $0.067(1K) / 約101トークン |
+| `/api/ai/text-fix` | 画像内テキストの文字化け修正 | gemini-3.1-flash-image-preview | $0.151(4K) / 約227トークン |
+| `/api/ai/background-unify` | 背景色の統一 | gemini-3.1-flash-image-preview | $0.067〜0.151 / 解像度依存 |
+| `/api/ai/design-unify` | デザインスタイルの統一 | gemini-3.1-flash-image-preview | $0.067(1K) / 約101トークン |
+| `/api/ai/image-transform` | サムネイル変換・資料化 | gemini-3.1-flash-image-preview | $0.067(1K) / 約101トークン |
 | `/api/ai/upscale` | 画像の高解像度化（AI超解像） | real-esrgan | $0.02 / 30トークン |
 
 ---

@@ -226,7 +226,7 @@ export async function checkGenerationLimit(
  */
 export async function checkImageGenerationLimit(
   userId: string,
-  model: string = 'gemini-3-pro-image-preview',
+  model: string = 'gemini-3.1-flash-image-preview',
   imageCount: number = 1,
   context?: { isBannerEdit?: boolean },
   resolution?: ImageResolution

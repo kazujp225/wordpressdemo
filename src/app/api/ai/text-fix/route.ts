@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // クレジット残高チェック（4K出力のため4K料金で計算）
-    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3-pro-image-preview', 1, undefined, '4K');
+    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3.1-flash-image-preview', 1, undefined, '4K');
     if (!limitCheck.allowed) {
         if (limitCheck.needApiKey) {
             return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });
@@ -159,7 +159,7 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
 
         // Gemini 3.0 Pro Image で画像生成
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -199,7 +199,7 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
         }
 
         const data = await response.json();
-        const modelUsed = 'gemini-3-pro-image-preview';
+        const modelUsed = 'gemini-3.1-flash-image-preview';
         const estimatedCost = estimateImageCost(modelUsed, 1, '4K');
         const durationMs = Date.now() - startTime;
 
@@ -302,7 +302,7 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
             userId: user.id,
             type: 'text-fix',
             endpoint: '/api/ai/text-fix',
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-3.1-flash-image-preview',
             inputPrompt: textFixPrompt || 'Error before prompt',
             status: 'failed',
             errorMessage: error.message,

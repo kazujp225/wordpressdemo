@@ -34,7 +34,7 @@ setCreditBalance(data.creditBalanceUsd || 0);
 ```
 data.creditBalanceUsd → undefined
 undefined || 0 → 0（残高0と判定）
-0 < 0.134（INPAINT_COST_USD）→ true
+0 < 0.067（INPAINT_COST_USD）→ true
 → hasInsufficientCredit = true → 「クレジット不足」表示
 ```
 

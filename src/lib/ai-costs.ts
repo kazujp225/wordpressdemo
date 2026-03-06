@@ -1,15 +1,19 @@
 // Gemini API Pricing (per 1M tokens / per image)
-// Source: https://ai.google.dev/pricing
-// Image pricing: 1K/2K = 1120 tokens × $120/1M = $0.134, 4K = 2000 tokens × $120/1M = $0.24
+// Source: https://ai.google.dev/gemini-api/docs/pricing
+// Image pricing (gemini-3.1-flash-image-preview): $60/1M output tokens
+//   1K = 1120 tokens × $60/1M = $0.067
+//   2K = 1680 tokens × $60/1M = $0.101
+//   4K = 2520 tokens × $60/1M = $0.151
 
 // 画像出力解像度の型定義
 export type ImageResolution = '1K' | '2K' | '4K';
 
-// 解像度別の画像生成コスト（USD/枚）
+// 解像度別の画像生成コスト（USD/枚）— ユーザー課金額（据え置き）
+// ※ 実際のAPI原価: 1K=$0.067, 2K=$0.101, 4K=$0.151（gemini-3.1-flash-image-preview, $60/1M tokens）
 const IMAGE_COST_BY_RESOLUTION: Record<ImageResolution, number> = {
-  '1K': 0.134,  // 1120 tokens × $120/1M
-  '2K': 0.134,  // 1120 tokens × $120/1M（1Kと同額）
-  '4K': 0.24,   // 2000 tokens × $120/1M
+  '1K': 0.134,  // 据え置き（API原価: $0.067）
+  '2K': 0.134,  // 据え置き（API原価: $0.101）
+  '4K': 0.24,   // 据え置き（API原価: $0.151）
 };
 
 export const AI_COSTS = {
@@ -36,7 +40,7 @@ export const GEMINI_PRICING = {
     type: 'text' as const
   },
   // Image Models (per image, resolution-dependent)
-  'gemini-3-pro-image-preview': {
+  'gemini-3.1-flash-image-preview': {
     perImage: IMAGE_COST_BY_RESOLUTION,
     type: 'image' as const
   },
@@ -113,7 +117,7 @@ export function getModelDisplayName(model: string): string {
     'gemini-2.0-flash': 'Gemini 2.0 Flash',
     'gemini-1.5-flash': 'Gemini 1.5 Flash',
     'gemini-1.5-flash-latest': 'Gemini 1.5 Flash',
-    'gemini-3-pro-image-preview': 'Gemini 3 Pro Image (Nano Banana Pro)',
+    'gemini-3.1-flash-image-preview': 'Gemini 3.1 Flash Image (Nano Banana 2)',
     'veo-2.0-generate-001': 'Veo 2 Video',
     'claude-sonnet-4-20250514': 'Claude Sonnet 4',
   };

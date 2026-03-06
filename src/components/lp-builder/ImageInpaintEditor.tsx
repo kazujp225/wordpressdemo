@@ -7,7 +7,7 @@ import { TextFixModule } from './TextFixModule';
 import type { ClickableArea, FormFieldConfig, ViewportType } from '@/types';
 import { usdToTokens, formatTokens } from '@/lib/plans';
 
-// インペイントの推定コスト（USD）
+// インペイントの推定コスト（USD）— 据え置き
 const INPAINT_COST_USD = 0.134;
 
 // デザイン定義の型

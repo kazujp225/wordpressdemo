@@ -18,7 +18,7 @@ const ENDPOINT = '/api/ai/generate-banner';
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
     let bannerPrompt = '';
-    const modelUsed = 'gemini-3-pro-image-preview';
+    const modelUsed = 'gemini-3.1-flash-image-preview';
 
     // ユーザー認証
     const supabaseClient = await createClient();
@@ -205,7 +205,7 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             try {
                 console.log(`[BANNER-GEN] Attempt ${attempt}/${maxRetries}...`);
                 response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

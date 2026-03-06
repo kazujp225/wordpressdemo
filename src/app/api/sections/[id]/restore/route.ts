@@ -235,7 +235,7 @@ export async function POST(
             userId: user.id,
             type: 'boundary-design',
             endpoint: `/api/sections/${sectionId}/restore`,
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-3.1-flash-image-preview',
             inputPrompt: prompt,
             imageCount: 1,
             status: 'succeeded',
@@ -245,7 +245,7 @@ export async function POST(
         // クレジット消費（自分のAPIキー使用時はスキップ）
         if (logResult && !limitCheck.skipCreditConsumption) {
             await recordApiUsage(user.id, logResult.id, logResult.estimatedCost, {
-                model: 'gemini-3-pro-image-preview',
+                model: 'gemini-3.1-flash-image-preview',
                 imageCount: 1,
             });
             log.info(`Credit consumed: $${logResult.estimatedCost.toFixed(6)}`);
@@ -328,7 +328,7 @@ ${userPrompt}
 
         // Gemini 3.0 Pro（画像生成・編集に最適）を使用
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

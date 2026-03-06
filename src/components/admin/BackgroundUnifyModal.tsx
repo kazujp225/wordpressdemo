@@ -32,9 +32,8 @@ const RESOLUTION_OPTIONS: { value: Resolution; label: string; desc: string }[] =
     { value: '4K', label: '4K', desc: '最高品質' },
 ];
 
-// 解像度別の1枚あたりクレジット数（USD→クレジット変換済み）
-// 1K/2K: $0.134 × 10000 ≈ 1,340 → 表示上1,300
-// 4K: $0.24 × 10000 ≈ 2,400
+// 解像度別の1枚あたりクレジット数（USD→クレジット変換済み）— 据え置き
+// ※ API原価は下がったがユーザー課金額は維持
 const CREDITS_PER_IMAGE: Record<Resolution, number> = {
     '1K': 1300,
     '2K': 1300,

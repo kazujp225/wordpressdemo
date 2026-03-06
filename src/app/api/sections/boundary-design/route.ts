@@ -134,7 +134,7 @@ ${targetWidth}x${boundaryHeight}pxの画像を1枚だけ生成してください
         log.info(`Generating boundary: ${targetWidth}x${boundaryHeight}px`);
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -170,7 +170,7 @@ ${targetWidth}x${boundaryHeight}pxの画像を1枚だけ生成してください
                     userId,
                     type: 'boundary-design',
                     endpoint: '/api/sections/boundary-design',
-                    model: 'gemini-3-pro-image-preview',
+                    model: 'gemini-3.1-flash-image-preview',
                     inputPrompt: prompt,
                     imageCount: 1,
                     status: 'succeeded',
@@ -180,7 +180,7 @@ ${targetWidth}x${boundaryHeight}pxの画像を1枚だけ生成してください
                 // クレジット消費（自分のAPIキー使用時はスキップ）
                 if (logResult && !skipCreditConsumption) {
                     await recordApiUsage(userId, logResult.id, logResult.estimatedCost, {
-                        model: 'gemini-3-pro-image-preview',
+                        model: 'gemini-3.1-flash-image-preview',
                         imageCount: 1,
                     });
                     log.info(`Credit consumed: $${logResult.estimatedCost.toFixed(6)}`);
