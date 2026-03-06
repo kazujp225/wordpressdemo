@@ -236,21 +236,20 @@ ${designDefinition.style?.buttonStyle ? `【ボタン】\n${designDefinition.sty
 
         log.info(`Style reference: userRef=${useUserReference}, autoRef=${useAutoReference}, useRef=${useStyleReference}, samplingMode=${isSamplingMode}`);
 
-        let styleReferenceBuffer: Buffer | null = null;
-        if (useStyleReference) {
-            const refUrl = useUserReference ? styleReferenceUrl : firstSection?.image?.filePath;
-            if (refUrl) {
-                try {
-                    log.info(`Fetching style reference image: ${useUserReference ? 'user-specified' : 'first section'}...`);
-                    const refResponse = await fetch(refUrl);
-                    const refArrayBuffer = await refResponse.arrayBuffer();
-                    styleReferenceBuffer = Buffer.from(refArrayBuffer);
-                    log.success(`Style reference image loaded (${styleReferenceBuffer.length} bytes)`);
-                } catch (error: any) {
-                    log.error(`Failed to load style reference: ${error.message}`);
-                }
-            }
-        }
+        // 参照画像とターゲット画像を並列フェッチ
+        const styleRefUrl = useStyleReference
+            ? (useUserReference ? styleReferenceUrl : firstSection?.image?.filePath)
+            : null;
+
+        const [styleReferenceBuffer, imageResponse] = await Promise.all([
+            styleRefUrl
+                ? fetch(styleRefUrl)
+                    .then(r => r.arrayBuffer())
+                    .then(ab => { const buf = Buffer.from(ab); log.success(`Style reference loaded (${buf.length} bytes)`); return buf; })
+                    .catch((e: any) => { log.error(`Failed to load style reference: ${e.message}`); return null; })
+                : Promise.resolve(null),
+            fetch(targetImageData.filePath),
+        ]);
 
         // 参照画像がある場合は一貫性指示を追加
         // モバイル用の場合は、デスクトップとの一致を最優先にする
@@ -398,8 +397,7 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
 
         log.info(`Processing with ${mode} mode, style: ${style}${styleReferenceBuffer ? (useUserReference ? ' (with USER-SPECIFIED style reference)' : ' (with auto style reference)') : ''}`);
 
-        // 画像をダウンロード
-        const imageResponse = await fetch(targetImageData.filePath);
+        // 画像データ取得（並列フェッチ済み）
         const imageArrayBuffer = await imageResponse.arrayBuffer();
         let imageBuffer = Buffer.from(imageArrayBuffer);
 
@@ -414,74 +412,54 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
             const currentWidth = currentMeta.width || 750;
             const currentHeight = currentMeta.height || 400;
 
-            // 前のセクション画像（上方向に拡張する場合）
-            let topExtensionBuffer: Buffer | null = null;
-            let topExtensionHeight = 0;
-            if (boundaryOffsetTop && boundaryOffsetTop > 0 && segmentIndex > 0) {
-                const prevSection = allSections[segmentIndex - 1];
-                const prevImageUrl = isMobile ? prevSection.mobileImage?.filePath : prevSection.image?.filePath;
-                if (prevImageUrl) {
+            // 前後のセクション画像を並列フェッチ＆切り出し
+            const prevImageUrl = (boundaryOffsetTop && boundaryOffsetTop > 0 && segmentIndex > 0)
+                ? (isMobile ? allSections[segmentIndex - 1].mobileImage?.filePath : allSections[segmentIndex - 1].image?.filePath)
+                : null;
+            const nextImageUrl = (boundaryOffsetBottom && boundaryOffsetBottom > 0 && segmentIndex < allSections.length - 1)
+                ? (isMobile ? allSections[segmentIndex + 1].mobileImage?.filePath : allSections[segmentIndex + 1].image?.filePath)
+                : null;
+
+            const [topResult, bottomResult] = await Promise.all([
+                prevImageUrl ? (async () => {
                     try {
-                        const prevResponse = await fetch(prevImageUrl);
-                        const prevBuffer = Buffer.from(await prevResponse.arrayBuffer());
+                        const prevBuffer = Buffer.from(await (await fetch(prevImageUrl)).arrayBuffer());
                         const prevMeta = await sharp(prevBuffer).metadata();
-
-                        // 前のセクションの下部からboundaryOffsetTop分を切り出す
-                        const extractHeight = Math.min(boundaryOffsetTop, prevMeta.height || 0);
+                        const extractHeight = Math.min(boundaryOffsetTop!, prevMeta.height || 0);
                         const extractTop = (prevMeta.height || 0) - extractHeight;
-
                         if (extractHeight > 0) {
-                            topExtensionBuffer = await sharp(prevBuffer)
-                                .extract({
-                                    left: 0,
-                                    top: extractTop,
-                                    width: prevMeta.width || currentWidth,
-                                    height: extractHeight
-                                })
-                                .resize(currentWidth, extractHeight) // 幅を合わせる
+                            const buf = await sharp(prevBuffer)
+                                .extract({ left: 0, top: extractTop, width: prevMeta.width || currentWidth, height: extractHeight })
+                                .resize(currentWidth, extractHeight)
                                 .toBuffer();
-                            topExtensionHeight = extractHeight;
                             log.info(`Extracted ${extractHeight}px from previous section for top extension`);
+                            return { buffer: buf, height: extractHeight };
                         }
-                    } catch (e: any) {
-                        log.error(`Failed to extract top extension: ${e.message}`);
-                    }
-                }
-            }
-
-            // 次のセクション画像（下方向に拡張する場合）
-            let bottomExtensionBuffer: Buffer | null = null;
-            let bottomExtensionHeight = 0;
-            if (boundaryOffsetBottom && boundaryOffsetBottom > 0 && segmentIndex < allSections.length - 1) {
-                const nextSection = allSections[segmentIndex + 1];
-                const nextImageUrl = isMobile ? nextSection.mobileImage?.filePath : nextSection.image?.filePath;
-                if (nextImageUrl) {
+                    } catch (e: any) { log.error(`Failed to extract top extension: ${e.message}`); }
+                    return null;
+                })() : Promise.resolve(null),
+                nextImageUrl ? (async () => {
                     try {
-                        const nextResponse = await fetch(nextImageUrl);
-                        const nextBuffer = Buffer.from(await nextResponse.arrayBuffer());
+                        const nextBuffer = Buffer.from(await (await fetch(nextImageUrl)).arrayBuffer());
                         const nextMeta = await sharp(nextBuffer).metadata();
-
-                        // 次のセクションの上部からboundaryOffsetBottom分を切り出す
-                        const extractHeight = Math.min(boundaryOffsetBottom, nextMeta.height || 0);
-
+                        const extractHeight = Math.min(boundaryOffsetBottom!, nextMeta.height || 0);
                         if (extractHeight > 0) {
-                            bottomExtensionBuffer = await sharp(nextBuffer)
-                                .extract({
-                                    left: 0,
-                                    top: 0,
-                                    width: nextMeta.width || currentWidth,
-                                    height: extractHeight
-                                })
-                                .resize(currentWidth, extractHeight) // 幅を合わせる
+                            const buf = await sharp(nextBuffer)
+                                .extract({ left: 0, top: 0, width: nextMeta.width || currentWidth, height: extractHeight })
+                                .resize(currentWidth, extractHeight)
                                 .toBuffer();
-                            bottomExtensionHeight = extractHeight;
                             log.info(`Extracted ${extractHeight}px from next section for bottom extension`);
+                            return { buffer: buf, height: extractHeight };
                         }
-                    } catch (e: any) {
-                        log.error(`Failed to extract bottom extension: ${e.message}`);
-                    }
-                }
-            }
+                    } catch (e: any) { log.error(`Failed to extract bottom extension: ${e.message}`); }
+                    return null;
+                })() : Promise.resolve(null),
+            ]);
+
+            const topExtensionBuffer = topResult?.buffer || null;
+            const topExtensionHeight = topResult?.height || 0;
+            const bottomExtensionBuffer = bottomResult?.buffer || null;
+            const bottomExtensionHeight = bottomResult?.height || 0;
 
             // 画像を結合（上部拡張 + 現在の画像 + 下部拡張）
             if (topExtensionBuffer || bottomExtensionBuffer) {
@@ -528,15 +506,32 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
         }
 
         const startTime = createTimer();
+
+        // 参照画像を軽量化（色・スタイル参照用なのでフル解像度不要）
+        // 1.4MB PNG → ~50-100KB JPEG でAPIペイロードを大幅削減
+        let optimizedRefBuffer: Buffer | null = null;
+        if (styleReferenceBuffer) {
+            try {
+                optimizedRefBuffer = await sharp(styleReferenceBuffer)
+                    .resize(768, undefined, { withoutEnlargement: true })
+                    .jpeg({ quality: 75 })
+                    .toBuffer();
+                log.info(`Style ref optimized: ${styleReferenceBuffer.length} → ${optimizedRefBuffer.length} bytes (${Math.round(optimizedRefBuffer.length / styleReferenceBuffer.length * 100)}%)`);
+            } catch {
+                optimizedRefBuffer = styleReferenceBuffer; // フォールバック
+            }
+        }
+
         const base64Data = imageBuffer.toString('base64');
 
         // API リクエストのパーツを構築
         const parts: Array<{ inlineData?: { mimeType: string; data: string }; text?: string }> = [];
 
         // 参照画像がある場合、最初に追加（スタイル参照として）
-        if (styleReferenceBuffer) {
-            const refBase64 = styleReferenceBuffer.toString('base64');
-            parts.push({ inlineData: { mimeType: 'image/png', data: refBase64 } });
+        if (optimizedRefBuffer) {
+            const refBase64 = optimizedRefBuffer.toString('base64');
+            const refMime = optimizedRefBuffer === styleReferenceBuffer ? 'image/png' : 'image/jpeg';
+            parts.push({ inlineData: { mimeType: refMime, data: refBase64 } });
             parts.push({ text: useUserReference
                 ? '↑【お手本】ユーザーが選択した参照セクション。このデザインスタイル（色、フォント、装飾、雰囲気）を下の画像に適用してください。'
                 : '↑ スタイル参照画像（このスタイルに合わせてください）'
@@ -545,7 +540,7 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
 
         // 処理対象の画像を追加
         parts.push({ inlineData: { mimeType: 'image/png', data: base64Data } });
-        parts.push({ text: styleReferenceBuffer ? `↑ 処理対象画像\n\n${prompt}` : prompt });
+        parts.push({ text: optimizedRefBuffer ? `↑ 処理対象画像\n\n${prompt}` : prompt });
 
         // Gemini API呼び出し
         const response = await fetch(
@@ -624,29 +619,32 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
             }
         }
 
-        await logGeneration({
-            userId: user.id,
-            type: 'import-arrange',
-            endpoint: '/api/sections/[id]/regenerate',
-            model: 'gemini-3.1-flash-image-preview',
-            inputPrompt: prompt,
-            imageCount: 1,
-            status: 'succeeded',
-            startTime
-        });
-
-        // 新しい画像をアップロード
+        // ログ記録・アップロード・メタデータ取得を並列実行
         const filename = `regenerate-${Date.now()}-sec-${sectionId}.png`;
 
-        const { error: uploadError } = await supabase
-            .storage
-            .from('images')
-            .upload(filename, aiBuffer, {
-                contentType: 'image/png',
-                cacheControl: '3600',
-                upsert: false
-            });
+        const [, uploadResult, processedMeta] = await Promise.all([
+            logGeneration({
+                userId: user.id,
+                type: 'import-arrange',
+                endpoint: '/api/sections/[id]/regenerate',
+                model: 'gemini-3.1-flash-image-preview',
+                inputPrompt: prompt,
+                imageCount: 1,
+                status: 'succeeded',
+                startTime
+            }),
+            supabase
+                .storage
+                .from('images')
+                .upload(filename, aiBuffer, {
+                    contentType: 'image/png',
+                    cacheControl: '3600',
+                    upsert: false
+                }),
+            sharp(aiBuffer).metadata(),
+        ]);
 
+        const { error: uploadError } = uploadResult;
         if (uploadError) {
             log.error(`Upload error: ${uploadError.message}`);
             return Response.json({ error: 'Failed to upload image' }, { status: 500 });
@@ -656,8 +654,6 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
             .storage
             .from('images')
             .getPublicUrl(filename);
-
-        const processedMeta = await sharp(aiBuffer).metadata();
 
         // 新しいMediaImageを作成
         const newMedia = await prisma.mediaImage.create({
@@ -671,27 +667,26 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
             },
         });
 
-        // 履歴を保存（復元機能用）
+        // 履歴保存とセクション更新を並列実行
         const previousImageId = isMobile ? section.mobileImageId : section.imageId;
-        if (previousImageId) {
-            await prisma.sectionImageHistory.create({
-                data: {
-                    sectionId: sectionId,
-                    userId: user.id,
-                    previousImageId: previousImageId,
-                    newImageId: newMedia.id,
-                    actionType: `regenerate-${mode}-${targetImage}`,
-                    prompt: customPrompt || null,
-                },
-            });
-            log.info(`History saved (${targetImage}): ${previousImageId} -> ${newMedia.id}`);
-        }
-
-        // セクションを更新（desktop or mobile）
-        await prisma.pageSection.update({
-            where: { id: sectionId },
-            data: { [targetImageField]: newMedia.id },
-        });
+        await Promise.all([
+            previousImageId
+                ? prisma.sectionImageHistory.create({
+                    data: {
+                        sectionId: sectionId,
+                        userId: user.id,
+                        previousImageId: previousImageId,
+                        newImageId: newMedia.id,
+                        actionType: `regenerate-${mode}-${targetImage}`,
+                        prompt: customPrompt || null,
+                    },
+                }).then(() => log.info(`History saved (${targetImage}): ${previousImageId} -> ${newMedia.id}`))
+                : Promise.resolve(),
+            prisma.pageSection.update({
+                where: { id: sectionId },
+                data: { [targetImageField]: newMedia.id },
+            }),
+        ]);
 
         log.success(`Section ${sectionId} ${targetImage} regenerated: ${previousImageId} -> ${newMedia.id}`);
 
