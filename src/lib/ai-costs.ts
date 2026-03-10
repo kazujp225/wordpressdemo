@@ -54,6 +54,11 @@ export const GEMINI_PRICING = {
 // Claude API Pricing (per 1M tokens)
 // Source: https://docs.anthropic.com/en/docs/about-claude/pricing
 export const CLAUDE_PRICING = {
+  'claude-haiku-4-5-20251001': {
+    input: 0.80,   // $0.80 per 1M input tokens
+    output: 4.0,   // $4.00 per 1M output tokens
+    type: 'text' as const,
+  },
   'claude-sonnet-4-20250514': {
     input: 3.0,    // $3.00 per 1M input tokens
     output: 15.0,  // $15.00 per 1M output tokens
@@ -119,6 +124,7 @@ export function getModelDisplayName(model: string): string {
     'gemini-1.5-flash-latest': 'Gemini 1.5 Flash',
     'gemini-3.1-flash-image-preview': 'Gemini 3.1 Flash Image (Nano Banana 2)',
     'veo-2.0-generate-001': 'Veo 2 Video',
+    'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
     'claude-sonnet-4-20250514': 'Claude Sonnet 4',
   };
   return displayNames[model] || model;

@@ -36,7 +36,8 @@ export type GenerationType =
   | 'extract-background-color'
   | 'outpaint'
   | 'banner-generate'
-  | 'template-gen';
+  | 'template-gen'
+  | 'claude-chat';
 
 export interface LogGenerationParams {
   userId?: string | null;

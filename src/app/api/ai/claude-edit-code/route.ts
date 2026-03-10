@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getClaudeClient } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
-import { getGoogleApiKey } from '@/lib/apiKeys';
 import type { DesignContext } from '@/lib/claude-templates';
-import { GEMINI_PRICING } from '@/lib/ai-costs';
+import { estimateClaudeCost } from '@/lib/ai-costs';
 
-const MODEL_NAME = 'gemini-2.0-flash';
+const MODEL_NAME = 'claude-haiku-4-5-20251001';
 
 function buildEditSystemPrompt(options: {
   layoutMode: 'desktop' | 'responsive';
@@ -33,7 +32,6 @@ function buildEditSystemPrompt(options: {
 - レイアウト変更の場合: 既存のCSS構造を尊重しつつ必要最小限の変更
 - 追加の場合: 既存のスタイルパターンに合わせて追加\n\n`;
 
-  // Layout mode
   if (layoutMode === 'desktop') {
     prompt += `【レイアウト: デスクトップ専用】
 - 想定画面幅: 1024px〜1440px
@@ -47,7 +45,6 @@ function buildEditSystemPrompt(options: {
 - 画像は max-width: 100% で親要素に収まるように\n\n`;
   }
 
-  // Design context
   if (designContext) {
     prompt += `【デザインシステム（維持すること）】\n`;
     if (designContext.colorPalette) {
@@ -95,7 +92,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Build system prompt
   const systemPrompt = buildEditSystemPrompt({
     layoutMode: layoutMode || 'responsive',
     designContext: designContext || null,
@@ -117,20 +113,9 @@ export async function POST(request: NextRequest) {
   const startTime = createTimer();
 
   try {
-    const apiKey = await getGoogleApiKey();
-    if (!apiKey) {
-      return NextResponse.json({ error: 'Google API key is not configured' }, { status: 500 });
-    }
+    const claude = getClaudeClient();
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-
-    // メインの指示テキスト
-    const fullPrompt = `${systemPrompt}
-
----
-
-以下のHTMLコードを修正してください。
+    const userContent = `以下のHTMLコードを修正してください。
 
 【現在のHTMLコード】
 \`\`\`html
@@ -142,9 +127,19 @@ ${editPrompt}
 
 修正後の完全なHTMLコードを出力してください。`;
 
-    const result = await model.generateContent(fullPrompt);
-    const response = result.response;
-    const textContent = response.text();
+    const response = await claude.messages.create({
+      model: MODEL_NAME,
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userContent },
+      ],
+    });
+
+    const textContent = response.content
+      .filter(block => block.type === 'text')
+      .map(block => block.type === 'text' ? block.text : '')
+      .join('\n');
 
     // Extract HTML from response
     let html = textContent;
@@ -158,15 +153,13 @@ ${editPrompt}
       }
     }
 
-    // Estimate cost (Gemini 2.0 Flash pricing)
-    const pricing = GEMINI_PRICING[MODEL_NAME] || { input: 0.075, output: 0.30 };
-    const inputTokens = fullPrompt.length / 4; // rough estimate
-    const outputTokens = textContent.length / 4;
-    const estimatedCost = (inputTokens / 1000000 * pricing.input) + (outputTokens / 1000000 * pricing.output);
+    const inputTokens = response.usage.input_tokens;
+    const outputTokens = response.usage.output_tokens;
+    const estimatedCost = estimateClaudeCost(MODEL_NAME, inputTokens, outputTokens);
 
     const logResult = await logGeneration({
       userId: user.id,
-      type: 'gemini-edit-code',
+      type: 'claude-edit-code',
       endpoint: '/api/ai/claude-edit-code',
       model: MODEL_NAME,
       inputPrompt: editPrompt,
@@ -175,12 +168,11 @@ ${editPrompt}
       startTime,
     });
 
-    // Record usage
     if (logResult && !limitCheck.skipCreditConsumption) {
       await recordApiUsage(user.id, logResult.id, estimatedCost, {
         model: MODEL_NAME,
-        inputTokens: Math.round(inputTokens),
-        outputTokens: Math.round(outputTokens),
+        inputTokens,
+        outputTokens,
       });
     }
 
@@ -189,14 +181,14 @@ ${editPrompt}
       html,
       estimatedCost,
       usage: {
-        inputTokens: Math.round(inputTokens),
-        outputTokens: Math.round(outputTokens),
+        inputTokens,
+        outputTokens,
       },
     });
   } catch (error: any) {
     await logGeneration({
       userId: user.id,
-      type: 'gemini-edit-code',
+      type: 'claude-edit-code',
       endpoint: '/api/ai/claude-edit-code',
       model: MODEL_NAME,
       inputPrompt: editPrompt,

@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getClaudeClient } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
-import { getGoogleApiKey } from '@/lib/apiKeys';
 import { getTemplate, TEMPLATES, buildSystemPrompt } from '@/lib/claude-templates';
 import type { FormField, DesignContext } from '@/lib/claude-templates';
-import { GEMINI_PRICING } from '@/lib/ai-costs';
+import { estimateClaudeCost } from '@/lib/ai-costs';
 
-const MODEL_NAME = 'gemini-2.0-flash';
+const MODEL_NAME = 'claude-haiku-4-5-20251001';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -67,20 +66,22 @@ export async function POST(request: NextRequest) {
   const startTime = createTimer();
 
   try {
-    const apiKey = await getGoogleApiKey();
-    if (!apiKey) {
-      return NextResponse.json({ error: 'Google API key is not configured' }, { status: 500 });
-    }
+    const claude = getClaudeClient();
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    const response = await claude.messages.create({
+      model: MODEL_NAME,
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: `【ユーザーからの指示】\n${prompt}` },
+      ],
+    });
 
-    // Combine system prompt and user prompt
-    const fullPrompt = `${systemPrompt}\n\n---\n\n【ユーザーからの指示】\n${prompt}`;
-
-    const result = await model.generateContent(fullPrompt);
-    const response = result.response;
-    const textContent = response.text();
+    // テキスト抽出
+    const textContent = response.content
+      .filter(block => block.type === 'text')
+      .map(block => block.type === 'text' ? block.text : '')
+      .join('\n');
 
     // Extract HTML from response (handle markdown code blocks)
     let html = textContent;
@@ -88,23 +89,21 @@ export async function POST(request: NextRequest) {
     if (htmlMatch) {
       html = htmlMatch[1].trim();
     } else if (!textContent.trim().startsWith('<!DOCTYPE') && !textContent.trim().startsWith('<html')) {
-      // Try to find HTML content between tags
       const docTypeMatch = textContent.match(/(<!DOCTYPE[\s\S]*<\/html>)/i);
       if (docTypeMatch) {
         html = docTypeMatch[1];
       }
     }
 
-    // Estimate cost (Gemini 2.0 Flash pricing)
-    const pricing = GEMINI_PRICING[MODEL_NAME] || { input: 0.075, output: 0.30 };
-    const inputTokens = fullPrompt.length / 4; // rough estimate
-    const outputTokens = textContent.length / 4;
-    const estimatedCost = (inputTokens / 1000000 * pricing.input) + (outputTokens / 1000000 * pricing.output);
+    // 正確なトークン使用量（Anthropic APIが返す）
+    const inputTokens = response.usage.input_tokens;
+    const outputTokens = response.usage.output_tokens;
+    const estimatedCost = estimateClaudeCost(MODEL_NAME, inputTokens, outputTokens);
 
     // Log generation
     const logResult = await logGeneration({
       userId: user.id,
-      type: 'gemini-generate',
+      type: 'claude-generate',
       endpoint: '/api/ai/claude-generate',
       model: MODEL_NAME,
       inputPrompt: prompt,
@@ -117,8 +116,8 @@ export async function POST(request: NextRequest) {
     if (logResult && !limitCheck.skipCreditConsumption) {
       await recordApiUsage(user.id, logResult.id, estimatedCost, {
         model: MODEL_NAME,
-        inputTokens: Math.round(inputTokens),
-        outputTokens: Math.round(outputTokens),
+        inputTokens,
+        outputTokens,
       });
     }
 
@@ -128,14 +127,14 @@ export async function POST(request: NextRequest) {
       templateId,
       estimatedCost,
       usage: {
-        inputTokens: Math.round(inputTokens),
-        outputTokens: Math.round(outputTokens),
+        inputTokens,
+        outputTokens,
       },
     });
   } catch (error: any) {
     await logGeneration({
       userId: user.id,
-      type: 'gemini-generate',
+      type: 'claude-generate',
       endpoint: '/api/ai/claude-generate',
       model: MODEL_NAME,
       inputPrompt: prompt,

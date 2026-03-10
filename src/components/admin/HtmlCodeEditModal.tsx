@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
-import { X, Copy, Check, Eye, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { X, Copy, Check, Eye, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2 } from 'lucide-react';
 import type { DesignContext } from '@/lib/claude-templates';
 import toast from 'react-hot-toast';
 
@@ -27,6 +27,11 @@ interface ChatMessage {
   images?: string[];
 }
 
+// localStorage用キー生成
+function getStorageKey(templateType?: string, pageSlug?: string): string {
+  return `html-edit-chat:${pageSlug || 'default'}:${templateType || 'none'}`;
+}
+
 export default function HtmlCodeEditModal({
   onClose,
   currentHtml,
@@ -43,6 +48,11 @@ export default function HtmlCodeEditModal({
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+
+  // Undo/Redo
+  const [htmlHistory, setHtmlHistory] = useState<string[]>([currentHtml]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
   // チャット
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -50,6 +60,59 @@ export default function HtmlCodeEditModal({
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // 会話復元（localStorage）
+  useEffect(() => {
+    try {
+      const key = getStorageKey(templateType, pageSlug);
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch {}
+  }, [templateType, pageSlug]);
+
+  // 会話保存（localStorage）
+  useEffect(() => {
+    if (messages.length === 0) return;
+    try {
+      const key = getStorageKey(templateType, pageSlug);
+      localStorage.setItem(key, JSON.stringify(messages));
+    } catch {}
+  }, [messages, templateType, pageSlug]);
+
+  // HTMLをhistoryに追加する関数
+  const pushHtmlHistory = useCallback((newHtml: string) => {
+    setHtmlHistory(prev => {
+      const truncated = prev.slice(0, historyIndex + 1);
+      return [...truncated, newHtml];
+    });
+    setHistoryIndex(prev => prev + 1);
+    setModifiedHtml(newHtml);
+    setHasChanges(true);
+  }, [historyIndex]);
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < htmlHistory.length - 1;
+
+  const handleUndo = () => {
+    if (!canUndo) return;
+    const newIndex = historyIndex - 1;
+    setHistoryIndex(newIndex);
+    setModifiedHtml(htmlHistory[newIndex]);
+    setHasChanges(htmlHistory[newIndex] !== currentHtml);
+  };
+
+  const handleRedo = () => {
+    if (!canRedo) return;
+    const newIndex = historyIndex + 1;
+    setHistoryIndex(newIndex);
+    setModifiedHtml(htmlHistory[newIndex]);
+    setHasChanges(htmlHistory[newIndex] !== currentHtml);
+  };
 
   // 画像アップロード処理
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +152,7 @@ export default function HtmlCodeEditModal({
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsGenerating(true);
+    setStreamingText('');
 
     try {
       // 画像がある場合は先にアップロード
@@ -118,21 +182,28 @@ export default function HtmlCodeEditModal({
         });
       }
 
-      const response = await fetch('/api/ai/claude-edit-code', {
+      // Claude Chat APIに送信する会話履歴を構築
+      const chatHistory = [
+        ...messages.map(m => ({ role: m.role, content: m.content })),
+        { role: 'user' as const, content: finalPrompt },
+      ];
+
+      // ストリーミングAPIを使用
+      const response = await fetch('/api/ai/claude-chat-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          messages: chatHistory,
           currentHtml: modifiedHtml,
-          editPrompt: finalPrompt,
           layoutMode,
           designContext: designDefinition || null,
           templateType,
+          mode: 'edit',
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         const errorMsg: ChatMessage = {
           role: 'assistant',
           content: `エラー: ${data.message || '修正に失敗しました'}`,
@@ -141,18 +212,62 @@ export default function HtmlCodeEditModal({
         return;
       }
 
-      setModifiedHtml(data.html);
-      setHasChanges(true);
+      // SSEストリーム読み取り
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No reader');
 
-      const successMsg: ChatMessage = {
-        role: 'assistant',
-        content: '修正を適用しました。プレビューで確認してください。',
-      };
-      setMessages(prev => [...prev, successMsg]);
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullStreamText = '';
 
-      // スクロール
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'text') {
+              fullStreamText += data.text;
+              setStreamingText(fullStreamText);
+              setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+            } else if (data.type === 'done') {
+              setStreamingText('');
+
+              if (data.html) {
+                pushHtmlHistory(data.html);
+              }
+
+              let assistantContent = data.message || '修正を適用しました。プレビューで確認してください。';
+              if (data.estimatedCost) {
+                assistantContent += `\n\nコスト: $${data.estimatedCost.toFixed(4)}`;
+              }
+              const successMsg: ChatMessage = {
+                role: 'assistant',
+                content: assistantContent,
+              };
+              setMessages(prev => [...prev, successMsg]);
+            } else if (data.type === 'error') {
+              setStreamingText('');
+              const errorMsg: ChatMessage = {
+                role: 'assistant',
+                content: `エラー: ${data.message}`,
+              };
+              setMessages(prev => [...prev, errorMsg]);
+            }
+          } catch {}
+        }
+      }
+
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (error) {
+      setStreamingText('');
       const errorMsg: ChatMessage = {
         role: 'assistant',
         content: '接続エラーが発生しました。',
@@ -193,6 +308,14 @@ export default function HtmlCodeEditModal({
     setModifiedHtml(currentHtml);
     setHasChanges(false);
     setMessages([]);
+    setHtmlHistory([currentHtml]);
+    setHistoryIndex(0);
+    setStreamingText('');
+    // localStorageもクリア
+    try {
+      const key = getStorageKey(templateType, pageSlug);
+      localStorage.removeItem(key);
+    } catch {}
     toast.success('リセットしました');
   };
 
@@ -206,12 +329,7 @@ export default function HtmlCodeEditModal({
     setIsGenerating(true);
     try {
       // AIにフォーム有効化を依頼
-      const response = await fetch('/api/ai/claude-edit-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentHtml: modifiedHtml,
-          editPrompt: `このHTMLフォームを有効化してください。
+      const formPrompt = `このHTMLフォームを有効化してください。
 
 【重要な変更点】
 1. formタグにonsubmit属性を追加して、JavaScriptでフォーム送信を処理する
@@ -277,10 +395,18 @@ document.querySelector('form').addEventListener('submit', async function(e) {
 });
 </script>
 
-元のフォームのデザインは一切変更せず、上記のスクリプトを</body>の前に追加してください。`,
+元のフォームのデザインは一切変更せず、上記のスクリプトを</body>の前に追加してください。`;
+
+      const response = await fetch('/api/ai/claude-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: formPrompt }],
+          currentHtml: modifiedHtml,
           layoutMode,
           designContext: designDefinition || null,
           templateType,
+          mode: 'edit',
         }),
       });
 
@@ -291,8 +417,9 @@ document.querySelector('form').addEventListener('submit', async function(e) {
         return;
       }
 
-      setModifiedHtml(data.html);
-      setHasChanges(true);
+      if (data.html) {
+        pushHtmlHistory(data.html);
+      }
       toast.success('フォームを有効化しました。設定画面でResend APIキーを設定すると、メール通知が届きます。');
 
       const successMsg: ChatMessage = {
@@ -369,6 +496,25 @@ document.querySelector('form').addEventListener('submit', async function(e) {
                     </button>
                   </div>
                 )}
+                {/* Undo/Redo */}
+                <div className="flex items-center gap-0.5 ml-1">
+                  <button
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                    className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="元に戻す"
+                  >
+                    <Undo2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={handleRedo}
+                    disabled={!canRedo}
+                    className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="やり直す"
+                  >
+                    <Redo2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {hasChanges && (
@@ -483,7 +629,16 @@ document.querySelector('form').addEventListener('submit', async function(e) {
                   </div>
                 ))
               )}
-              {isGenerating && (
+              {/* ストリーミング中の表示 */}
+              {isGenerating && streamingText && (
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-sm">
+                    <p className="whitespace-pre-wrap">{streamingText}</p>
+                    <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5 align-middle" />
+                  </div>
+                </div>
+              )}
+              {isGenerating && !streamingText && (
                 <div className="flex justify-start">
                   <div className="bg-gray-100 text-gray-500 px-3 py-2 rounded-xl text-sm flex items-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
