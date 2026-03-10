@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Crop, Check, RotateCcw, Maximize2, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Crop, Check, RotateCcw, Maximize2, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -274,7 +274,10 @@ export default function SectionCropModal({
                         className="px-6 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
                     >
                         {isCropping ? (
-                            <>処理中...</>
+                            <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                処理中...
+                            </>
                         ) : (
                             <>
                                 <Check className="h-4 w-4" />
