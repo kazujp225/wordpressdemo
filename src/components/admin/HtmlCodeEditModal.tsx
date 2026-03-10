@@ -14,6 +14,7 @@ interface HtmlCodeEditModalProps {
   layoutMode: 'desktop' | 'responsive';
   onSave: (newHtml: string) => void | Promise<void>;
   pageSlug?: string;
+  pageId?: string;
 }
 
 interface UploadedImage {
@@ -50,6 +51,7 @@ export default function HtmlCodeEditModal({
   layoutMode,
   onSave,
   pageSlug,
+  pageId,
 }: HtmlCodeEditModalProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [modifiedHtml, setModifiedHtml] = useState(currentHtml);
@@ -58,6 +60,7 @@ export default function HtmlCodeEditModal({
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
 
@@ -261,7 +264,8 @@ export default function HtmlCodeEditModal({
               const actions = ['コード生成', 'HTML更新', 'プレビュー反映'];
               let assistantContent = data.message || '変更を適用しました。';
               if (data.estimatedCost) {
-                assistantContent += `\n\nコスト: $${data.estimatedCost.toFixed(4)}`;
+                const credits = Math.ceil(data.estimatedCost * 1500);
+                assistantContent += `\n\n消費: ${credits.toLocaleString()}クレジット`;
               }
               const successMsg: ChatMessage = {
                 role: 'assistant',
@@ -322,11 +326,37 @@ export default function HtmlCodeEditModal({
     try {
       await onSave(modifiedHtml);
       toast.success('保存しました');
-      onClose();
+      setHasChanges(false);
     } catch (error) {
       toast.error('保存に失敗しました');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveAndDeploy = async () => {
+    setIsDeploying(true);
+    try {
+      await onSave(modifiedHtml);
+      setHasChanges(false);
+      if (pageId && pageId !== 'new') {
+        const res = await fetch(`/api/pages/${pageId}/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'webhook' }),
+        });
+        if (res.ok) {
+          toast.success('保存して公開しました');
+        } else {
+          toast.success('保存しました（公開に失敗）');
+        }
+      } else {
+        toast.success('保存しました');
+      }
+    } catch (error) {
+      toast.error('保存に失敗しました');
+    } finally {
+      setIsDeploying(false);
     }
   };
 
@@ -405,11 +435,11 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
     return rawCost * 0.5; // 50%減価
   }, [modifiedHtml, messages]);
 
-  // 円換算（1ドル=150円想定）
-  const formatCostJpy = (usd: number) => {
-    const jpy = usd * 150;
-    if (jpy < 1) return '1円未満';
-    return `約${Math.ceil(jpy)}円`;
+  // クレジット換算（1 USD = 150円 × 10クレジット/円 = 1,500クレジット）
+  const formatCostCredits = (usd: number) => {
+    const credits = Math.ceil(usd * 1500);
+    if (credits < 1) return '1クレジット未満';
+    return `約${credits.toLocaleString()}クレジット`;
   };
 
   // Quick actions — LP制作に実用的なアクション
@@ -499,7 +529,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
                       <span className="text-base mt-0.5">{s.icon}</span>
                       <div>
                         <span className="text-[13px] text-gray-500 group-hover:text-gray-700 block">{s.label}</span>
-                        <span className="text-[10px] text-gray-300">{formatCostJpy(cost)}</span>
+                        <span className="text-[10px] text-gray-300">{formatCostCredits(cost)}</span>
                       </div>
                     </button>
                   );
@@ -642,7 +672,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
                 <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
                 {inputText.trim() && (
                   <span className="text-[10px] text-gray-300 whitespace-nowrap">
-                    {formatCostJpy(estimateCost(inputText.length))}
+                    {formatCostCredits(estimateCost(inputText.length))}
                   </span>
                 )}
               </div>
@@ -659,13 +689,20 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
 
         {/* Save Footer */}
         {hasChanges && (
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-4 flex gap-2">
             <button
               onClick={handleSave}
-              disabled={isSaving}
-              className="w-full py-3 bg-black hover:bg-gray-800 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={isSaving || isDeploying}
+              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> 保存中...</> : '変更を保存'}
+              {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> 保存中...</> : '保存'}
+            </button>
+            <button
+              onClick={handleSaveAndDeploy}
+              disabled={isSaving || isDeploying}
+              className="flex-1 py-3 bg-black hover:bg-gray-800 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isDeploying ? <><Loader2 className="h-4 w-4 animate-spin" /> 公開中...</> : '保存して公開'}
             </button>
           </div>
         )}
@@ -675,73 +712,73 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
       <div className="flex-1 flex flex-col">
 
         {/* Computer Header */}
-        <div className="flex items-center justify-between px-5 py-2.5 bg-[#e8e8e3] border-b border-gray-200/60">
+        <div className="flex items-center justify-between px-5 py-3 bg-[#e8e8e3] border-b border-gray-200/60">
           <div className="flex items-center gap-3">
             {/* Window Controls */}
-            <div className="flex items-center gap-1.5">
-              <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 transition" />
-              <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
-              <button onClick={handleFullPreview} className="w-3 h-3 rounded-full bg-[#28c840] hover:brightness-110 transition" />
+            <div className="flex items-center gap-2">
+              <button onClick={onClose} className="w-3.5 h-3.5 rounded-full bg-[#ff5f57] hover:brightness-110 transition" />
+              <div className="w-3.5 h-3.5 rounded-full bg-[#febc2e]" />
+              <button onClick={handleFullPreview} className="w-3.5 h-3.5 rounded-full bg-[#28c840] hover:brightness-110 transition" />
             </div>
-            <span className="text-[11px] font-medium text-gray-500 tracking-wide uppercase">Computer</span>
+            <span className="text-xs font-medium text-gray-500 tracking-wide uppercase">Computer</span>
           </div>
 
           {/* URL Bar */}
           <div className="flex-1 mx-6">
-            <div className="flex items-center gap-2 bg-white/80 rounded-lg px-3 py-1.5 max-w-lg mx-auto border border-gray-200/50">
+            <div className="flex items-center gap-2 bg-white/80 rounded-lg px-4 py-2 max-w-lg mx-auto border border-gray-200/50">
               {agentStatus !== 'idle' ? (
-                <Loader2 className="h-3 w-3 text-gray-300 animate-spin flex-shrink-0" />
+                <Loader2 className="h-4 w-4 text-gray-300 animate-spin flex-shrink-0" />
               ) : (
-                <Globe className="h-3 w-3 text-gray-300 flex-shrink-0" />
+                <Globe className="h-4 w-4 text-gray-300 flex-shrink-0" />
               )}
-              <span className="text-xs text-gray-400 truncate">
+              <span className="text-sm text-gray-400 truncate">
                 {pageSlug ? `${pageSlug}.zettai.co.jp` : 'preview'}
               </span>
             </div>
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {/* Device Toggle */}
-            <div className="flex items-center bg-white/60 rounded-lg p-0.5 border border-gray-200/50">
+            <div className="flex items-center bg-white/60 rounded-lg p-1 border border-gray-200/50">
               <button
                 onClick={() => setPreviewDevice('desktop')}
-                className={`p-1.5 rounded-md transition-all ${previewDevice === 'desktop' ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+                className={`p-2 rounded-md transition-all ${previewDevice === 'desktop' ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
               >
-                <Monitor className="h-3.5 w-3.5" />
+                <Monitor className="h-[18px] w-[18px]" />
               </button>
               <button
                 onClick={() => setPreviewDevice('mobile')}
-                className={`p-1.5 rounded-md transition-all ${previewDevice === 'mobile' ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+                className={`p-2 rounded-md transition-all ${previewDevice === 'mobile' ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
               >
-                <Smartphone className="h-3.5 w-3.5" />
+                <Smartphone className="h-[18px] w-[18px]" />
               </button>
             </div>
 
             {/* Undo/Redo */}
             <div className="flex items-center gap-0.5 ml-1">
-              <button onClick={handleUndo} disabled={!canUndo} className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-all disabled:opacity-20" title="元に戻す">
-                <Undo2 className="h-3.5 w-3.5" />
+              <button onClick={handleUndo} disabled={!canUndo} className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-all disabled:opacity-20" title="元に戻す">
+                <Undo2 className="h-[18px] w-[18px]" />
               </button>
-              <button onClick={handleRedo} disabled={!canRedo} className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-all disabled:opacity-20" title="やり直す">
-                <Redo2 className="h-3.5 w-3.5" />
+              <button onClick={handleRedo} disabled={!canRedo} className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-all disabled:opacity-20" title="やり直す">
+                <Redo2 className="h-[18px] w-[18px]" />
               </button>
             </div>
 
-            <div className="w-px h-5 bg-gray-300/50 mx-1" />
+            <div className="w-px h-6 bg-gray-300/50 mx-1.5" />
 
             <button
               onClick={() => setShowCode(!showCode)}
-              className={`p-1.5 rounded-md transition-all ${showCode ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500 hover:bg-white/60'}`}
+              className={`p-2 rounded-md transition-all ${showCode ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500 hover:bg-white/60'}`}
               title="コードを表示"
             >
-              <Code2 className="h-3.5 w-3.5" />
+              <Code2 className="h-[18px] w-[18px]" />
             </button>
-            <button onClick={handleCopy} className="p-1.5 rounded-md text-gray-400 hover:text-gray-500 hover:bg-white/60 transition-all" title="コピー">
-              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            <button onClick={handleCopy} className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-white/60 transition-all" title="コピー">
+              {copied ? <Check className="h-[18px] w-[18px] text-green-500" /> : <Copy className="h-[18px] w-[18px]" />}
             </button>
-            <button onClick={handleFullPreview} className="p-1.5 rounded-md text-gray-400 hover:text-gray-500 hover:bg-white/60 transition-all" title="新しいタブで開く">
-              <ExternalLink className="h-3.5 w-3.5" />
+            <button onClick={handleFullPreview} className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-white/60 transition-all" title="新しいタブで開く">
+              <ExternalLink className="h-[18px] w-[18px]" />
             </button>
           </div>
         </div>

@@ -7091,6 +7091,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         designDefinition={designDefinition}
                         layoutMode={sections[0]?.config?.layout === 'desktop' ? 'desktop' : 'responsive'}
                         pageSlug={initialSlug || pageId}
+                        pageId={pageId}
                         onSave={async (newHtml) => {
                             if (targetSection) {
                                 // 既存のhtml-embedセクションを更新
