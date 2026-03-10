@@ -66,6 +66,9 @@ export const CLAUDE_PRICING = {
   },
 } as const;
 
+// Claudeクレジット消費の減価率（50% = 半額で課金）
+const CLAUDE_DISCOUNT_RATE = 0.5;
+
 export function estimateClaudeCost(
   model: string,
   inputTokens: number,
@@ -74,8 +77,9 @@ export function estimateClaudeCost(
   const pricing = CLAUDE_PRICING[model as keyof typeof CLAUDE_PRICING];
   if (!pricing) return 0;
 
-  return (inputTokens / 1_000_000) * pricing.input +
-         (outputTokens / 1_000_000) * pricing.output;
+  const rawCost = (inputTokens / 1_000_000) * pricing.input +
+                  (outputTokens / 1_000_000) * pricing.output;
+  return rawCost * CLAUDE_DISCOUNT_RATE;
 }
 
 export type ModelName = keyof typeof GEMINI_PRICING;
