@@ -489,13 +489,13 @@ const tutorialSteps: TutorialStep[] = [
         icon: <Check className="h-6 w-6" />,
         iconBg: 'from-green-500 to-emerald-600',
         title: '公開 or ダウンロード',
-        description: '保存後、ページ一覧から\n「プレビュー」でURLを取得、\nまたは「ZIP出力」でダウンロード。',
+        description: '保存後、LP一覧から\n「プレビュー」でURLを取得、\nまたは「ZIP出力」でダウンロード。',
         visual: (
             <div className="space-y-2">
                 <div className="bg-gray-100 rounded-xl p-3">
                     <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
                         <span className="w-5 h-5 rounded-full bg-violet-500 text-white flex items-center justify-center text-[10px] font-bold">1</span>
-                        ページ一覧で操作
+                        LP一覧で操作
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div className="bg-green-50 rounded-lg p-2 text-center border border-green-200">

@@ -45,7 +45,7 @@ export default async function ImportHistoryPage() {
                         className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-4"
                     >
                         <ArrowLeft className="h-4 w-4" />
-                        ページ一覧に戻る
+                        LP一覧に戻る
                     </Link>
                     <h1 className="text-xl sm:text-3xl font-black text-gray-900">インポート履歴</h1>
                     <p className="text-gray-500 mt-1">URLからインポートしたスクリーンショットの履歴</p>

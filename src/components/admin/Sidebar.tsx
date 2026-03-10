@@ -13,7 +13,7 @@ import { PLANS, type PlanType } from '@/lib/plans';
 
 // ナビゲーションアイテムをコンポーネント外で定義（再生成防止）
 const navItems = [
-    { name: 'ページ一覧', href: '/admin/pages', icon: FileText, prefetchUrl: '/api/pages', adminOnly: false },
+    { name: 'LP一覧', href: '/admin/pages', icon: FileText, prefetchUrl: '/api/pages', adminOnly: false },
     { name: 'バナー編集', href: '/admin/banners', icon: Presentation, prefetchUrl: '/api/banners', adminOnly: false },
     { name: 'サムネイル編集', href: '/admin/thumbnails', icon: ImageIcon, prefetchUrl: '/api/thumbnails', adminOnly: false },
     { name: 'メディア', href: '/admin/media', icon: Images, prefetchUrl: '/api/media', adminOnly: false },
