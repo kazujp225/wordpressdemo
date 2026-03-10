@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2, ExternalLink, Globe, Sparkles, RotateCw, ChevronDown, ArrowRight, CheckCircle2, Circle, Zap } from 'lucide-react';
+import { X, Copy, Check, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2, ExternalLink, Globe, Sparkles, RotateCw, ChevronDown, ArrowRight, CheckCircle2, Circle, Zap, Search, AlertCircle, TrendingUp } from 'lucide-react';
 import type { DesignContext } from '@/lib/claude-templates';
 import toast from 'react-hot-toast';
 
@@ -29,12 +29,13 @@ interface ChatMessage {
   actions?: string[];
 }
 
-type AgentStatus = 'idle' | 'thinking' | 'generating' | 'updating' | 'done';
+type AgentStatus = 'idle' | 'diagnosing' | 'thinking' | 'generating' | 'updating' | 'done';
 
 const STATUS_LABELS: Record<AgentStatus, string> = {
   idle: '',
-  thinking: '指示を分析中...',
-  generating: 'コードを生成中...',
+  diagnosing: 'ページを診断中...',
+  thinking: '導線を分析中...',
+  generating: 'パーツを生成中...',
   updating: 'プレビューを更新中...',
   done: '完了',
 };
@@ -63,6 +64,12 @@ export default function HtmlCodeEditModal({
   const [isDeploying, setIsDeploying] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
+
+  // 診断
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [diagnosisText, setDiagnosisText] = useState('');
+  const [diagnosisRecommendations, setDiagnosisRecommendations] = useState<{ title: string; prompt: string; reason: string }[]>([]);
+  const [diagnosisDone, setDiagnosisDone] = useState(false);
 
   // Undo/Redo
   const [htmlHistory, setHtmlHistory] = useState<string[]>([currentHtml]);
@@ -375,6 +382,86 @@ export default function HtmlCodeEditModal({
     toast.success('リセットしました');
   };
 
+  // 自動ページ診断
+  const runDiagnosis = useCallback(async () => {
+    // 空テンプレートの場合は診断しない
+    if (!modifiedHtml || modifiedHtml.includes('<body>\n\n</body>')) return;
+
+    setIsDiagnosing(true);
+    setAgentStatus('diagnosing');
+    setDiagnosisText('');
+
+    try {
+      const response = await fetch('/api/ai/claude-chat-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'このページのCV導線を診断してください。' }],
+          currentHtml: modifiedHtml,
+          layoutMode,
+          designContext: designDefinition || null,
+          mode: 'diagnose',
+        }),
+      });
+
+      if (!response.ok) {
+        setIsDiagnosing(false);
+        setAgentStatus('idle');
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === 'text') {
+              fullText += data.text;
+              // [RECOMMEND]タグを除外して表示
+              setDiagnosisText(fullText.replace(/\[RECOMMEND\][\s\S]*?\[\/RECOMMEND\]/g, '').replace(/\[RECOMMEND\][\s\S]*$/, ''));
+            } else if (data.type === 'done') {
+              if (data.recommendations && data.recommendations.length > 0) {
+                setDiagnosisRecommendations(data.recommendations);
+              }
+              setDiagnosisText(data.message || fullText);
+              setDiagnosisDone(true);
+              setAgentStatus('done');
+              setTimeout(() => setAgentStatus('idle'), 2000);
+            }
+          } catch {}
+        }
+      }
+    } catch (error) {
+      console.error('Diagnosis error:', error);
+    } finally {
+      setIsDiagnosing(false);
+    }
+  }, [modifiedHtml, layoutMode, designDefinition]);
+
+  // エディタ起動時に自動診断
+  const diagnosisRan = useRef(false);
+  useEffect(() => {
+    if (!diagnosisRan.current && modifiedHtml && !modifiedHtml.includes('<body>\n\n</body>')) {
+      diagnosisRan.current = true;
+      // 少し遅延してから診断開始（UIの初期表示を邪魔しない）
+      setTimeout(() => runDiagnosis(), 500);
+    }
+  }, [runDiagnosis, modifiedHtml]);
+
   // フォーム有効化
   const handleEnableFormSubmission = async () => {
     if (!pageSlug) { toast.error('ページ情報が取得できません'); return; }
@@ -475,7 +562,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h2 className="text-[13px] font-semibold text-gray-900">AI エディタ</h2>
+              <h2 className="text-[13px] font-semibold text-gray-900">CV導線オペレーター</h2>
               {agentStatus !== 'idle' && (
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="relative flex h-2 w-2">
@@ -502,49 +589,114 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
-              <div className="flex-shrink-0 mt-4" />
-              <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-5">
-                <Sparkles className="h-8 w-8 text-gray-300" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">何をしますか？</h3>
-              <p className="text-sm text-gray-400 mb-2 text-center">指示するだけで、AIがコードを生成・編集します</p>
+            <div className="h-full flex flex-col items-start px-5 py-6 overflow-y-auto">
 
-              {/* Credit Warning */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100 mb-7">
-                <Zap className="h-3 w-3 text-amber-500" />
-                <span className="text-[11px] text-amber-600">クレジットを消費します</span>
-              </div>
+              {/* 診断中のローディング */}
+              {isDiagnosing && !diagnosisText && (
+                <div className="w-full flex flex-col items-center justify-center py-16">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4">
+                    <Search className="h-7 w-7 text-blue-400 animate-pulse" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">ページを診断中...</h3>
+                  <p className="text-sm text-gray-400">CV導線と改善ポイントを分析しています</p>
+                  <div className="flex gap-1 mt-4">
+                    <div className="w-2 h-2 rounded-full bg-blue-300 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-blue-300 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-blue-300 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              )}
 
-              {/* Suggestion Chips */}
-              <div className="w-full grid grid-cols-2 gap-2 mb-6">
-                {suggestions.map((s, i) => {
-                  const cost = estimateCost(s.prompt.length);
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => { setInputText(s.prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
-                      className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left transition-all group"
-                    >
-                      <span className="text-base mt-0.5">{s.icon}</span>
-                      <div>
-                        <span className="text-[13px] text-gray-500 group-hover:text-gray-700 block">{s.label}</span>
-                        <span className="text-[10px] text-gray-300">{formatCostCredits(cost)}</span>
+              {/* 診断結果 */}
+              {diagnosisText && (
+                <>
+                  <div className="w-full mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <AlertCircle className="h-3.5 w-3.5 text-blue-500" />
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
+                      <span className="text-[13px] font-semibold text-gray-900">ページ診断結果</span>
+                      {diagnosisDone && (
+                        <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full">完了</span>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-[13px] text-gray-700 leading-relaxed whitespace-pre-wrap">
+                      {diagnosisText}
+                      {isDiagnosing && <span className="inline-block w-1.5 h-4 bg-blue-400/50 animate-pulse ml-0.5 align-middle rounded-sm" />}
+                    </div>
+                  </div>
 
-              {/* Form Enable */}
-              {pageSlug && (
-                <button
-                  onClick={handleEnableFormSubmission}
-                  disabled={isGenerating}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 text-sm text-gray-500 hover:text-gray-700 transition-all disabled:opacity-40"
-                >
-                  {isGenerating ? <><Loader2 className="h-4 w-4 animate-spin" /> 処理中...</> : <><Mail className="h-4 w-4" /> フォームを有効化</>}
-                </button>
+                  {/* 推奨アクション */}
+                  {diagnosisRecommendations.length > 0 && (
+                    <div className="w-full mb-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center">
+                          <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                        </div>
+                        <span className="text-[13px] font-semibold text-gray-900">推奨アクション</span>
+                      </div>
+                      <div className="space-y-2">
+                        {diagnosisRecommendations.map((rec, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              setInputText(rec.prompt);
+                              setTimeout(() => {
+                                inputRef.current?.focus();
+                                // 自動送信: ユーザーが推奨アクションを選んだら即実行
+                              }, 100);
+                            }}
+                            className="w-full flex items-start gap-3 px-4 py-3 rounded-xl bg-white border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/30 text-left transition-all group"
+                          >
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold mt-0.5">
+                              {i + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[13px] font-medium text-gray-800 group-hover:text-emerald-700 block">{rec.title}</span>
+                              <span className="text-[11px] text-gray-400 block mt-0.5">{rec.reason}</span>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-gray-300 group-hover:text-emerald-500 flex-shrink-0 mt-1 transition-colors" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* フォーム有効化 */}
+                  {pageSlug && diagnosisDone && (
+                    <button
+                      onClick={handleEnableFormSubmission}
+                      disabled={isGenerating}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 text-sm text-gray-500 hover:text-gray-700 transition-all disabled:opacity-40"
+                    >
+                      {isGenerating ? <><Loader2 className="h-4 w-4 animate-spin" /> 処理中...</> : <><Mail className="h-4 w-4" /> フォームを有効化</>}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* 診断できない場合（空ページ） */}
+              {!isDiagnosing && !diagnosisText && (
+                <div className="w-full flex flex-col items-center justify-center py-12">
+                  <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-4">
+                    <Sparkles className="h-7 w-7 text-gray-300" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">ページを作成しましょう</h3>
+                  <p className="text-sm text-gray-400 mb-6 text-center">チャットで指示すると、AIがHTMLを生成します</p>
+
+                  <div className="w-full grid grid-cols-2 gap-2">
+                    {suggestions.slice(0, 4).map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { setInputText(s.prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
+                        className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left transition-all group"
+                      >
+                        <span className="text-base mt-0.5">{s.icon}</span>
+                        <span className="text-[13px] text-gray-500 group-hover:text-gray-700">{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           ) : (

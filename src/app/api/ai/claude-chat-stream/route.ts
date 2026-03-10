@@ -9,33 +9,78 @@ import type { DesignContext } from '@/lib/claude-templates';
 const MODEL_NAME = 'claude-haiku-4-5-20251001';
 
 function buildSystemPrompt(options: {
-  mode: 'generate' | 'edit';
+  mode: 'generate' | 'edit' | 'diagnose';
   layoutMode: 'desktop' | 'responsive';
   designContext?: DesignContext | null;
   templateType?: string;
 }): string {
   const { mode, layoutMode, designContext, templateType } = options;
 
-  let prompt = `あなたは優秀なWebデザイナー兼フロントエンドエンジニアです。
-ランディングページ（LP）のHTML/CSSセクションを${mode === 'generate' ? '生成' : '修正'}してください。
+  // 診断モード: ページを読んでCV導線を分析
+  if (mode === 'diagnose') {
+    return `あなたは画像ベースLP専用のCV導線オペレーターです。
+ページのHTMLを分析し、コンバージョン導線の改善点を診断してください。
+
+【あなたの役割】
+- LPを「作る」のではなく「読んで導線を改善する」エージェント
+- 既存のデザインやクリエイティブは資産として活かす
+- 追加すべきは最小限のUIパーツのみ
+
+【診断項目】
+1. ファーストビュー内のCTA導線の有無と視認性
+2. 電話・LINE等の即時連絡導線の有無
+3. 問い合わせフォーム/導線の位置と数
+4. ヘッダーの固定有無（スクロール時の導線消失リスク）
+5. スマホでのタップ操作性・視認性
+6. ページ下部のCTA不足
+7. 信頼要素（実績・お客様の声等）の有無
+8. 長尺LPでの中間CTA不足
+
+【出力フォーマット（厳守）】
+まず2-3文でページの全体的な印象を述べてください。
+
+次に検出された課題を重要度順に列挙してください:
+🔴 [重大な課題]
+🟡 [改善推奨]
+🟢 [あると良い]
+
+最後に推奨アクションを以下の形式で出力してください（最大4つ）:
+[RECOMMEND]アクション名|実行プロンプト|理由（1文）[/RECOMMEND]
+
+例:
+[RECOMMEND]追従CTAボタンを追加|右下に追従するCTAボタンを追加してください。背景色はページのメインカラーに合わせ、「お問い合わせ」テキスト、ホバーで浮き上がるエフェクト付き。スマホでは幅100%の下部固定バーにしてください。|スクロール中にCTA導線が消失し、離脱リスクが高い[/RECOMMEND]
+
+【重要ルール】
+- HTMLコードは絶対に出力しないでください
+- 診断と提案のみ行ってください
+- 推奨アクションの「実行プロンプト」は、そのまま実行できる具体的な指示にしてください
+- 既存のデザインを壊す提案はしないでください
+- 画像ベースLPであることを前提にしてください`;
+  }
+
+  // 編集・生成モード: CV導線改善エージェント
+  let prompt = `あなたは画像ベースLP専用のCV導線オペレーターです。
+ランディングページのHTML/CSSに最適なUIパーツを追加・修正します。
+
+【あなたの役割】
+- 既存のデザインやクリエイティブを資産として最大限活かす
+- 追加するのは最小限のUIパーツ（CTA、フォーム、ヘッダー等）のみ
+- ページ全体を作り直すのではなく、CV導線を改善する
 
 【基本ルール】
 - 完全なHTMLファイルとして出力（<!DOCTYPE html>から</html>まで）
 - CSS・JSはインライン埋め込み（外部依存なし、Googleフォントは例外的にOK）
 - HTMLコードは必ず \`\`\`html ... \`\`\` で囲んで出力
-- HTMLコードの前後に簡潔な説明を日本語で付ける
 - 全てのテキストは日本語で記述
-- モダンで洗練されたデザインにする
 - smooth scrollを有効にする（scroll-behavior: smooth）
 
-【LP用HTML/CSSのベストプラクティス】
-- セクションの区切りを明確にする（背景色の交互切替など）
-- CTAボタンは目立つグラデーションで、ホバーエフェクト付き
-- テーブルは見やすくストライプ表示
-- Q&Aはアコーディオン（純CSS or 最小限のJS）
-- お問い合わせフォームはdl/dt/ddで構成、必須マーク付き
-- フッターはシンプルにコピーライトとリンク
-- max-width: 1000pxで中央揃え（.sec_inner パターン）
+【LP改善のベストプラクティス】
+- 追加パーツは既存デザインの色調・フォントに馴染ませる
+- CTAボタンは目立つが品のあるデザイン（ホバーエフェクト付き）
+- 追従ボタンはposition:fixedで右下配置、スマホはbottom:0の全幅バー
+- お問い合わせフォームは必須マーク付き、送信ボタンは目立つ色
+- ヘッダーはposition:sticky、半透明背景でスクロール時も機能する
+- 中間CTAは背景色を変えてセクション区切りを明確にする
 `;
 
   if (layoutMode === 'desktop') {
@@ -46,7 +91,7 @@ function buildSystemPrompt(options: {
     prompt += `\n【レイアウト: レスポンシブ対応必須】
 - モバイルファースト設計
 - @media (max-width: 768px) でモバイル対応
-- モバイル: 1カラム、タップしやすいボタン（min-height: 44px）、フォントサイズ16px以上
+- モバイル: タップしやすいボタン（min-height: 44px）、フォントサイズ16px以上
 - 画像は max-width: 100%\n`;
   }
 
@@ -65,27 +110,20 @@ function buildSystemPrompt(options: {
     prompt += `\n【テンプレートタイプ: ${templateType}】\n`;
   }
 
-  if (mode === 'edit') {
-    prompt += `\n【修正時の注意】
-- 既存のコード構造やスタイルをできるだけ維持
-- 指示された部分のみ修正
-- 元のデザインの雰囲気を壊さない\n`;
-  }
+  prompt += `\n【修正時の注意】
+- 既存のコード構造・画像・スタイルをできるだけ維持
+- 指示されたパーツのみ追加・修正
+- 元のデザインの雰囲気を壊さない
+- パーツ追加後、なぜその変更をしたかを1-2文で説明する
 
-  prompt += `\n【ディスカッションモード（重要）】
-ユーザーの指示が曖昧な場合や、デザインの選択肢がある場合は、すぐにコードを生成せずにまず質問してください。
-例:
-- 「CTAボタンを追加して」→「どんな雰囲気のCTAにしますか？例えば：①シンプルで落ち着いた感じ ②グラデーションで目立つ感じ ③アニメーション付きで動きのある感じ」
-- 「フォームを追加して」→「どんな項目が必要ですか？例：名前・メール・電話・メッセージ、それとも他に必要な項目はありますか？」
-- 「デザインを良くして」→「具体的にどの部分を改善しますか？①全体の配色 ②フォント・余白 ③セクション構成 ④全部まとめて」
+【対話ルール】
+ユーザーの指示が曖昧な場合は、すぐにコードを生成せずに質問してください。
+ただし以下の場合はすぐにコードを生成してOK:
+- 具体的な指示（色、サイズ、テキスト内容が明確）
+- 質問に回答した後の2回目以降
+- 「おまかせ」と判断を委ねた場合
 
-ただし、以下の場合はすぐにコードを生成してOK:
-- ユーザーが具体的に指示している場合（色、サイズ、テキスト内容が明確）
-- ユーザーが質問に回答した後の2回目以降のやりとり
-- 「そのままで」「おまかせ」などユーザーが判断を委ねた場合
-
-質問する時はHTMLコードブロックを出力しないでください。会話だけにしてください。\n`;
-
+質問する時はHTMLコードブロックを出力しないでください。\n`;
 
   return prompt;
 }
@@ -110,7 +148,7 @@ export async function POST(request: NextRequest) {
     layoutMode?: 'desktop' | 'responsive';
     designContext?: DesignContext | null;
     templateType?: string;
-    mode: 'generate' | 'edit';
+    mode: 'generate' | 'edit' | 'diagnose';
   };
 
   if (!messages || messages.length === 0) {
@@ -177,19 +215,39 @@ export async function POST(request: NextRequest) {
           const outputTokens = finalMessage.usage.output_tokens;
           const estimatedCost = estimateClaudeCost(MODEL_NAME, inputTokens, outputTokens);
 
-          // HTML抽出
+          // HTML抽出（diagnoseモードではHTMLなし）
           let html: string | null = null;
-          const htmlMatch = fullText.match(/```html\s*([\s\S]*?)```/);
-          if (htmlMatch) {
-            html = htmlMatch[1].trim();
-          } else if (fullText.trim().startsWith('<!DOCTYPE') || fullText.trim().startsWith('<html')) {
-            html = fullText.trim();
+          if (mode !== 'diagnose') {
+            const htmlMatch = fullText.match(/```html\s*([\s\S]*?)```/);
+            if (htmlMatch) {
+              html = htmlMatch[1].trim();
+            } else if (fullText.trim().startsWith('<!DOCTYPE') || fullText.trim().startsWith('<html')) {
+              html = fullText.trim();
+            }
           }
 
           // 説明文抽出
           let message = fullText;
-          if (htmlMatch) {
+          if (html) {
             message = fullText.replace(/```html\s*[\s\S]*?```/g, '').trim();
+          }
+
+          // 推奨アクション抽出（diagnoseモード用）
+          let recommendations: { title: string; prompt: string; reason: string }[] = [];
+          if (mode === 'diagnose') {
+            const recMatches = fullText.matchAll(/\[RECOMMEND\]([\s\S]*?)\[\/RECOMMEND\]/g);
+            for (const match of recMatches) {
+              const parts = match[1].split('|');
+              if (parts.length >= 3) {
+                recommendations.push({
+                  title: parts[0].trim(),
+                  prompt: parts[1].trim(),
+                  reason: parts[2].trim(),
+                });
+              }
+            }
+            // [RECOMMEND]タグを表示テキストから除去
+            message = fullText.replace(/\[RECOMMEND\][\s\S]*?\[\/RECOMMEND\]/g, '').trim();
           }
 
           // ログ記録
@@ -217,6 +275,7 @@ export async function POST(request: NextRequest) {
             type: 'done',
             html,
             message,
+            recommendations: recommendations.length > 0 ? recommendations : undefined,
             usage: { inputTokens, outputTokens },
             estimatedCost,
           })}\n\n`));
