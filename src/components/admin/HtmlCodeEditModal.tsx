@@ -390,6 +390,28 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
     }
   };
 
+  // コスト見積もり（Claude Haiku 4.5, 50%減価適用後）
+  // Input: $0.80/1M tokens, Output: $4.00/1M tokens × 0.5
+  const estimateCost = useCallback((promptLength: number = 100) => {
+    // トークン推定: 日本語は約2文字=1トークン、英語/HTMLは約4文字=1トークン
+    const htmlTokens = Math.ceil(modifiedHtml.length / 3); // HTML混在
+    const systemTokens = 500; // システムプロンプト
+    const promptTokens = Math.ceil(promptLength / 2); // ユーザー入力(日本語)
+    const chatHistoryTokens = messages.reduce((sum, m) => sum + Math.ceil(m.content.length / 3), 0);
+    const inputTokens = systemTokens + htmlTokens + promptTokens + chatHistoryTokens;
+    const outputTokens = htmlTokens + 200; // 出力はHTML＋説明文
+
+    const rawCost = (inputTokens / 1_000_000) * 0.80 + (outputTokens / 1_000_000) * 4.00;
+    return rawCost * 0.5; // 50%減価
+  }, [modifiedHtml, messages]);
+
+  // 円換算（1ドル=150円想定）
+  const formatCostJpy = (usd: number) => {
+    const jpy = usd * 150;
+    if (jpy < 1) return '1円未満';
+    return `約${Math.ceil(jpy)}円`;
+  };
+
   // Quick actions — LP制作に実用的なアクション
   const suggestions = [
     { icon: '🔘', label: 'CTAボタンを追加', prompt: '目立つCTAボタンを追加してください。グラデーション背景、ホバーエフェクト（浮き上がり＋影）、パルスアニメーション付きで、「今すぐ無料で始める」のテキストにしてください。ボタンはページ内の適切な位置に配置してください。' },
@@ -466,16 +488,22 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
 
               {/* Suggestion Chips */}
               <div className="w-full grid grid-cols-2 gap-2 mb-6">
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    onClick={() => { setInputText(s.prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
-                    className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left transition-all group"
-                  >
-                    <span className="text-base">{s.icon}</span>
-                    <span className="text-[13px] text-gray-500 group-hover:text-gray-700">{s.label}</span>
-                  </button>
-                ))}
+                {suggestions.map((s, i) => {
+                  const cost = estimateCost(s.prompt.length);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => { setInputText(s.prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
+                      className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left transition-all group"
+                    >
+                      <span className="text-base mt-0.5">{s.icon}</span>
+                      <div>
+                        <span className="text-[13px] text-gray-500 group-hover:text-gray-700 block">{s.label}</span>
+                        <span className="text-[10px] text-gray-300">{formatCostJpy(cost)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Form Enable */}
@@ -603,7 +631,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               style={{ minHeight: '40px', maxHeight: '120px' }}
             />
             <div className="flex items-center justify-between px-3 pb-2.5">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="p-1.5 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
@@ -612,6 +640,11 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
                   <ImagePlus className="h-4 w-4" />
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+                {inputText.trim() && (
+                  <span className="text-[10px] text-gray-300 whitespace-nowrap">
+                    {formatCostJpy(estimateCost(inputText.length))}
+                  </span>
+                )}
               </div>
               <button
                 onClick={handleSend}
