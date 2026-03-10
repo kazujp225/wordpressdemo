@@ -113,12 +113,12 @@ function getTimestamp(): string {
 }
 
 const GENERATING_LOGS: { message: string; type: LogEntry['type']; delay: number }[] = [
-  { message: 'Initializing Gemini 2.0 Flash engine...', type: 'system', delay: 200 },
-  { message: 'Loading model: gemini-2.0-flash', type: 'info', delay: 600 },
+  { message: 'Initializing Claude Haiku 4.5 engine...', type: 'system', delay: 200 },
+  { message: 'Loading model: claude-haiku-4.5', type: 'info', delay: 600 },
   { message: 'Template context loaded successfully', type: 'success', delay: 400 },
   { message: 'Tokenizing user prompt...', type: 'info', delay: 300 },
   { message: 'Estimated input tokens: calculating...', type: 'info', delay: 500 },
-  { message: 'Establishing connection to Google AI API', type: 'system', delay: 700 },
+  { message: 'Establishing connection to Anthropic API', type: 'system', delay: 700 },
   { message: 'TLS handshake complete', type: 'info', delay: 300 },
   { message: 'Sending request payload...', type: 'info', delay: 400 },
   { message: 'Awaiting model response...', type: 'system', delay: 1200 },
@@ -479,7 +479,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-gray-900 leading-none">AI Code Generator</h2>
-                <p className="text-[10px] text-gray-400 mt-0.5">Gemini 2.0 Flash</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Claude Haiku 4.5</p>
               </div>
             </div>
           </div>
@@ -553,8 +553,8 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
                 })}
               </div>
               <div className="mt-6 flex items-center justify-between text-xs text-gray-400">
-                <span>約300〜1,000クレジット / 生成</span>
-                <span>model: gemini-2.0-flash</span>
+                <span>約5〜30クレジット / 生成</span>
+                <span>model: claude-haiku-4.5</span>
               </div>
             </div>
           )}
@@ -845,7 +845,7 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
               <div className="px-4 py-2.5 border-b border-gray-800 bg-gray-900 flex items-center gap-2.5">
                 <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-[11px] font-mono text-gray-400">
-                  Building | gemini-2.0-flash | {layoutMode}
+                  Building | claude-haiku-4.5 | {layoutMode}
                 </span>
               </div>
               <div
