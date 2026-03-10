@@ -13,6 +13,7 @@ import {
   Code2,
   Eye,
   RefreshCw,
+  Loader2,
   Zap,
   Palette,
   Type,
@@ -289,7 +290,7 @@ export default function AiGeneratorPage() {
                   >
                     {isGenerating ? (
                       <>
-                        <RefreshCw className="animate-spin -ml-1 mr-2 h-5 w-5" />
+                        <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5" />
                         Generating Code...
                       </>
                     ) : (
@@ -309,7 +310,7 @@ export default function AiGeneratorPage() {
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 animate-progress"></div>
                 <div className="space-y-6 text-center">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 text-blue-600 mb-2">
-                    <RefreshCw className="w-8 h-8 animate-spin" />
+                    <Loader2 className="w-8 h-8 animate-spin" />
                   </div>
                   <h3 className="text-xl font-bold text-slate-900">AI is building your website...</h3>
 

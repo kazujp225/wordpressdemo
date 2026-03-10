@@ -2378,7 +2378,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-all disabled:opacity-50 shadow-sm"
                 >
                     {isSaving ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                         <Save className="h-4 w-4" />
                     )}
@@ -2425,7 +2425,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         disabled={isSaving}
                         className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 min-h-[44px]"
                     >
-                        {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         <span>{isSaving ? '保存中' : '保存'}</span>
                     </button>
 
@@ -3044,12 +3044,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                 {/* 固定配置バッジ */}
                                                                 {(overlay.positionMode === 'fixed_right' || overlay.positionMode === 'fixed_left' || overlay.positionMode === 'fixed_bottom' ||
                                                                     (overlay.template && CTA_TEMPLATES[overlay.template]?.positionMode && CTA_TEMPLATES[overlay.template].positionMode !== 'absolute')) && (
-                                                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 bg-cyan-600 text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap">
-                                                                        {(overlay.positionMode || CTA_TEMPLATES[overlay.template]?.positionMode) === 'fixed_right' ? '右固定'
-                                                                            : (overlay.positionMode || CTA_TEMPLATES[overlay.template]?.positionMode) === 'fixed_left' ? '左固定'
-                                                                            : '下固定'}
-                                                                    </span>
-                                                                )}
+                                                                        <span className="absolute -top-5 left-1/2 -translate-x-1/2 bg-cyan-600 text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap">
+                                                                            {(overlay.positionMode || CTA_TEMPLATES[overlay.template]?.positionMode) === 'fixed_right' ? '右固定'
+                                                                                : (overlay.positionMode || CTA_TEMPLATES[overlay.template]?.positionMode) === 'fixed_left' ? '左固定'
+                                                                                    : '下固定'}
+                                                                        </span>
+                                                                    )}
                                                                 {overlay.type === 'button' && (
                                                                     editingOverlayId === overlay.id ? (
                                                                         <input
@@ -3352,7 +3352,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                                 <div className="relative">
                                                                     <div className="absolute inset-0 rounded-full bg-white/20 animate-ping" style={{ animationDuration: '1.5s' }} />
                                                                     <div className="relative w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
-                                                                        <RefreshCw className="h-10 w-10 text-white animate-spin" />
+                                                                        <Loader2 className="h-10 w-10 text-white animate-spin" />
                                                                     </div>
                                                                 </div>
                                                                 {/* テキスト */}
@@ -3779,7 +3779,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         <div className="p-6 max-h-[60vh] overflow-y-auto">
                             {isLoadingHistory ? (
                                 <div className="flex items-center justify-center py-12">
-                                    <RefreshCw className="h-8 w-8 text-gray-400 animate-spin" />
+                                    <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
                                 </div>
                             ) : (
                                 <>
@@ -4164,7 +4164,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     disabled={isGeneratingSectionImage || !sectionAIPrompt}
                                     className="flex-[2] flex items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-black text-white shadow-xl shadow-blue-100 hover:bg-blue-700 disabled:opacity-50 transition-all"
                                 >
-                                    {isGeneratingSectionImage ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                                    {isGeneratingSectionImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                                     <span>画像を生成</span>
                                 </button>
                             </div>
@@ -4226,7 +4226,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     disabled={isEditingImage || !editImagePrompt}
                                     className="flex-[2] flex items-center justify-center gap-2 rounded-sm bg-gray-900 py-3.5 text-sm font-black text-white hover:bg-gray-800 disabled:opacity-50 transition-all"
                                 >
-                                    {isEditingImage ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PenTool className="h-4 w-4" />}
+                                    {isEditingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenTool className="h-4 w-4" />}
                                     <span>{isEditingImage ? '編集中...' : '画像を編集'}</span>
                                 </button>
                             </div>
@@ -4368,15 +4368,15 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('logo') ? 'rotate-180' : ''}`} />
                                     </button>
                                     {headerOpenSections.has('logo') && (
-                                    <div className="pt-1 pb-2">
-                                        <input
-                                            type="text"
-                                            value={headerConfig.logoText || ''}
-                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoText: e.target.value }))}
-                                            placeholder="サイト名"
-                                            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                                        />
-                                    </div>
+                                        <div className="pt-1 pb-2">
+                                            <input
+                                                type="text"
+                                                value={headerConfig.logoText || ''}
+                                                onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoText: e.target.value }))}
+                                                placeholder="サイト名"
+                                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                            />
+                                        </div>
                                     )}
                                 </div>
                                 {/* サイズ設定 */}
@@ -4389,36 +4389,36 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('size') ? 'rotate-180' : ''}`} />
                                     </button>
                                     {headerOpenSections.has('size') && (
-                                    <div className="space-y-3 pt-1 pb-2">
-                                        <div>
-                                            <label className="block text-xs text-gray-500 mb-1">ヘッダーの高さ</label>
-                                            <div className="grid grid-cols-4 gap-1">
-                                                {([['sm', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大']] as const).map(([val, label]) => (
-                                                    <button
-                                                        key={val}
-                                                        onClick={() => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, headerHeight: val }))}
-                                                        className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${(headerConfig.headerHeight || 'md') === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                                                    >
-                                                        {label}
-                                                    </button>
-                                                ))}
+                                        <div className="space-y-3 pt-1 pb-2">
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">ヘッダーの高さ</label>
+                                                <div className="grid grid-cols-4 gap-1">
+                                                    {([['sm', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大']] as const).map(([val, label]) => (
+                                                        <button
+                                                            key={val}
+                                                            onClick={() => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, headerHeight: val }))}
+                                                            className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${(headerConfig.headerHeight || 'md') === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                        >
+                                                            {label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">ロゴの文字サイズ</label>
+                                                <div className="grid grid-cols-4 gap-1">
+                                                    {([['sm', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大']] as const).map(([val, label]) => (
+                                                        <button
+                                                            key={val}
+                                                            onClick={() => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoSize: val }))}
+                                                            className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${(headerConfig.logoSize || 'md') === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                        >
+                                                            {label}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs text-gray-500 mb-1">ロゴの文字サイズ</label>
-                                            <div className="grid grid-cols-4 gap-1">
-                                                {([['sm', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大']] as const).map(([val, label]) => (
-                                                    <button
-                                                        key={val}
-                                                        onClick={() => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, logoSize: val }))}
-                                                        className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${(headerConfig.logoSize || 'md') === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                                                    >
-                                                        {label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
                                     )}
                                 </div>
                                 {/* CTAボタン */}
@@ -4431,87 +4431,87 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('cta') ? 'rotate-180' : ''}`} />
                                     </button>
                                     {headerOpenSections.has('cta') && (
-                                <div className="space-y-2 pt-1 pb-2">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">CTAテキスト</label>
-                                        <input
-                                            type="text"
-                                            value={headerConfig.ctaText || ''}
-                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaText: e.target.value }))}
-                                            placeholder="お問い合わせ"
-                                            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        {(() => {
-                                            const ctaVal = headerConfig.ctaLink || '';
-                                            const sectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
-                                            const isCustom = ctaVal !== '' && !sectionOptions.includes(ctaVal);
-                                            const roleLabels: Record<string, string> = {
-                                                hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
-                                                pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
-                                                cta: 'CTA', footer: 'フッター', other: 'その他',
-                                                'html-embed': 'HTML埋め込み',
-                                            };
-                                            const selectedLabel = isCustom ? 'カスタムURL' : ctaVal === '#contact' ? 'お問い合わせ' : ctaVal ? (roleLabels[ctaVal.replace('#', '')] || ctaVal) : '未選択';
-                                            return (
-                                                <>
-                                                    <button
-                                                        onClick={() => toggleHeaderSection('ctaLink')}
-                                                        className="flex items-center justify-between w-full text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
-                                                    >
-                                                        <span>リンク先: <span className="text-purple-600">{selectedLabel}</span></span>
-                                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('ctaLink') ? 'rotate-180' : ''}`} />
-                                                    </button>
-                                                    {headerOpenSections.has('ctaLink') && (
-                                                        <div className="space-y-1 pb-2">
-                                                            {sections.map((section: any) => (
-                                                                <button
-                                                                    key={section.id}
-                                                                    onClick={() => {
-                                                                        setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: `#${section.role}` }));
-                                                                        toggleHeaderSection('ctaLink');
-                                                                    }}
-                                                                    className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${ctaVal === `#${section.role}` ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
-                                                                >
-                                                                    {roleLabels[section.role] || section.role}
-                                                                </button>
-                                                            ))}
+                                        <div className="space-y-2 pt-1 pb-2">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">CTAテキスト</label>
+                                                <input
+                                                    type="text"
+                                                    value={headerConfig.ctaText || ''}
+                                                    onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaText: e.target.value }))}
+                                                    placeholder="お問い合わせ"
+                                                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                {(() => {
+                                                    const ctaVal = headerConfig.ctaLink || '';
+                                                    const sectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
+                                                    const isCustom = ctaVal !== '' && !sectionOptions.includes(ctaVal);
+                                                    const roleLabels: Record<string, string> = {
+                                                        hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
+                                                        pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
+                                                        cta: 'CTA', footer: 'フッター', other: 'その他',
+                                                        'html-embed': 'HTML埋め込み',
+                                                    };
+                                                    const selectedLabel = isCustom ? 'カスタムURL' : ctaVal === '#contact' ? 'お問い合わせ' : ctaVal ? (roleLabels[ctaVal.replace('#', '')] || ctaVal) : '未選択';
+                                                    return (
+                                                        <>
                                                             <button
-                                                                onClick={() => {
-                                                                    setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: '#contact' }));
-                                                                    toggleHeaderSection('ctaLink');
-                                                                }}
-                                                                className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${ctaVal === '#contact' ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                onClick={() => toggleHeaderSection('ctaLink')}
+                                                                className="flex items-center justify-between w-full text-xs font-medium text-gray-600 py-1.5 hover:text-purple-600"
                                                             >
-                                                                お問い合わせ
+                                                                <span>リンク先: <span className="text-purple-600">{selectedLabel}</span></span>
+                                                                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('ctaLink') ? 'rotate-180' : ''}`} />
                                                             </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: 'https://' }));
-                                                                    if (!isCustom) toggleHeaderSection('ctaLink');
-                                                                }}
-                                                                className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${isCustom ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
-                                                            >
-                                                                カスタムURL
-                                                            </button>
-                                                            {isCustom && (
-                                                                <input
-                                                                    type="text"
-                                                                    value={ctaVal}
-                                                                    onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
-                                                                    placeholder="https://example.com"
-                                                                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
-                                                                />
+                                                            {headerOpenSections.has('ctaLink') && (
+                                                                <div className="space-y-1 pb-2">
+                                                                    {sections.map((section: any) => (
+                                                                        <button
+                                                                            key={section.id}
+                                                                            onClick={() => {
+                                                                                setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: `#${section.role}` }));
+                                                                                toggleHeaderSection('ctaLink');
+                                                                            }}
+                                                                            className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${ctaVal === `#${section.role}` ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                        >
+                                                                            {roleLabels[section.role] || section.role}
+                                                                        </button>
+                                                                    ))}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: '#contact' }));
+                                                                            toggleHeaderSection('ctaLink');
+                                                                        }}
+                                                                        className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${ctaVal === '#contact' ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                    >
+                                                                        お問い合わせ
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: 'https://' }));
+                                                                            if (!isCustom) toggleHeaderSection('ctaLink');
+                                                                        }}
+                                                                        className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${isCustom ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                    >
+                                                                        カスタムURL
+                                                                    </button>
+                                                                    {isCustom && (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={ctaVal}
+                                                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, ctaLink: e.target.value }))}
+                                                                            placeholder="https://example.com"
+                                                                            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                             )}
-                                                        </div>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-                                )}
+                                                        </>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 {/* ナビゲーション */}
                                 <div className="border-t border-gray-100 pt-1">
@@ -4523,141 +4523,141 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('nav') ? 'rotate-180' : ''}`} />
                                     </button>
                                     {headerOpenSections.has('nav') && (
-                                    <div className="pt-2 space-y-2">
-                                        {headerConfig.navItems.map((item: { id: string; label: string; href: string }, index: number) => (
-                                            <div key={item.id} className="p-2 bg-gray-50 rounded-lg space-y-1.5">
-                                                <div className="flex gap-1.5 items-center">
-                                                    <input
-                                                        type="text"
-                                                        value={item.label}
-                                                        onChange={(e) => {
-                                                            const newLabel = e.target.value;
-                                                            setHeaderConfig((prev: typeof headerConfig) => ({
-                                                                ...prev,
-                                                                navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                    i === index ? { ...navItem, label: newLabel } : navItem
-                                                                )
-                                                            }));
-                                                        }}
-                                                        placeholder="表示テキスト"
-                                                        className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
-                                                    />
-                                                    <button
-                                                        onClick={() => {
-                                                            setHeaderConfig((prev: typeof headerConfig) => ({
-                                                                ...prev,
-                                                                navItems: prev.navItems.filter((_: { id: string; label: string; href: string }, i: number) => i !== index)
-                                                            }));
-                                                        }}
-                                                        className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </div>
-                                                {(() => {
-                                                    const navVal = item.href || '';
-                                                    const navSectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
-                                                    const navIsCustom = navVal !== '' && !navSectionOptions.includes(navVal);
-                                                    const roleLabels: Record<string, string> = {
-                                                        hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
-                                                        pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
-                                                        cta: 'CTA', footer: 'フッター', other: 'その他',
-                                                        'html-embed': 'HTML埋め込み',
-                                                    };
-                                                    const navKey = `navLink-${item.id}`;
-                                                    const selectedLabel = navIsCustom ? 'カスタムURL' : navVal === '#contact' ? 'お問い合わせ' : navVal ? (roleLabels[navVal.replace('#', '')] || navVal) : '未選択';
-                                                    return (
-                                                        <div className="flex flex-col">
-                                                            <button
-                                                                onClick={() => toggleHeaderSection(navKey)}
-                                                                className="flex items-center justify-between w-full text-xs text-gray-500 py-1 hover:text-purple-600"
-                                                            >
-                                                                <span>リンク先: <span className="text-purple-600">{selectedLabel}</span></span>
-                                                                <ChevronDown className={`h-3 w-3 transition-transform ${headerOpenSections.has(navKey) ? 'rotate-180' : ''}`} />
-                                                            </button>
-                                                            {headerOpenSections.has(navKey) && (
-                                                                <div className="space-y-0.5 pb-1">
-                                                                    {sections.map((section: any) => (
+                                        <div className="pt-2 space-y-2">
+                                            {headerConfig.navItems.map((item: { id: string; label: string; href: string }, index: number) => (
+                                                <div key={item.id} className="p-2 bg-gray-50 rounded-lg space-y-1.5">
+                                                    <div className="flex gap-1.5 items-center">
+                                                        <input
+                                                            type="text"
+                                                            value={item.label}
+                                                            onChange={(e) => {
+                                                                const newLabel = e.target.value;
+                                                                setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                    ...prev,
+                                                                    navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                        i === index ? { ...navItem, label: newLabel } : navItem
+                                                                    )
+                                                                }));
+                                                            }}
+                                                            placeholder="表示テキスト"
+                                                            className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                        />
+                                                        <button
+                                                            onClick={() => {
+                                                                setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                    ...prev,
+                                                                    navItems: prev.navItems.filter((_: { id: string; label: string; href: string }, i: number) => i !== index)
+                                                                }));
+                                                            }}
+                                                            className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                    {(() => {
+                                                        const navVal = item.href || '';
+                                                        const navSectionOptions = ['', ...sections.map((s: any) => `#${s.role}`), '#contact'];
+                                                        const navIsCustom = navVal !== '' && !navSectionOptions.includes(navVal);
+                                                        const roleLabels: Record<string, string> = {
+                                                            hero: 'ヒーロー', problem: 'お悩み', solution: '解決策',
+                                                            pricing: '料金', faq: 'FAQ', testimony: 'お客様の声',
+                                                            cta: 'CTA', footer: 'フッター', other: 'その他',
+                                                            'html-embed': 'HTML埋め込み',
+                                                        };
+                                                        const navKey = `navLink-${item.id}`;
+                                                        const selectedLabel = navIsCustom ? 'カスタムURL' : navVal === '#contact' ? 'お問い合わせ' : navVal ? (roleLabels[navVal.replace('#', '')] || navVal) : '未選択';
+                                                        return (
+                                                            <div className="flex flex-col">
+                                                                <button
+                                                                    onClick={() => toggleHeaderSection(navKey)}
+                                                                    className="flex items-center justify-between w-full text-xs text-gray-500 py-1 hover:text-purple-600"
+                                                                >
+                                                                    <span>リンク先: <span className="text-purple-600">{selectedLabel}</span></span>
+                                                                    <ChevronDown className={`h-3 w-3 transition-transform ${headerOpenSections.has(navKey) ? 'rotate-180' : ''}`} />
+                                                                </button>
+                                                                {headerOpenSections.has(navKey) && (
+                                                                    <div className="space-y-0.5 pb-1">
+                                                                        {sections.map((section: any) => (
+                                                                            <button
+                                                                                key={section.id}
+                                                                                onClick={() => {
+                                                                                    setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                                        ...prev,
+                                                                                        navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                                            i === index ? { ...navItem, href: `#${section.role}` } : navItem
+                                                                                        )
+                                                                                    }));
+                                                                                    toggleHeaderSection(navKey);
+                                                                                }}
+                                                                                className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navVal === `#${section.role}` ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                            >
+                                                                                {roleLabels[section.role] || section.role}
+                                                                            </button>
+                                                                        ))}
                                                                         <button
-                                                                            key={section.id}
                                                                             onClick={() => {
                                                                                 setHeaderConfig((prev: typeof headerConfig) => ({
                                                                                     ...prev,
                                                                                     navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                                        i === index ? { ...navItem, href: `#${section.role}` } : navItem
+                                                                                        i === index ? { ...navItem, href: '#contact' } : navItem
                                                                                     )
                                                                                 }));
                                                                                 toggleHeaderSection(navKey);
                                                                             }}
-                                                                            className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navVal === `#${section.role}` ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                            className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navVal === '#contact' ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
                                                                         >
-                                                                            {roleLabels[section.role] || section.role}
+                                                                            お問い合わせ
                                                                         </button>
-                                                                    ))}
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setHeaderConfig((prev: typeof headerConfig) => ({
-                                                                                ...prev,
-                                                                                navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                                    i === index ? { ...navItem, href: '#contact' } : navItem
-                                                                                )
-                                                                            }));
-                                                                            toggleHeaderSection(navKey);
-                                                                        }}
-                                                                        className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navVal === '#contact' ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
-                                                                    >
-                                                                        お問い合わせ
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setHeaderConfig((prev: typeof headerConfig) => ({
-                                                                                ...prev,
-                                                                                navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                                    i === index ? { ...navItem, href: 'https://' } : navItem
-                                                                                )
-                                                                            }));
-                                                                            if (!navIsCustom) toggleHeaderSection(navKey);
-                                                                        }}
-                                                                        className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navIsCustom ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
-                                                                    >
-                                                                        カスタムURL
-                                                                    </button>
-                                                                    {navIsCustom && (
-                                                                        <input
-                                                                            type="text"
-                                                                            value={navVal}
-                                                                            onChange={(e) => {
-                                                                                const newHref = e.target.value;
+                                                                        <button
+                                                                            onClick={() => {
                                                                                 setHeaderConfig((prev: typeof headerConfig) => ({
                                                                                     ...prev,
                                                                                     navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
-                                                                                        i === index ? { ...navItem, href: newHref } : navItem
+                                                                                        i === index ? { ...navItem, href: 'https://' } : navItem
                                                                                     )
                                                                                 }));
+                                                                                if (!navIsCustom) toggleHeaderSection(navKey);
                                                                             }}
-                                                                            placeholder="https://example.com"
-                                                                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-                                        ))}
-                                        <button
-                                            onClick={() => {
-                                                setHeaderConfig((prev: typeof headerConfig) => ({
-                                                    ...prev,
-                                                    navItems: [...(prev.navItems || []), { id: `nav-${Date.now()}`, label: '', href: '' }]
-                                                }));
-                                            }}
-                                            className="w-full py-1 text-xs text-purple-600 border border-dashed border-purple-300 rounded hover:bg-purple-50 transition-colors"
-                                        >
-                                            + ナビを追加
-                                        </button>
-                                    </div>
+                                                                            className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${navIsCustom ? 'bg-purple-100 text-purple-700 font-medium' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                                        >
+                                                                            カスタムURL
+                                                                        </button>
+                                                                        {navIsCustom && (
+                                                                            <input
+                                                                                type="text"
+                                                                                value={navVal}
+                                                                                onChange={(e) => {
+                                                                                    const newHref = e.target.value;
+                                                                                    setHeaderConfig((prev: typeof headerConfig) => ({
+                                                                                        ...prev,
+                                                                                        navItems: prev.navItems.map((navItem: { id: string; label: string; href: string }, i: number) =>
+                                                                                            i === index ? { ...navItem, href: newHref } : navItem
+                                                                                        )
+                                                                                    }));
+                                                                                }}
+                                                                                placeholder="https://example.com"
+                                                                                className="w-full px-2 py-1 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            ))}
+                                            <button
+                                                onClick={() => {
+                                                    setHeaderConfig((prev: typeof headerConfig) => ({
+                                                        ...prev,
+                                                        navItems: [...(prev.navItems || []), { id: `nav-${Date.now()}`, label: '', href: '' }]
+                                                    }));
+                                                }}
+                                                className="w-full py-1 text-xs text-purple-600 border border-dashed border-purple-300 rounded hover:bg-purple-50 transition-colors"
+                                            >
+                                                + ナビを追加
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                                 {/* ヘッダー固定設定 */}
@@ -4670,18 +4670,18 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('display') ? 'rotate-180' : ''}`} />
                                     </button>
                                     {headerOpenSections.has('display') && (
-                                    <div className="flex items-center gap-2 pt-1 pb-2">
-                                        <input
-                                            type="checkbox"
-                                            id="header-sticky"
-                                            checked={headerConfig.sticky}
-                                            onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, sticky: e.target.checked }))}
-                                            className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                                        />
-                                        <label htmlFor="header-sticky" className="text-xs text-gray-600">
-                                            スクロール時にヘッダーを固定
-                                        </label>
-                                    </div>
+                                        <div className="flex items-center gap-2 pt-1 pb-2">
+                                            <input
+                                                type="checkbox"
+                                                id="header-sticky"
+                                                checked={headerConfig.sticky}
+                                                onChange={(e) => setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, sticky: e.target.checked }))}
+                                                className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                            />
+                                            <label htmlFor="header-sticky" className="text-xs text-gray-600">
+                                                スクロール時にヘッダーを固定
+                                            </label>
+                                        </div>
                                     )}
                                 </div>
                                 {/* AIでヘッダーを作成 */}
@@ -4694,86 +4694,86 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${headerOpenSections.has('aiHeader') ? 'rotate-180' : ''}`} />
                                     </button>
                                     {headerOpenSections.has('aiHeader') && (
-                                    <div className="space-y-2 pt-1 pb-2">
-                                        <div>
-                                            <label className="block text-xs text-gray-500 mb-1">スタイル</label>
-                                            <div className="grid grid-cols-2 gap-1">
-                                                {([['professional', 'プロフェッショナル'], ['casual', 'カジュアル'], ['modern', 'モダン'], ['minimal', 'ミニマル']] as const).map(([val, label]) => (
-                                                    <button
-                                                        key={val}
-                                                        onClick={() => setAiHeaderStyle(val)}
-                                                        className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${aiHeaderStyle === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                                                    >
-                                                        {label}
-                                                    </button>
-                                                ))}
+                                        <div className="space-y-2 pt-1 pb-2">
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">スタイル</label>
+                                                <div className="grid grid-cols-2 gap-1">
+                                                    {([['professional', 'プロフェッショナル'], ['casual', 'カジュアル'], ['modern', 'モダン'], ['minimal', 'ミニマル']] as const).map(([val, label]) => (
+                                                        <button
+                                                            key={val}
+                                                            onClick={() => setAiHeaderStyle(val)}
+                                                            className={`px-2 py-1.5 text-xs rounded-md border transition-colors ${aiHeaderStyle === val ? 'bg-purple-100 border-purple-400 text-purple-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                        >
+                                                            {label}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs text-gray-500 mb-1">メインカラー</label>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="color"
-                                                    value={aiHeaderColor}
-                                                    onChange={(e) => setAiHeaderColor(e.target.value)}
-                                                    className="w-8 h-8 rounded border border-gray-200 cursor-pointer"
-                                                />
-                                                <span className="text-xs text-gray-500">{aiHeaderColor}</span>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">メインカラー</label>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="color"
+                                                        value={aiHeaderColor}
+                                                        onChange={(e) => setAiHeaderColor(e.target.value)}
+                                                        className="w-8 h-8 rounded border border-gray-200 cursor-pointer"
+                                                    />
+                                                    <span className="text-xs text-gray-500">{aiHeaderColor}</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <button
-                                            onClick={async () => {
-                                                setIsGeneratingHeader(true);
-                                                try {
-                                                    const res = await fetch('/api/ai/generate-header', {
-                                                        method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({
-                                                            serviceName: headerConfig.logoText || 'My Brand',
-                                                            style: aiHeaderStyle,
-                                                            color: aiHeaderColor,
-                                                            ctaText: headerConfig.ctaText || 'お問い合わせ',
-                                                            ctaLink: headerConfig.ctaLink || '#contact',
-                                                            navItems: headerConfig.navItems || [],
-                                                        }),
-                                                    });
-                                                    if (!res.ok) {
-                                                        const err = await res.json();
-                                                        throw new Error(err.message || err.error || 'ヘッダー生成に失敗');
-                                                    }
-                                                    const data = await res.json();
-                                                    setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, headerHtml: data.headerHtml }));
-                                                    toast.success('ヘッダーを生成しました');
-                                                } catch (err: any) {
-                                                    toast.error(err.message || 'ヘッダー生成に失敗しました');
-                                                } finally {
-                                                    setIsGeneratingHeader(false);
-                                                }
-                                            }}
-                                            disabled={isGeneratingHeader || !headerConfig.logoText}
-                                            className="w-full py-2 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
-                                        >
-                                            {isGeneratingHeader ? (
-                                                <><Loader2 className="h-3 w-3 animate-spin" />生成中...</>
-                                            ) : (
-                                                <><Sparkles className="h-3 w-3" />AIでヘッダーを生成</>
-                                            )}
-                                        </button>
-                                        {headerConfig.headerHtml && (
                                             <button
-                                                onClick={() => {
-                                                    setHeaderConfig((prev: typeof headerConfig) => {
-                                                        const { headerHtml, ...rest } = prev;
-                                                        return rest as typeof headerConfig;
-                                                    });
-                                                    toast.success('デフォルトヘッダーに戻しました');
+                                                onClick={async () => {
+                                                    setIsGeneratingHeader(true);
+                                                    try {
+                                                        const res = await fetch('/api/ai/generate-header', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({
+                                                                serviceName: headerConfig.logoText || 'My Brand',
+                                                                style: aiHeaderStyle,
+                                                                color: aiHeaderColor,
+                                                                ctaText: headerConfig.ctaText || 'お問い合わせ',
+                                                                ctaLink: headerConfig.ctaLink || '#contact',
+                                                                navItems: headerConfig.navItems || [],
+                                                            }),
+                                                        });
+                                                        if (!res.ok) {
+                                                            const err = await res.json();
+                                                            throw new Error(err.message || err.error || 'ヘッダー生成に失敗');
+                                                        }
+                                                        const data = await res.json();
+                                                        setHeaderConfig((prev: typeof headerConfig) => ({ ...prev, headerHtml: data.headerHtml }));
+                                                        toast.success('ヘッダーを生成しました');
+                                                    } catch (err: any) {
+                                                        toast.error(err.message || 'ヘッダー生成に失敗しました');
+                                                    } finally {
+                                                        setIsGeneratingHeader(false);
+                                                    }
                                                 }}
-                                                className="w-full py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                                                disabled={isGeneratingHeader || !headerConfig.logoText}
+                                                className="w-full py-2 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
                                             >
-                                                デフォルトに戻す
+                                                {isGeneratingHeader ? (
+                                                    <><Loader2 className="h-3 w-3 animate-spin" />生成中...</>
+                                                ) : (
+                                                    <><Sparkles className="h-3 w-3" />AIでヘッダーを生成</>
+                                                )}
                                             </button>
-                                        )}
-                                    </div>
+                                            {headerConfig.headerHtml && (
+                                                <button
+                                                    onClick={() => {
+                                                        setHeaderConfig((prev: typeof headerConfig) => {
+                                                            const { headerHtml, ...rest } = prev;
+                                                            return rest as typeof headerConfig;
+                                                        });
+                                                        toast.success('デフォルトヘッダーに戻しました');
+                                                    }}
+                                                    className="w-full py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                                                >
+                                                    デフォルトに戻す
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -6314,7 +6314,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 >
                                     {isRegenerating ? (
                                         <>
-                                            <RefreshCw className="h-4 w-4 animate-spin" />
+                                            <Loader2 className="h-4 w-4 animate-spin" />
                                             処理中...
                                         </>
                                     ) : (
@@ -6350,7 +6350,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                         {isBatchRegenerating ? (
                             <div className="p-8 flex flex-col items-center justify-center">
-                                <RefreshCw className="h-10 w-10 text-blue-600 animate-spin mb-4" />
+                                <Loader2 className="h-10 w-10 text-blue-600 animate-spin mb-4" />
                                 <p className="text-sm font-medium text-gray-700">再生成中...</p>
                                 {batchRegenerateProgress && (
                                     <div className="w-full max-w-xs mt-4">

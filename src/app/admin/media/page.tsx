@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { Upload, X, Image as ImageIcon, Search, Sparkles, Wand2, Download, Copy, RefreshCw, Eye, Info, Check, Pencil } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Search, Sparkles, Wand2, Download, Copy, RefreshCw, Eye, Info, Check, Pencil, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMedia } from '@/lib/hooks/useAdminData';
 import { LazyImage } from '@/components/ui/LazyImage';
@@ -337,7 +337,7 @@ export default function MediaLibrary() {
                                     disabled={isAnalyzing}
                                     className="flex-1 flex items-center justify-center gap-2 rounded-md bg-surface-100 px-4 py-3 text-sm font-bold text-foreground hover:bg-surface-200 transition-all border border-border disabled:opacity-50"
                                 >
-                                    {isAnalyzing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                    {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                                     解析する
                                 </button>
                             </div>

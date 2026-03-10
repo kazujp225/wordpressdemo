@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Check, X, RefreshCw, Shield, Clock, Mail, Zap, Database, FileText, Crown, Ban, AlertTriangle, CreditCard, Plus, Coins, Key, Eye, EyeOff, Copy } from 'lucide-react';
+import { Check, X, RefreshCw, Loader2, Shield, Clock, Mail, Zap, Database, FileText, Crown, Ban, AlertTriangle, CreditCard, Plus, Coins, Key, Eye, EyeOff, Copy } from 'lucide-react';
 
 // プラン定義（src/lib/plans.ts と同期）
 const PLANS = {
@@ -330,7 +330,7 @@ export default function UsersPage() {
                     disabled={loading}
                     className="flex items-center justify-center gap-2 min-w-[44px] min-h-[44px] px-3 sm:px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
                 >
-                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     <span className="hidden sm:inline">更新</span>
                 </button>
             </div>
@@ -367,7 +367,7 @@ export default function UsersPage() {
             <div className="bg-white rounded-lg border overflow-hidden">
                 {loading ? (
                     <div className="p-8 text-center text-gray-500">
-                        <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
                         <p>読み込み中...</p>
                     </div>
                 ) : users.length === 0 ? (
@@ -590,7 +590,7 @@ export default function UsersPage() {
                                                     <span className="text-sm text-gray-600">現在の残高</span>
                                                     <div className="flex items-center gap-2">
                                                         {creditInfoMap.get(user.id)?.loading ? (
-                                                            <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
+                                                            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                                                         ) : (
                                                             <span className="text-xl font-bold text-amber-600">
                                                                 {formatTokens(creditInfoMap.get(user.id)?.currentBalanceTokens || 0)} クレジット
@@ -665,7 +665,7 @@ export default function UsersPage() {
                                                 <h5 className="text-sm font-medium text-gray-700 mb-2">最近の履歴（直近20件）</h5>
                                                 {creditInfoMap.get(user.id)?.loading ? (
                                                     <div className="flex items-center justify-center py-4">
-                                                        <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
+                                                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                                                     </div>
                                                 ) : creditInfoMap.get(user.id)?.recentTransactions?.length === 0 ? (
                                                     <p className="text-sm text-gray-400 py-2">履歴がありません</p>
@@ -771,7 +771,7 @@ export default function UsersPage() {
                                                             className="px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center gap-2 transition-colors min-h-[44px] whitespace-nowrap"
                                                         >
                                                             {settingPassword === user.id ? (
-                                                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
                                                             ) : (
                                                                 <Key className="w-4 h-4" />
                                                             )}

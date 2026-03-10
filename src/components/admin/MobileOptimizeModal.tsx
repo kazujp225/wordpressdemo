@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Smartphone, RefreshCw, Check, Sparkles, Monitor, DollarSign } from 'lucide-react';
+import { X, Smartphone, RefreshCw, Check, Sparkles, Monitor, DollarSign, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -103,7 +103,7 @@ export default function MobileOptimizeModal({
                 <div className="flex-1 overflow-y-auto p-6">
                     {isOptimizing ? (
                         <div className="flex flex-col items-center justify-center py-16">
-                            <RefreshCw className="h-12 w-12 text-gray-900 animate-spin mb-4" />
+                            <Loader2 className="h-12 w-12 text-gray-900 animate-spin mb-4" />
                             <p className="text-lg font-bold text-gray-900 mb-2">
                                 最適化中... {progress.current}/{progress.total}
                             </p>

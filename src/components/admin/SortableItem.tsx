@@ -3,7 +3,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, RefreshCw, Pencil } from 'lucide-react';
+import { GripVertical, Trash2, RefreshCw, Pencil, Loader2 } from 'lucide-react';
 
 interface SortableItemProps {
     id: string;
@@ -104,7 +104,7 @@ export function SortableItem(props: SortableItemProps) {
                 )}
                 {(props.isGeneratingImage || props.isEditingImage) && (
                     <div className="absolute inset-0 bg-purple-600/80 flex items-center justify-center">
-                        <RefreshCw className="h-4 w-4 text-white animate-spin" />
+                        <Loader2 className="h-4 w-4 text-white animate-spin" />
                     </div>
                 )}
             </div>
