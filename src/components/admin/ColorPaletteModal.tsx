@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Sparkles, RefreshCw, Palette, DollarSign, Crown, Lock } from 'lucide-react';
+import { X, Sparkles, RefreshCw, Palette, DollarSign, Crown, Lock, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { estimateImageCost } from '@/lib/ai-costs';
@@ -201,7 +201,7 @@ export default function ColorPaletteModal({
                             </>
                         ) : isDetecting ? (
                             <>
-                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                                 検出中...
                             </>
                         ) : (
@@ -291,7 +291,7 @@ export default function ColorPaletteModal({
                                     </>
                                 ) : isRegenerating ? (
                                     <>
-                                        <RefreshCw className="h-4 w-4 animate-spin" />
+                                        <Loader2 className="h-4 w-4 animate-spin" />
                                         再生成中...
                                     </>
                                 ) : (

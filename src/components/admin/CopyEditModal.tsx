@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Type, Sparkles, Copy, Check, RefreshCw, Wand2, DollarSign } from 'lucide-react';
+import { X, Type, Sparkles, Copy, Check, RefreshCw, Wand2, DollarSign, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -279,7 +279,7 @@ export default function CopyEditModal({
 
                     {step === 'generating' && (
                         <div className="flex flex-col items-center justify-center py-16">
-                            <RefreshCw className="h-12 w-12 text-emerald-500 animate-spin mb-4" />
+                            <Loader2 className="h-12 w-12 text-emerald-500 animate-spin mb-4" />
                             <p className="text-lg font-bold text-gray-900 mb-2">コピーを生成中...</p>
                             <p className="text-sm text-gray-500">最適なキャッチコピーを生成しています</p>
                         </div>
@@ -410,7 +410,7 @@ export default function CopyEditModal({
                                     >
                                         {isRegenerating ? (
                                             <>
-                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                                <Loader2 className="h-4 w-4 animate-spin" />
                                                 再生成中...
                                             </>
                                         ) : (
