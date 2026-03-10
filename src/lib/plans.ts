@@ -101,7 +101,7 @@ export const PLANS: Record<PlanType, Plan> = {
       maxPages: 3,
       maxBanners: -1, // 無制限
       maxStorageMB: 500,
-      canAIGenerate: true,
+      canAIGenerate: false,
       canUpscale4K: false,
       canRestyle: false,
       canExport: true,

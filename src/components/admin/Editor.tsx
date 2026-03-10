@@ -5118,20 +5118,13 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     description="Claude AIでHTML/CSS/JSを生成"
                                     tooltip="Claude AIでHTML/CSS/JSコードを自動生成します"
                                     iconVariant="dark"
-                                    badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : <EditorBadge variant="new">NEW</EditorBadge>}
+                                    badge={<EditorBadge variant="new">NEW</EditorBadge>}
                                     action={
                                         <EditorActionButton
-                                            onClick={() => {
-                                                if (planLimits?.canAIGenerate === false) {
-                                                    toast.error('有料プランにアップグレードしてご利用ください');
-                                                    return;
-                                                }
-                                                setShowClaudeGeneratorModal(true);
-                                            }}
-                                            variant={planLimits?.canAIGenerate === false ? "default" : "primary"}
-                                            disabled={planLimits?.canAIGenerate === false}
+                                            onClick={() => setShowClaudeGeneratorModal(true)}
+                                            variant="primary"
                                         >
-                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : 'コードを生成'}
+                                            コードを生成
                                         </EditorActionButton>
                                     }
                                 />
