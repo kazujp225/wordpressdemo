@@ -927,6 +927,19 @@ export default function ClaudeCodeGeneratorModal({ onClose, sections, designDefi
                     {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                     {copied ? 'コピー済' : 'コピー'}
                   </button>
+                  <button
+                    onClick={() => {
+                      const html = previewDevice === 'mobile' && generatedHtmlMobile ? generatedHtmlMobile : generatedHtml;
+                      const blob = new Blob([html], { type: 'text/html' });
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, '_blank');
+                      setTimeout(() => URL.revokeObjectURL(url), 5000);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    実際に確認
+                  </button>
                 </div>
               </div>
               <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-100 flex items-start justify-center" style={{ height: '420px' }}>

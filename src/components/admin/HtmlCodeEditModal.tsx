@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Eye, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2 } from 'lucide-react';
+import { X, Copy, Check, Eye, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2, ExternalLink } from 'lucide-react';
 import type { DesignContext } from '@/lib/claude-templates';
 import toast from 'react-hot-toast';
 
@@ -291,6 +291,15 @@ export default function HtmlCodeEditModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // フルスクリーンプレビュー（新しいタブで実際のHTMLを表示）
+  const handleFullPreview = () => {
+    const blob = new Blob([modifiedHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    // メモリリーク防止: 少し遅延してから解放
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -531,6 +540,13 @@ document.querySelector('form').addEventListener('submit', async function(e) {
                 >
                   {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                   {copied ? 'コピー済' : 'コピー'}
+                </button>
+                <button
+                  onClick={handleFullPreview}
+                  className="flex items-center gap-1 text-xs text-white bg-gray-900 hover:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  実際に確認
                 </button>
               </div>
             </div>
