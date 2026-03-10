@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClaudeClient } from '@/lib/claude';
 import { createClient } from '@/lib/supabase/server';
-import { checkGenerationLimit, recordApiUsage, incrementFreeAICodeGenCount } from '@/lib/usage';
+import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import type { DesignContext } from '@/lib/claude-templates';
 import { estimateClaudeCost } from '@/lib/ai-costs';
@@ -99,12 +99,12 @@ export async function POST(request: NextRequest) {
   });
 
   // Credit check
-  const limitCheck = await checkGenerationLimit(user.id, undefined, { isAICodeGen: true });
+  const limitCheck = await checkGenerationLimit(user.id);
   if (!limitCheck.allowed) {
     return NextResponse.json({
       error: limitCheck.needApiKey ? 'API_KEY_REQUIRED' :
              limitCheck.needPurchase ? 'CREDIT_INSUFFICIENT' :
-             limitCheck.needSubscription ? 'UPGRADE_REQUIRED' : 'USAGE_LIMIT_EXCEEDED',
+             'USAGE_LIMIT_EXCEEDED',
       message: limitCheck.reason,
       needApiKey: limitCheck.needApiKey,
       needPurchase: limitCheck.needPurchase,
@@ -175,11 +175,6 @@ ${editPrompt}
         inputTokens,
         outputTokens,
       });
-    }
-
-    // Freeプラン無料枠カウンターインクリメント
-    if (limitCheck.isFreeAICodeGen) {
-      await incrementFreeAICodeGenCount(user.id);
     }
 
     return NextResponse.json({

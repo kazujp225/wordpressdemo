@@ -13,8 +13,6 @@ export type PlanType = 'free' | 'starter' | 'pro' | 'business' | 'enterprise' | 
 /** Freeプランのバナー AI編集無料回数（生涯） */
 export const FREE_BANNER_EDIT_LIMIT = 3;
 
-/** Freeプランの AIコード生成無料回数（生涯） */
-export const FREE_AI_CODEGEN_LIMIT = 5;
 
 export interface PlanLimits {
   // 最大ページ数
@@ -39,8 +37,6 @@ export interface PlanLimits {
   prioritySupport: boolean;
   // Freeプラン用: バナーAI編集の無料回数（0 = 無料枠なし＝クレジット制）
   freeBannerEditLimit: number;
-  // Freeプラン用: AIコード生成の無料回数（0 = 無料枠なし＝クレジット制）
-  freeAICodeGenLimit: number;
 }
 
 export interface Plan {
@@ -109,14 +105,12 @@ export const PLANS: Record<PlanType, Plan> = {
       canSetApiKey: false,
       prioritySupport: false,
       freeBannerEditLimit: FREE_BANNER_EDIT_LIMIT,
-      freeAICodeGenLimit: FREE_AI_CODEGEN_LIMIT,
     },
     features: [
       '最大3ページ',
       '画像アップロード・編集',
       'エクスポート機能',
       `バナーAI編集 ${FREE_BANNER_EDIT_LIMIT}回無料`,
-      `AIコード生成 ${FREE_AI_CODEGEN_LIMIT}回無料`,
     ],
   },
 
@@ -143,7 +137,6 @@ export const PLANS: Record<PlanType, Plan> = {
       canSetApiKey: false,
       prioritySupport: false,
       freeBannerEditLimit: 0,
-      freeAICodeGenLimit: 0,
     },
     features: [
       '最大10ページ',
@@ -177,7 +170,6 @@ export const PLANS: Record<PlanType, Plan> = {
       canSetApiKey: false,
       prioritySupport: false,
       freeBannerEditLimit: 0,
-      freeAICodeGenLimit: 0,
     },
     features: [
       '最大30ページ',
@@ -210,7 +202,6 @@ export const PLANS: Record<PlanType, Plan> = {
       canSetApiKey: false,
       prioritySupport: false,
       freeBannerEditLimit: 0,
-      freeAICodeGenLimit: 0,
     },
     features: [
       '最大50ページ',
@@ -243,7 +234,6 @@ export const PLANS: Record<PlanType, Plan> = {
       canSetApiKey: false,
       prioritySupport: false,
       freeBannerEditLimit: 0,
-      freeAICodeGenLimit: 0,
     },
     features: [
       '無制限ページ',
@@ -276,7 +266,6 @@ export const PLANS: Record<PlanType, Plan> = {
       canSetApiKey: false,
       prioritySupport: false,
       freeBannerEditLimit: 0,
-      freeAICodeGenLimit: 0,
     },
     features: [
       '無制限ページ',
