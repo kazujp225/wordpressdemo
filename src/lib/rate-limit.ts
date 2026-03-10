@@ -10,9 +10,10 @@ interface RateLimitEntry {
 
 // インメモリストア（サーバーレス環境では各インスタンスで独立）
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const MAX_STORE_SIZE = 10000;
 
 // 定期的にストアをクリーンアップ（メモリリーク防止）
-const CLEANUP_INTERVAL = 60 * 1000; // 1分ごと
+const CLEANUP_INTERVAL = 30 * 1000; // 30秒ごと
 let lastCleanup = Date.now();
 
 function cleanupExpiredEntries() {
@@ -24,6 +25,10 @@ function cleanupExpiredEntries() {
     if (now > entry.resetTime) {
       rateLimitStore.delete(key);
     }
+  }
+  // サイズ上限を超えた場合は全クリア（安全弁）
+  if (rateLimitStore.size > MAX_STORE_SIZE) {
+    rateLimitStore.clear();
   }
 }
 

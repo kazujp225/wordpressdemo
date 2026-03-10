@@ -366,6 +366,10 @@ export async function POST(request: NextRequest) {
                         '--disable-setuid-sandbox',
                         '--disable-dev-shm-usage',
                         '--disable-gpu',
+                        '--disable-extensions',
+                        '--disable-background-networking',
+                        '--js-flags=--max-old-space-size=256',
+                        '--single-process',
                     ],
                 });
             } else {
@@ -374,7 +378,7 @@ export async function POST(request: NextRequest) {
                 log.info(`Using @sparticuz/chromium: ${executablePath}`);
 
                 browser = await puppeteer.launch({
-                    args: chromium.args,
+                    args: [...chromium.args, '--js-flags=--max-old-space-size=256', '--single-process'],
                     executablePath,
                     headless: true,
                 });

@@ -23,37 +23,74 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const body = await request.json();
-        const { pageId, sectionId, croppedImage, cropData } = body as {
-            pageId: string;
-            sectionId: string;
-            croppedImage: string;
-            cropData: CropData;
-        };
+        let pageId: string;
+        let sectionId: string;
+        let cropData: CropData;
+        let buffer: Buffer;
+        let mimeType: string;
 
-        if (!pageId || !sectionId || !croppedImage) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        const contentType = request.headers.get('content-type') || '';
+
+        if (contentType.includes('multipart/form-data')) {
+            // FormData形式（高速：バイナリ送信）
+            const formData = await request.formData();
+            const imageFile = formData.get('image') as File;
+            pageId = formData.get('pageId') as string;
+            sectionId = formData.get('sectionId') as string;
+            cropData = JSON.parse(formData.get('cropData') as string);
+
+            if (!imageFile || !pageId || !sectionId) {
+                return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+            }
+
+            buffer = Buffer.from(await imageFile.arrayBuffer());
+            mimeType = imageFile.type || 'image/jpeg';
+        } else {
+            // JSON形式（後方互換）
+            const body = await request.json();
+            pageId = body.pageId;
+            sectionId = body.sectionId;
+            cropData = body.cropData;
+            const croppedImage = body.croppedImage as string;
+
+            if (!pageId || !sectionId || !croppedImage) {
+                return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+            }
+
+            const base64Data = croppedImage.replace(/^data:image\/\w+;base64,/, '');
+            buffer = Buffer.from(base64Data, 'base64');
+            mimeType = 'image/png';
         }
 
-        // Base64からバッファに変換
-        const base64Data = croppedImage.replace(/^data:image\/\w+;base64,/, '');
-        const buffer = Buffer.from(base64Data, 'base64');
+        const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
 
         // ファイル名を生成
         const timestamp = Date.now();
-        const fileName = `cropped_${sectionId}_${timestamp}.png`;
+        const fileName = `cropped_${sectionId}_${timestamp}.${ext}`;
         const filePath = `sections/${pageId}/${fileName}`;
 
-        // Supabaseにアップロード
-        const { data: uploadData, error: uploadError } = await supabaseStorage.storage
-            .from('images')
-            .upload(filePath, buffer, {
-                contentType: 'image/png',
-                upsert: true
-            });
+        // 数値IDに変換（先にチェック）
+        const numericSectionId = parseInt(sectionId);
+        const isTempSection = isNaN(numericSectionId);
 
-        if (uploadError) {
-            console.error('Supabase upload error:', uploadError);
+        // アップロードとDB検索を並列実行
+        const [uploadResult, section] = await Promise.all([
+            supabaseStorage.storage
+                .from('images')
+                .upload(filePath, buffer, {
+                    contentType: mimeType,
+                    upsert: true
+                }),
+            isTempSection
+                ? Promise.resolve(null)
+                : prisma.pageSection.findUnique({
+                    where: { id: numericSectionId },
+                    include: { image: true, page: true }
+                }),
+        ]);
+
+        if (uploadResult.error) {
+            console.error('Supabase upload error:', uploadResult.error);
             return NextResponse.json({ error: 'Failed to upload cropped image' }, { status: 500 });
         }
 
@@ -64,9 +101,7 @@ export async function POST(request: NextRequest) {
 
         const publicUrl = urlData.publicUrl;
 
-        // 数値IDに変換
-        const numericSectionId = parseInt(sectionId);
-        if (isNaN(numericSectionId)) {
+        if (isTempSection) {
             // temp-で始まるセクションの場合はDBを更新しない
             return NextResponse.json({
                 success: true,
@@ -74,12 +109,6 @@ export async function POST(request: NextRequest) {
                 message: 'Cropped image saved (temp section)'
             });
         }
-
-        // データベースでセクションのimageIdを更新
-        const section = await prisma.pageSection.findUnique({
-            where: { id: numericSectionId },
-            include: { image: true, page: true }
-        });
 
         if (!section) {
             return NextResponse.json({ error: 'Section not found' }, { status: 404 });
@@ -94,29 +123,31 @@ export async function POST(request: NextRequest) {
         const newMedia = await prisma.mediaImage.create({
             data: {
                 filePath: publicUrl,
-                mime: 'image/png',
+                mime: mimeType,
                 sourceType: 'cropped',
             }
         });
 
-        // 履歴を保存（復元用）
-        if (section.imageId) {
-            await prisma.sectionImageHistory.create({
-                data: {
-                    sectionId: numericSectionId,
-                    userId: user.id,
-                    previousImageId: section.imageId,
-                    newImageId: newMedia.id,
-                    actionType: 'crop',
-                }
-            });
-        }
-
-        // セクションを更新
-        await prisma.pageSection.update({
-            where: { id: numericSectionId },
-            data: { imageId: newMedia.id }
-        });
+        // 履歴保存 + セクション更新を並列実行
+        await Promise.all([
+            // 履歴を保存（復元用）
+            section.imageId
+                ? prisma.sectionImageHistory.create({
+                    data: {
+                        sectionId: numericSectionId,
+                        userId: user.id,
+                        previousImageId: section.imageId,
+                        newImageId: newMedia.id,
+                        actionType: 'crop',
+                    }
+                })
+                : Promise.resolve(),
+            // セクションを更新
+            prisma.pageSection.update({
+                where: { id: numericSectionId },
+                data: { imageId: newMedia.id }
+            }),
+        ]);
 
         return NextResponse.json({
             success: true,

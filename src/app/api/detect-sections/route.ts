@@ -250,66 +250,73 @@ export async function POST(request: NextRequest) {
         log.info('Launching Puppeteer...');
         const { launchBrowser } = await import('@/lib/puppeteer');
         const browser = await launchBrowser();
-        const page = await browser.newPage();
 
-        await page.setViewport({
-            width: deviceConfig.width,
-            height: deviceConfig.height,
-            deviceScaleFactor: deviceConfig.deviceScaleFactor,
-            isMobile: deviceConfig.isMobile,
-            hasTouch: deviceConfig.isMobile
-        });
-
-        if (deviceConfig.userAgent) {
-            await page.setUserAgent(deviceConfig.userAgent);
-        }
-
-        // Navigate to URL
-        log.info('Navigating to URL...');
-        await page.goto(url, {
-            waitUntil: 'networkidle2',
-            timeout: 30000
-        });
-
-        // Wait for content to load
-        await page.waitForFunction(() => document.readyState === 'complete', { timeout: 10000 }).catch(() => { });
-
-        // Scroll to load lazy content
-        log.info('Loading lazy content...');
-        await page.evaluate(async () => {
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-            for (let i = 0; i < 3; i++) {
-                window.scrollTo(0, (i + 1) * (document.body.scrollHeight / 3));
-                await delay(500);
-            }
-            window.scrollTo(0, 0);
-        });
-
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Get page dimensions
-        const dimensions = await page.evaluate(() => ({
-            width: document.documentElement.scrollWidth,
-            height: document.documentElement.scrollHeight
-        }));
-
-        log.info(`Page dimensions: ${dimensions.width}x${dimensions.height}px`);
-
-        // Take full page screenshot using viewport stitching
-        log.info('Taking full page screenshot...');
-
+        let dimensions: { width: number; height: number };
+        let screenshots: Buffer[] = [];
         const viewportHeight = deviceConfig.height;
-        const numCaptures = Math.ceil(dimensions.height / viewportHeight);
-        const screenshots: Buffer[] = [];
 
-        for (let i = 0; i < numCaptures; i++) {
-            await page.evaluate((scrollY) => window.scrollTo(0, scrollY), i * viewportHeight);
-            await new Promise(resolve => setTimeout(resolve, 200));
-            const screenshot = await page.screenshot({ type: 'png' }) as Buffer;
-            screenshots.push(screenshot);
+        try {
+            const page = await browser.newPage();
+
+            await page.setViewport({
+                width: deviceConfig.width,
+                height: deviceConfig.height,
+                deviceScaleFactor: deviceConfig.deviceScaleFactor,
+                isMobile: deviceConfig.isMobile,
+                hasTouch: deviceConfig.isMobile
+            });
+
+            if (deviceConfig.userAgent) {
+                await page.setUserAgent(deviceConfig.userAgent);
+            }
+
+            // Navigate to URL
+            log.info('Navigating to URL...');
+            await page.goto(url, {
+                waitUntil: 'networkidle2',
+                timeout: 30000
+            });
+
+            // Wait for content to load
+            await page.waitForFunction(() => document.readyState === 'complete', { timeout: 10000 }).catch(() => { });
+
+            // Scroll to load lazy content
+            log.info('Loading lazy content...');
+            await page.evaluate(async () => {
+                const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+                for (let i = 0; i < 3; i++) {
+                    window.scrollTo(0, (i + 1) * (document.body.scrollHeight / 3));
+                    await delay(500);
+                }
+                window.scrollTo(0, 0);
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Get page dimensions
+            dimensions = await page.evaluate(() => ({
+                width: document.documentElement.scrollWidth,
+                height: document.documentElement.scrollHeight
+            }));
+
+            log.info(`Page dimensions: ${dimensions.width}x${dimensions.height}px`);
+
+            // Take full page screenshot using viewport stitching
+            log.info('Taking full page screenshot...');
+
+            const numCaptures = Math.ceil(dimensions.height / viewportHeight);
+
+            for (let i = 0; i < numCaptures; i++) {
+                await page.evaluate((scrollY) => window.scrollTo(0, scrollY), i * viewportHeight);
+                await new Promise(resolve => setTimeout(resolve, 200));
+                const screenshot = await page.screenshot({ type: 'png' }) as Buffer;
+                screenshots.push(screenshot);
+            }
+
+            await page.close();
+        } finally {
+            await browser.close();
         }
-
-        await browser.close();
 
         // Stitch screenshots
         log.info('Stitching screenshots...');

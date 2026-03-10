@@ -8,12 +8,32 @@ interface RateLimitEntry {
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const MAX_STORE_SIZE = 10000;
+let lastCleanup = Date.now();
+const CLEANUP_INTERVAL = 30 * 1000; // 30秒ごと
+
+function cleanupExpiredEntries() {
+  const now = Date.now();
+  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  lastCleanup = now;
+  for (const [key, entry] of rateLimitStore.entries()) {
+    if (now > entry.resetTime) {
+      rateLimitStore.delete(key);
+    }
+  }
+  // サイズ上限を超えた場合は全クリア（安全弁）
+  if (rateLimitStore.size > MAX_STORE_SIZE) {
+    rateLimitStore.clear();
+  }
+}
 
 function checkRateLimit(
   identifier: string,
   maxRequests: number,
   windowMs: number
 ): { allowed: boolean; remaining: number; retryAfterMs?: number } {
+  cleanupExpiredEntries();
+
   const now = Date.now();
   const entry = rateLimitStore.get(identifier);
 

@@ -9,9 +9,24 @@ import { decrypt } from '@/lib/encryption';
 const deployRateMap = new Map<string, number[]>();
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
+let lastDeployCleanup = Date.now();
 
 function checkRateLimit(userId: string): boolean {
   const now = Date.now();
+
+  // 30秒ごとに期限切れエントリをクリーンアップ
+  if (now - lastDeployCleanup > 30_000) {
+    lastDeployCleanup = now;
+    for (const [key, timestamps] of deployRateMap.entries()) {
+      const valid = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+      if (valid.length === 0) {
+        deployRateMap.delete(key);
+      } else {
+        deployRateMap.set(key, valid);
+      }
+    }
+  }
+
   const timestamps = deployRateMap.get(userId) || [];
   const recent = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
   if (recent.length >= RATE_LIMIT_MAX) return false;

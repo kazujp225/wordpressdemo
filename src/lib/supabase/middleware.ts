@@ -21,6 +21,13 @@ export async function updateSession(request: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
+            global: {
+                fetch: (url: RequestInfo | URL, init?: RequestInit) => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+                },
+            },
             cookies: {
                 get(name: string) {
                     return request.cookies.get(name)?.value;
@@ -64,9 +71,23 @@ export async function updateSession(request: NextRequest) {
     );
 
     // セッションを更新（重要: auth.getUser()を使用）
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) {
-        console.error('Auth Error:', error.message);
+    let user = null;
+    let authNetworkError = false;
+    try {
+        const { data, error } = await supabase.auth.getUser();
+        user = data?.user ?? null;
+        if (error) {
+            // fetch失敗（タイムアウト含む）はネットワークエラーとして扱う
+            if (error.message === 'fetch failed' || error.message?.includes('abort')) {
+                console.error('Auth Network Error (timeout):', error.message);
+                authNetworkError = true;
+            } else {
+                console.error('Auth Error:', error.message);
+            }
+        }
+    } catch (e: any) {
+        console.error('Auth Exception:', e?.message);
+        authNetworkError = true;
     }
 
     const pathname = request.nextUrl.pathname;
@@ -81,6 +102,11 @@ export async function updateSession(request: NextRequest) {
         || pathname.startsWith('/api/user/status')  // BAN/planチェック用API
         || pathname.startsWith('/api/inquiries/password-reset')  // パスワードリセット依頼
         || pathname.startsWith('/reset-password');
+
+    // ネットワークエラー時はリダイレクトせずリクエストを通す（認証失敗ではなく接続障害）
+    if (!user && authNetworkError && !isPublicRoute) {
+        return response;
+    }
 
     // 未認証ユーザーがプライベートルートにアクセスした場合、ログインページへリダイレクト
     if (!user && !isPublicRoute) {

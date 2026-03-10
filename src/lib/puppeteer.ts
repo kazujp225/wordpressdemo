@@ -38,6 +38,10 @@ export async function launchBrowser() {
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--js-flags=--max-old-space-size=256',
+            '--single-process',
           ],
         });
       }

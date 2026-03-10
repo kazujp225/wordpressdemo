@@ -18,7 +18,15 @@ export const supabase = (() => {
     });
   }
   if (!supabaseInstance) {
-    supabaseInstance = createClient(supabaseUrl, supabaseServiceKey);
+    supabaseInstance = createClient(supabaseUrl, supabaseServiceKey, {
+      global: {
+        fetch: (url: RequestInfo | URL, init?: RequestInit) => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+        },
+      },
+    });
   }
   return supabaseInstance;
 })();

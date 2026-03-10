@@ -6831,19 +6831,25 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
                         ctx.drawImage(img, 0, startY, img.width, cropHeight, 0, 0, img.width, cropHeight);
 
-                        // Base64に変換
-                        const croppedBase64 = canvas.toDataURL('image/png');
+                        // JPEG圧縮してBlobで送信（PNGの1/5〜1/10サイズ）
+                        const blob = await new Promise<Blob>((resolve, reject) => {
+                            canvas.toBlob(
+                                (b) => b ? resolve(b) : reject(new Error('Blob conversion failed')),
+                                'image/jpeg',
+                                0.85
+                            );
+                        });
+
+                        const formData = new FormData();
+                        formData.append('image', blob, 'cropped.jpg');
+                        formData.append('pageId', pageId.toString());
+                        formData.append('sectionId', sectionId);
+                        formData.append('cropData', JSON.stringify(cropData));
 
                         // サーバーに保存
                         const response = await fetch('/api/sections/crop', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                pageId,
-                                sectionId,
-                                croppedImage: croppedBase64,
-                                cropData
-                            })
+                            body: formData,
                         });
 
                         if (!response.ok) throw new Error('クロップに失敗しました');

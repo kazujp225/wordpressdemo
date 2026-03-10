@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3002",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_OPTIONS='--max-old-space-size=768' next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "fix:red-border": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/remove-red-border.ts",
