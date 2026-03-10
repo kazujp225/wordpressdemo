@@ -7054,39 +7054,51 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             )}
 
             {/* HTMLコード編集モーダル */}
-            {showHtmlEditModal && htmlEditSectionId && (() => {
-                const targetSection = sections.find(s => String(s.id) === htmlEditSectionId);
-                if (!targetSection || targetSection.role !== 'html-embed' || !targetSection.config?.htmlContent) {
-                    return null;
-                }
+            {showHtmlEditModal && (() => {
+                // html-embedセクションがある場合はそのHTMLを使用
+                const targetSection = htmlEditSectionId
+                    ? sections.find(s => String(s.id) === htmlEditSectionId && s.role === 'html-embed' && s.config?.htmlContent)
+                    : null;
+
+                const currentHtml = targetSection?.config?.htmlContent || '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>ページ</title>\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }\n</style>\n</head>\n<body>\n\n</body>\n</html>';
+
                 return (
                     <HtmlCodeEditModal
                         onClose={() => {
                             setShowHtmlEditModal(false);
                             setHtmlEditSectionId(null);
                         }}
-                        currentHtml={targetSection.config.htmlContent}
-                        templateType={targetSection.config.templateType}
-                        originalPrompt={targetSection.config.prompt}
+                        currentHtml={currentHtml}
+                        templateType={targetSection?.config?.templateType}
+                        originalPrompt={targetSection?.config?.prompt}
                         designDefinition={designDefinition}
                         layoutMode={sections[0]?.config?.layout === 'desktop' ? 'desktop' : 'responsive'}
                         pageSlug={initialSlug || pageId}
                         onSave={async (newHtml) => {
-                            // セクションのHTMLコンテンツを更新
-                            const updatedSections = sections.map(s =>
-                                String(s.id) === htmlEditSectionId
-                                    ? {
-                                        ...s,
-                                        config: {
-                                            ...s.config,
-                                            htmlContent: newHtml,
-                                        }
-                                    }
-                                    : s
-                            );
-                            setSections(updatedSections);
-                            // データベースに保存
-                            await handleSave(updatedSections);
+                            if (targetSection) {
+                                // 既存のhtml-embedセクションを更新
+                                const updatedSections = sections.map(s =>
+                                    String(s.id) === htmlEditSectionId
+                                        ? { ...s, config: { ...s.config, htmlContent: newHtml } }
+                                        : s
+                                );
+                                setSections(updatedSections);
+                                await handleSave(updatedSections);
+                            } else {
+                                // 新しいhtml-embedセクションを追加
+                                const newSection = {
+                                    id: `temp-${Date.now()}`,
+                                    role: 'html-embed',
+                                    order: sections.length,
+                                    config: {
+                                        htmlContent: newHtml,
+                                        templateType: 'custom',
+                                    },
+                                };
+                                const updatedSections = [...sections, newSection];
+                                setSections(updatedSections);
+                                await handleSave(updatedSections);
+                            }
                         }}
                     />
                 );
