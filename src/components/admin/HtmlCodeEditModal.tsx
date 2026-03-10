@@ -44,6 +44,69 @@ function getStorageKey(templateType?: string, pageSlug?: string): string {
   return `html-edit-chat:${pageSlug || 'default'}:${templateType || 'none'}`;
 }
 
+// HTML構文ハイライト（簡易版）
+function colorizeHtml(line: string): React.ReactNode {
+  // タグ、属性、文字列、コメントを色分け
+  const parts: React.ReactNode[] = [];
+  let remaining = line;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    // HTMLコメント
+    const commentMatch = remaining.match(/^(<!--[\s\S]*?-->)/);
+    if (commentMatch) {
+      parts.push(<span key={key++} style={{ color: '#545d68' }}>{commentMatch[1]}</span>);
+      remaining = remaining.slice(commentMatch[1].length);
+      continue;
+    }
+
+    // HTMLタグ
+    const tagMatch = remaining.match(/^(<\/?)([\w-]+)((?:\s+[\w-]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?)*\s*)(\/?>)/);
+    if (tagMatch) {
+      parts.push(<span key={key++} style={{ color: '#8b949e' }}>{tagMatch[1]}</span>);
+      parts.push(<span key={key++} style={{ color: '#7ee787' }}>{tagMatch[2]}</span>);
+      // 属性部分
+      const attrStr = tagMatch[3];
+      if (attrStr) {
+        const attrParts = attrStr.replace(/([\w-]+)(=)("[^"]*"|'[^']*')/g, (_m, name: string, eq: string, val: string) => {
+          return `\x01${name}\x02${eq}\x03${val}\x04`;
+        });
+        const attrTokens = attrParts.split(/(\x01.*?\x04)/);
+        attrTokens.forEach(t => {
+          const attrMatch2 = t.match(/\x01(.*?)\x02(.*?)\x03(.*?)\x04/);
+          if (attrMatch2) {
+            parts.push(<span key={key++} style={{ color: '#79c0ff' }}> {attrMatch2[1]}</span>);
+            parts.push(<span key={key++} style={{ color: '#8b949e' }}>{attrMatch2[2]}</span>);
+            parts.push(<span key={key++} style={{ color: '#a5d6ff' }}>{attrMatch2[3]}</span>);
+          } else if (t.trim()) {
+            parts.push(<span key={key++} style={{ color: '#79c0ff' }}>{t}</span>);
+          }
+        });
+      }
+      parts.push(<span key={key++} style={{ color: '#8b949e' }}>{tagMatch[4]}</span>);
+      remaining = remaining.slice(tagMatch[0].length);
+      continue;
+    }
+
+    // CSS プロパティ（style内）
+    const cssMatch = remaining.match(/^([\w-]+)(\s*:\s*)([^;{]+)(;?)/);
+    if (cssMatch && (line.includes('{') || line.includes(';') || line.trimStart().match(/^[\w-]+\s*:/))) {
+      parts.push(<span key={key++} style={{ color: '#79c0ff' }}>{cssMatch[1]}</span>);
+      parts.push(<span key={key++} style={{ color: '#8b949e' }}>{cssMatch[2]}</span>);
+      parts.push(<span key={key++} style={{ color: '#a5d6ff' }}>{cssMatch[3]}</span>);
+      parts.push(<span key={key++} style={{ color: '#8b949e' }}>{cssMatch[4]}</span>);
+      remaining = remaining.slice(cssMatch[0].length);
+      continue;
+    }
+
+    // その他の文字（1文字ずつ進める）
+    parts.push(remaining[0]);
+    remaining = remaining.slice(1);
+  }
+
+  return <>{parts}</>;
+}
+
 export default function HtmlCodeEditModal({
   onClose,
   currentHtml,
@@ -936,7 +999,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
         </div>
 
         {/* Preview Content */}
-        <div className="flex-1 overflow-auto bg-[#e8e8e3] flex items-start justify-center p-3">
+        <div className="flex-1 overflow-auto bg-[#e8e8e3] flex items-start justify-center p-3 relative">
           {showCode ? (
             <div className="w-full h-full rounded-lg overflow-auto bg-[#1e1e1e] shadow-xl">
               <pre className="p-5 text-[12px] leading-relaxed font-mono text-gray-300">
@@ -957,6 +1020,64 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               />
             </div>
           )}
+
+          {/* コード生成アニメーション — ストリーミング中にオーバーレイ表示 */}
+          {isGenerating && streamingText && (() => {
+            // ストリーミングテキストからHTMLコード部分を抽出
+            const codeMatch = streamingText.match(/```html\s*([\s\S]*)/);
+            const liveCode = codeMatch ? codeMatch[1].replace(/```\s*$/, '') : null;
+            if (!liveCode) return null;
+
+            const lines = liveCode.split('\n');
+            const visibleLines = lines.slice(-35); // 最新35行を表示
+            const startLine = Math.max(1, lines.length - 35 + 1);
+
+            return (
+              <div className="absolute inset-3 rounded-lg overflow-hidden shadow-2xl z-10 flex flex-col" style={{ background: '#0d1117' }}>
+                {/* エディタヘッダー */}
+                <div className="flex items-center justify-between px-4 py-2 border-b border-white/5" style={{ background: '#161b22' }}>
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
+                      <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
+                      <div className="w-3 h-3 rounded-full bg-[#28c840]" />
+                    </div>
+                    <span className="text-[11px] text-gray-500 ml-2 font-mono">index.html</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: '#1f6feb20', color: '#58a6ff' }}>
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                      生成中...
+                    </span>
+                    <span className="text-[10px] text-gray-600 font-mono">{lines.length} lines</span>
+                  </div>
+                </div>
+                {/* コード表示 */}
+                <div className="flex-1 overflow-hidden font-mono text-[12px] leading-[1.7]">
+                  <div className="p-4">
+                    {visibleLines.map((line, i) => {
+                      const lineNum = startLine + i;
+                      const isLast = i === visibleLines.length - 1;
+                      return (
+                        <div key={i} className="flex" style={{ opacity: isLast ? 1 : 0.7 + (i / visibleLines.length) * 0.3 }}>
+                          <span className="w-10 text-right pr-4 select-none flex-shrink-0" style={{ color: '#484f58' }}>{lineNum}</span>
+                          <span style={{ color: isLast ? '#e6edf3' : '#8b949e' }}>
+                            {colorizeHtml(line)}
+                            {isLast && <span className="inline-block w-[7px] h-[15px] ml-px align-middle rounded-sm animate-pulse" style={{ background: '#58a6ff' }} />}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* ステータスバー */}
+                <div className="flex items-center justify-between px-4 py-1.5 text-[10px] border-t border-white/5" style={{ background: '#161b22', color: '#484f58' }}>
+                  <span>HTML</span>
+                  <span>{lines.length} 行 · UTF-8</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
