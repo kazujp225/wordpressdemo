@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Eye, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2, ExternalLink, Globe, Sparkles, RotateCw, ChevronDown, ArrowRight, CheckCircle2, Circle, Zap } from 'lucide-react';
 import type { DesignContext } from '@/lib/claude-templates';
 import toast from 'react-hot-toast';
 
@@ -25,9 +25,19 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   images?: string[];
+  actions?: string[];
 }
 
-// localStorage用キー生成
+type AgentStatus = 'idle' | 'thinking' | 'generating' | 'updating' | 'done';
+
+const STATUS_LABELS: Record<AgentStatus, string> = {
+  idle: '',
+  thinking: '指示を分析中...',
+  generating: 'コードを生成中...',
+  updating: 'プレビューを更新中...',
+  done: '完了',
+};
+
 function getStorageKey(templateType?: string, pageSlug?: string): string {
   return `html-edit-chat:${pageSlug || 'default'}:${templateType || 'none'}`;
 }
@@ -44,11 +54,12 @@ export default function HtmlCodeEditModal({
   const [isGenerating, setIsGenerating] = useState(false);
   const [modifiedHtml, setModifiedHtml] = useState(currentHtml);
   const [hasChanges, setHasChanges] = useState(false);
-  const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview');
+  const [showCode, setShowCode] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
 
   // Undo/Redo
   const [htmlHistory, setHtmlHistory] = useState<string[]>([currentHtml]);
@@ -60,8 +71,9 @@ export default function HtmlCodeEditModal({
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 会話復元（localStorage）
+  // 会話復元
   useEffect(() => {
     try {
       const key = getStorageKey(templateType, pageSlug);
@@ -75,7 +87,7 @@ export default function HtmlCodeEditModal({
     } catch {}
   }, [templateType, pageSlug]);
 
-  // 会話保存（localStorage）
+  // 会話保存
   useEffect(() => {
     if (messages.length === 0) return;
     try {
@@ -84,7 +96,6 @@ export default function HtmlCodeEditModal({
     } catch {}
   }, [messages, templateType, pageSlug]);
 
-  // HTMLをhistoryに追加する関数
   const pushHtmlHistory = useCallback((newHtml: string) => {
     setHtmlHistory(prev => {
       const truncated = prev.slice(0, historyIndex + 1);
@@ -114,11 +125,9 @@ export default function HtmlCodeEditModal({
     setHasChanges(htmlHistory[newIndex] !== currentHtml);
   };
 
-  // 画像アップロード処理
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
     const newImages: UploadedImage[] = [];
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/')) continue;
@@ -143,7 +152,6 @@ export default function HtmlCodeEditModal({
     const text = inputText.trim();
     if (!text && uploadedImages.length === 0) return;
 
-    // ユーザーメッセージを追加
     const userMessage: ChatMessage = {
       role: 'user',
       content: text,
@@ -153,18 +161,15 @@ export default function HtmlCodeEditModal({
     setInputText('');
     setIsGenerating(true);
     setStreamingText('');
+    setAgentStatus('thinking');
 
     try {
-      // 画像がある場合は先にアップロード
       let imageUrls: string[] = [];
       if (uploadedImages.length > 0) {
         for (const img of uploadedImages) {
           const formData = new FormData();
           formData.append('file', img.file);
-          const uploadRes = await fetch('/api/upload-temp-image', {
-            method: 'POST',
-            body: formData,
-          });
+          const uploadRes = await fetch('/api/upload-temp-image', { method: 'POST', body: formData });
           if (uploadRes.ok) {
             const uploadData = await uploadRes.json();
             if (uploadData.url) imageUrls.push(uploadData.url);
@@ -173,22 +178,20 @@ export default function HtmlCodeEditModal({
       }
       setUploadedImages([]);
 
-      // プロンプト構築
       let finalPrompt = text;
       if (imageUrls.length > 0) {
         finalPrompt += `\n\n【使用する画像URL】\n`;
-        imageUrls.forEach((url, i) => {
-          finalPrompt += `画像${i + 1}: ${url}\n`;
-        });
+        imageUrls.forEach((url, i) => { finalPrompt += `画像${i + 1}: ${url}\n`; });
       }
 
-      // Claude Chat APIに送信する会話履歴を構築
       const chatHistory = [
         ...messages.map(m => ({ role: m.role, content: m.content })),
         { role: 'user' as const, content: finalPrompt },
       ];
 
-      // ストリーミングAPIを使用
+      // ステータスを段階的に進行
+      setTimeout(() => setAgentStatus('generating'), 1500);
+
       const response = await fetch('/api/ai/claude-chat-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -204,15 +207,16 @@ export default function HtmlCodeEditModal({
 
       if (!response.ok) {
         const data = await response.json();
+        setAgentStatus('idle');
         const errorMsg: ChatMessage = {
           role: 'assistant',
           content: `エラー: ${data.message || '修正に失敗しました'}`,
+          actions: ['エラー'],
         };
         setMessages(prev => [...prev, errorMsg]);
         return;
       }
 
-      // SSEストリーム読み取り
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No reader');
 
@@ -236,28 +240,42 @@ export default function HtmlCodeEditModal({
             if (data.type === 'text') {
               fullStreamText += data.text;
               setStreamingText(fullStreamText);
+              // HTMLが生成され始めたらステータス更新
+              if (fullStreamText.includes('```html') || fullStreamText.includes('<!DOCTYPE')) {
+                setAgentStatus('generating');
+              }
               setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
             } else if (data.type === 'done') {
               setStreamingText('');
+              setAgentStatus('updating');
 
               if (data.html) {
                 pushHtmlHistory(data.html);
               }
 
-              let assistantContent = data.message || '修正を適用しました。プレビューで確認してください。';
+              setTimeout(() => {
+                setAgentStatus('done');
+                setTimeout(() => setAgentStatus('idle'), 2000);
+              }, 500);
+
+              const actions = ['コード生成', 'HTML更新', 'プレビュー反映'];
+              let assistantContent = data.message || '変更を適用しました。';
               if (data.estimatedCost) {
                 assistantContent += `\n\nコスト: $${data.estimatedCost.toFixed(4)}`;
               }
               const successMsg: ChatMessage = {
                 role: 'assistant',
                 content: assistantContent,
+                actions,
               };
               setMessages(prev => [...prev, successMsg]);
             } else if (data.type === 'error') {
               setStreamingText('');
+              setAgentStatus('idle');
               const errorMsg: ChatMessage = {
                 role: 'assistant',
                 content: `エラー: ${data.message}`,
+                actions: ['エラー'],
               };
               setMessages(prev => [...prev, errorMsg]);
             }
@@ -268,6 +286,7 @@ export default function HtmlCodeEditModal({
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (error) {
       setStreamingText('');
+      setAgentStatus('idle');
       const errorMsg: ChatMessage = {
         role: 'assistant',
         content: '接続エラーが発生しました。',
@@ -291,12 +310,10 @@ export default function HtmlCodeEditModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // フルスクリーンプレビュー（新しいタブで実際のHTMLを表示）
   const handleFullPreview = () => {
     const blob = new Blob([modifiedHtml], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
-    // メモリリーク防止: 少し遅延してから解放
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
@@ -320,7 +337,7 @@ export default function HtmlCodeEditModal({
     setHtmlHistory([currentHtml]);
     setHistoryIndex(0);
     setStreamingText('');
-    // localStorageもクリア
+    setAgentStatus('idle');
     try {
       const key = getStorageKey(templateType, pageSlug);
       localStorage.removeItem(key);
@@ -328,83 +345,19 @@ export default function HtmlCodeEditModal({
     toast.success('リセットしました');
   };
 
-  // フォーム有効化: HTMLを修正してResend API連携を追加
+  // フォーム有効化
   const handleEnableFormSubmission = async () => {
-    if (!pageSlug) {
-      toast.error('ページ情報が取得できません');
-      return;
-    }
-
+    if (!pageSlug) { toast.error('ページ情報が取得できません'); return; }
     setIsGenerating(true);
+    setAgentStatus('thinking');
     try {
-      // AIにフォーム有効化を依頼
       const formPrompt = `このHTMLフォームを有効化してください。
+formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/form-submissions (POST)。
+送信データはJSON形式: { "pageSlug": "${pageSlug}", "formTitle": "お問い合わせ", "formFields": [{ "fieldName": "name", "fieldLabel": "お名前", "value": "入力値" }] }
+送信成功時は「送信完了しました」表示、失敗時はエラーメッセージ、送信中はボタン無効化。
+元のデザインは一切変更せず、スクリプトを</body>前に追加。`;
 
-【重要な変更点】
-1. formタグにonsubmit属性を追加して、JavaScriptでフォーム送信を処理する
-2. 送信先は /api/form-submissions (POSTリクエスト)
-3. 送信データはJSON形式で以下の構造:
-   {
-     "pageSlug": "${pageSlug}",
-     "formTitle": "お問い合わせ",
-     "formFields": [
-       { "fieldName": "name", "fieldLabel": "お名前", "value": "入力値" },
-       { "fieldName": "email", "fieldLabel": "メールアドレス", "value": "入力値" },
-       ...（フォームの各フィールドを含める）
-     ]
-   }
-4. 送信成功時は「送信完了しました」のメッセージを表示
-5. 送信失敗時はエラーメッセージを表示
-6. 送信中はボタンを無効化して「送信中...」と表示
-
-【フォームフィールドの取得方法】
-- 各input, select, textareaからname属性とlabel要素のテキストを取得
-- labelが見つからない場合はplaceholderやname属性を使用
-
-【サンプルコード参考】
-<script>
-document.querySelector('form').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const btn = this.querySelector('button[type="submit"]');
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '送信中...';
-
-  const formData = new FormData(this);
-  const fields = [];
-  for (const [name, value] of formData.entries()) {
-    const input = this.querySelector('[name="' + name + '"]');
-    const label = input?.closest('div')?.querySelector('label')?.textContent || name;
-    fields.push({ fieldName: name, fieldLabel: label.replace('*', '').trim(), value: String(value) });
-  }
-
-  try {
-    const res = await fetch('/api/form-submissions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pageSlug: '${pageSlug}',
-        formTitle: 'お問い合わせ',
-        formFields: fields
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      alert('送信完了しました');
-      this.reset();
-    } else {
-      alert(data.error || '送信に失敗しました');
-    }
-  } catch (err) {
-    alert('送信に失敗しました');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
-});
-</script>
-
-元のフォームのデザインは一切変更せず、上記のスクリプトを</body>の前に追加してください。`;
+      setTimeout(() => setAgentStatus('generating'), 1000);
 
       const response = await fetch('/api/ai/claude-chat', {
         method: 'POST',
@@ -418,331 +371,365 @@ document.querySelector('form').addEventListener('submit', async function(e) {
           mode: 'edit',
         }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.message || 'フォーム有効化に失敗しました');
-        return;
-      }
-
-      if (data.html) {
-        pushHtmlHistory(data.html);
-      }
-      toast.success('フォームを有効化しました。設定画面でResend APIキーを設定すると、メール通知が届きます。');
-
-      const successMsg: ChatMessage = {
+      if (!response.ok) { toast.error(data.message || 'フォーム有効化に失敗しました'); setAgentStatus('idle'); return; }
+      setAgentStatus('updating');
+      if (data.html) { pushHtmlHistory(data.html); }
+      setTimeout(() => { setAgentStatus('done'); setTimeout(() => setAgentStatus('idle'), 2000); }, 500);
+      toast.success('フォームを有効化しました');
+      setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'フォームを有効化しました。送信データは管理画面で確認でき、Resend APIキーを設定するとメール通知も届きます。',
-      };
-      setMessages(prev => [...prev, successMsg]);
-
+        content: 'フォームを有効化しました。送信データは管理画面で確認できます。',
+        actions: ['フォーム解析', 'スクリプト追加', 'プレビュー更新'],
+      }]);
     } catch (error) {
       toast.error('フォーム有効化に失敗しました');
+      setAgentStatus('idle');
     } finally {
       setIsGenerating(false);
     }
   };
 
+  // Quick actions
+  const suggestions = [
+    { icon: '🎨', label: 'デザインを改善', prompt: 'デザインをよりモダンで洗練されたものに改善してください' },
+    { icon: '📱', label: 'モバイル最適化', prompt: 'モバイル表示を改善してスマートフォンでも見やすいレイアウトにしてください' },
+    { icon: '✨', label: 'アニメーション追加', prompt: 'スクロールアニメーションやホバーエフェクトを追加してください' },
+    { icon: '📝', label: 'コンテンツ追加', prompt: '新しいセクションを追加してください' },
+  ];
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + 'px';
+    }
+  }, [inputText]);
+
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1200px] h-[85vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[9999] bg-[#f5f5f0] flex">
+
+      {/* ===== Left: Chat Panel ===== */}
+      <div className="w-[440px] flex flex-col bg-white border-r border-gray-200/80">
+
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center gap-2">
-            <Code2 className="h-4 w-4 text-gray-600" />
-            <span className="font-semibold text-gray-800">HTML編集</span>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-black flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-[13px] font-semibold text-gray-900">AI エディタ</h2>
+              {agentStatus !== 'idle' && (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  </span>
+                  <span className="text-[11px] text-green-600 font-medium">{STATUS_LABELS[agentStatus]}</span>
+                </div>
+              )}
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors">
-            <X className="h-4 w-4 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-1">
+            {hasChanges && (
+              <button onClick={handleReset} className="p-2 text-gray-300 hover:text-gray-500 rounded-lg transition-colors" title="リセット">
+                <RotateCw className="h-4 w-4" />
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 text-gray-300 hover:text-gray-500 rounded-lg transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left: Preview */}
-          <div className="flex-1 flex flex-col border-r border-gray-200 bg-gray-100">
-            {/* Preview Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                  <button
-                    onClick={() => setViewMode('preview')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                      viewMode === 'preview' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <Eye className="h-3 w-3" />
-                    プレビュー
-                  </button>
-                  <button
-                    onClick={() => setViewMode('code')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                      viewMode === 'code' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <Code2 className="h-3 w-3" />
-                    コード
-                  </button>
-                </div>
-                {viewMode === 'preview' && (
-                  <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                    <button
-                      onClick={() => setPreviewDevice('desktop')}
-                      className={`p-1.5 rounded-md transition-all ${
-                        previewDevice === 'desktop' ? 'bg-white text-gray-700 shadow-sm' : 'text-gray-400'
-                      }`}
-                    >
-                      <Monitor className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setPreviewDevice('mobile')}
-                      className={`p-1.5 rounded-md transition-all ${
-                        previewDevice === 'mobile' ? 'bg-white text-gray-700 shadow-sm' : 'text-gray-400'
-                      }`}
-                    >
-                      <Smartphone className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-                {/* Undo/Redo */}
-                <div className="flex items-center gap-0.5 ml-1">
-                  <button
-                    onClick={handleUndo}
-                    disabled={!canUndo}
-                    className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="元に戻す"
-                  >
-                    <Undo2 className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={handleRedo}
-                    disabled={!canRedo}
-                    className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="やり直す"
-                  >
-                    <Redo2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+        {/* Chat Messages */}
+        <div className="flex-1 overflow-y-auto">
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center px-8">
+              <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-5">
+                <Sparkles className="h-8 w-8 text-gray-300" />
               </div>
-              <div className="flex items-center gap-2">
-                {hasChanges && (
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">何をしますか？</h3>
+              <p className="text-sm text-gray-400 mb-2 text-center">指示するだけで、AIがコードを生成・編集します</p>
+
+              {/* Credit Warning */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100 mb-7">
+                <Zap className="h-3 w-3 text-amber-500" />
+                <span className="text-[11px] text-amber-600">クレジットを消費します</span>
+              </div>
+
+              {/* Suggestion Chips */}
+              <div className="w-full grid grid-cols-2 gap-2 mb-6">
+                {suggestions.map((s, i) => (
                   <button
-                    onClick={handleReset}
-                    className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                    key={i}
+                    onClick={() => { setInputText(s.prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
+                    className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left transition-all group"
                   >
-                    リセット
+                    <span className="text-base">{s.icon}</span>
+                    <span className="text-[13px] text-gray-500 group-hover:text-gray-700">{s.label}</span>
                   </button>
-                )}
+                ))}
+              </div>
+
+              {/* Form Enable */}
+              {pageSlug && (
                 <button
-                  onClick={handleCopy}
-                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 border border-gray-200 rounded-lg"
+                  onClick={handleEnableFormSubmission}
+                  disabled={isGenerating}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 text-sm text-gray-500 hover:text-gray-700 transition-all disabled:opacity-40"
                 >
-                  {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-                  {copied ? 'コピー済' : 'コピー'}
+                  {isGenerating ? <><Loader2 className="h-4 w-4 animate-spin" /> 処理中...</> : <><Mail className="h-4 w-4" /> フォームを有効化</>}
                 </button>
-                <button
-                  onClick={handleFullPreview}
-                  className="flex items-center gap-1 text-xs text-white bg-gray-900 hover:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  実際に確認
-                </button>
-              </div>
+              )}
             </div>
-
-            {/* Preview Content */}
-            <div className="flex-1 overflow-auto p-4">
-              <div
-                className={`bg-white rounded-lg shadow-sm overflow-hidden mx-auto transition-all ${
-                  previewDevice === 'mobile' ? 'max-w-[375px]' : 'w-full'
-                }`}
-                style={{ minHeight: '100%' }}
-              >
-                {viewMode === 'preview' ? (
-                  <iframe
-                    srcDoc={modifiedHtml}
-                    className="w-full h-full min-h-[500px] border-0"
-                    sandbox="allow-scripts allow-forms"
-                    title="Preview"
-                  />
-                ) : (
-                  <pre className="p-4 text-[11px] leading-relaxed font-mono overflow-auto bg-gray-950 text-gray-300 h-full min-h-[500px]">
-                    <code>{modifiedHtml}</code>
-                  </pre>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Chat Panel */}
-          <div className="w-[320px] flex flex-col bg-white">
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                    <Code2 className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <p className="text-sm text-gray-600 font-medium">HTMLを編集</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    変更したい内容をチャットで指示してください
-                  </p>
-                  <div className="mt-4 space-y-1.5 text-[11px] text-gray-400">
-                    <p>例: 「ボタンの色を青に」</p>
-                    <p>例: 「見出しを大きく」</p>
-                    <p>例: 「この画像を追加して」</p>
-                  </div>
-
-                  {/* フォーム有効化ボタン */}
-                  {pageSlug && (
-                    <button
-                      onClick={handleEnableFormSubmission}
-                      disabled={isGenerating}
-                      className="mt-6 flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          処理中...
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="h-4 w-4" />
-                          フォームを有効化
-                        </>
-                      )}
-                    </button>
+          ) : (
+            <div className="px-5 py-4 space-y-4">
+              {messages.map((msg, idx) => (
+                <div key={idx}>
+                  {msg.role === 'user' ? (
+                    <div className="flex justify-end">
+                      <div className="max-w-[85%] bg-black text-white px-4 py-2.5 rounded-2xl rounded-br-md text-[13px] leading-relaxed">
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {msg.images.map((img, i) => (
+                              <img key={i} src={img} alt="" className="h-14 w-14 object-cover rounded-lg" />
+                            ))}
+                          </div>
+                        )}
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-start">
+                      <div className="max-w-[90%]">
+                        {/* Action Pills */}
+                        {msg.actions && msg.actions.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {msg.actions.map((action, i) => (
+                              <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-100 text-[11px] text-green-700 font-medium">
+                                <CheckCircle2 className="h-3 w-3" />
+                                {action}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="bg-gray-50 border border-gray-100 text-gray-700 px-4 py-2.5 rounded-2xl rounded-bl-md text-[13px] leading-relaxed">
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-              ) : (
-                messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${
-                        msg.role === 'user'
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {msg.images && msg.images.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {msg.images.map((img, i) => (
-                            <img
-                              key={i}
-                              src={img}
-                              alt=""
-                              className="h-12 w-12 object-cover rounded"
-                            />
-                          ))}
-                        </div>
-                      )}
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-              {/* ストリーミング中の表示 */}
+              ))}
+
+              {/* Streaming */}
               {isGenerating && streamingText && (
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-sm">
-                    <p className="whitespace-pre-wrap">{streamingText}</p>
-                    <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5 align-middle" />
+                  <div className="max-w-[90%]">
+                    {/* Live Status Pills */}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[11px] text-blue-600 font-medium">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {STATUS_LABELS[agentStatus] || 'コード生成中...'}
+                      </span>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-100 text-gray-600 px-4 py-2.5 rounded-2xl rounded-bl-md text-[13px]">
+                      <p className="whitespace-pre-wrap">{streamingText}</p>
+                      <span className="inline-block w-1.5 h-4 bg-black/30 animate-pulse ml-0.5 align-middle rounded-sm" />
+                    </div>
                   </div>
                 </div>
               )}
+
               {isGenerating && !streamingText && (
                 <div className="flex justify-start">
-                  <div className="bg-gray-100 text-gray-500 px-3 py-2 rounded-xl text-sm flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    生成中...
+                  <div className="max-w-[90%]">
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[11px] text-blue-600 font-medium">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {STATUS_LABELS[agentStatus] || '考え中...'}
+                      </span>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl rounded-bl-md">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
+
               <div ref={chatEndRef} />
             </div>
+          )}
+        </div>
 
-            {/* Image Preview */}
-            {uploadedImages.length > 0 && (
-              <div className="px-4 py-2 border-t border-gray-100">
-                <div className="flex flex-wrap gap-2">
-                  {uploadedImages.map((img, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={img.preview}
-                        alt={`Upload ${index + 1}`}
-                        className="h-12 w-12 object-cover rounded-lg border border-gray-200"
-                      />
-                      <button
-                        onClick={() => handleRemoveImage(index)}
-                        className="absolute -top-1 -right-1 p-0.5 bg-gray-800 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Input Area */}
-            <div className="p-3 border-t border-gray-200">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-10 w-10 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl border border-gray-200 transition-colors flex-shrink-0"
-                >
-                  <ImagePlus className="h-5 w-5" />
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="修正内容を入力..."
-                    className="w-full h-10 px-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 pr-10"
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={isGenerating || (!inputText.trim() && uploadedImages.length === 0)}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-gray-900 text-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
-                  >
-                    <Send className="h-3.5 w-3.5" />
+        {/* Image Preview */}
+        {uploadedImages.length > 0 && (
+          <div className="px-5 py-2 border-t border-gray-100">
+            <div className="flex flex-wrap gap-2">
+              {uploadedImages.map((img, index) => (
+                <div key={index} className="relative group">
+                  <img src={img.preview} alt="" className="h-14 w-14 object-cover rounded-xl border border-gray-200" />
+                  <button onClick={() => handleRemoveImage(index)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
-              </div>
+              ))}
             </div>
+          </div>
+        )}
 
-            {/* Footer */}
-            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+        {/* Input Area */}
+        <div className="p-4 border-t border-gray-100">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden focus-within:border-gray-300 focus-within:bg-white transition-all">
+            <textarea
+              ref={inputRef}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="変更内容を入力..."
+              rows={1}
+              className="w-full px-4 pt-3 pb-1 bg-transparent text-[13px] text-gray-800 placeholder-gray-300 focus:outline-none resize-none"
+              style={{ minHeight: '40px', maxHeight: '120px' }}
+            />
+            <div className="flex items-center justify-between px-3 pb-2.5">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="画像を添付"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+              </div>
               <button
-                onClick={handleSave}
-                disabled={!hasChanges || isSaving}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={handleSend}
+                disabled={isGenerating || (!inputText.trim() && uploadedImages.length === 0)}
+                className="p-2 bg-black hover:bg-gray-800 text-white rounded-xl disabled:opacity-15 disabled:cursor-not-allowed transition-colors"
               >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    保存中...
-                  </>
-                ) : (
-                  '変更を保存'
-                )}
+                <ArrowRight className="h-4 w-4" />
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Save Footer */}
+        {hasChanges && (
+          <div className="px-4 pb-4">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full py-3 bg-black hover:bg-gray-800 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> 保存中...</> : '変更を保存'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ===== Right: Computer View ===== */}
+      <div className="flex-1 flex flex-col">
+
+        {/* Computer Header */}
+        <div className="flex items-center justify-between px-5 py-2.5 bg-[#e8e8e3] border-b border-gray-200/60">
+          <div className="flex items-center gap-3">
+            {/* Window Controls */}
+            <div className="flex items-center gap-1.5">
+              <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 transition" />
+              <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
+              <button onClick={handleFullPreview} className="w-3 h-3 rounded-full bg-[#28c840] hover:brightness-110 transition" />
+            </div>
+            <span className="text-[11px] font-medium text-gray-500 tracking-wide uppercase">Computer</span>
+          </div>
+
+          {/* URL Bar */}
+          <div className="flex-1 mx-6">
+            <div className="flex items-center gap-2 bg-white/80 rounded-lg px-3 py-1.5 max-w-lg mx-auto border border-gray-200/50">
+              {agentStatus !== 'idle' ? (
+                <Loader2 className="h-3 w-3 text-gray-300 animate-spin flex-shrink-0" />
+              ) : (
+                <Globe className="h-3 w-3 text-gray-300 flex-shrink-0" />
+              )}
+              <span className="text-xs text-gray-400 truncate">
+                {pageSlug ? `${pageSlug}.zettai.co.jp` : 'preview'}
+              </span>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-1">
+            {/* Device Toggle */}
+            <div className="flex items-center bg-white/60 rounded-lg p-0.5 border border-gray-200/50">
+              <button
+                onClick={() => setPreviewDevice('desktop')}
+                className={`p-1.5 rounded-md transition-all ${previewDevice === 'desktop' ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+              >
+                <Monitor className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setPreviewDevice('mobile')}
+                className={`p-1.5 rounded-md transition-all ${previewDevice === 'mobile' ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+              >
+                <Smartphone className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Undo/Redo */}
+            <div className="flex items-center gap-0.5 ml-1">
+              <button onClick={handleUndo} disabled={!canUndo} className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-all disabled:opacity-20" title="元に戻す">
+                <Undo2 className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={handleRedo} disabled={!canRedo} className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-all disabled:opacity-20" title="やり直す">
+                <Redo2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="w-px h-5 bg-gray-300/50 mx-1" />
+
+            <button
+              onClick={() => setShowCode(!showCode)}
+              className={`p-1.5 rounded-md transition-all ${showCode ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-500 hover:bg-white/60'}`}
+              title="コードを表示"
+            >
+              <Code2 className="h-3.5 w-3.5" />
+            </button>
+            <button onClick={handleCopy} className="p-1.5 rounded-md text-gray-400 hover:text-gray-500 hover:bg-white/60 transition-all" title="コピー">
+              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            </button>
+            <button onClick={handleFullPreview} className="p-1.5 rounded-md text-gray-400 hover:text-gray-500 hover:bg-white/60 transition-all" title="新しいタブで開く">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Preview Content */}
+        <div className="flex-1 overflow-auto bg-[#e8e8e3] flex items-start justify-center p-3">
+          {showCode ? (
+            <div className="w-full h-full rounded-lg overflow-auto bg-[#1e1e1e] shadow-xl">
+              <pre className="p-5 text-[12px] leading-relaxed font-mono text-gray-300">
+                <code>{modifiedHtml}</code>
+              </pre>
+            </div>
+          ) : (
+            <div
+              className={`bg-white rounded-lg shadow-xl overflow-hidden transition-all ${previewDevice === 'mobile' ? 'w-[375px]' : 'w-full'}`}
+              style={{ minHeight: 'calc(100vh - 80px)' }}
+            >
+              <iframe
+                srcDoc={modifiedHtml}
+                className="w-full border-0"
+                style={{ height: 'calc(100vh - 80px)' }}
+                sandbox="allow-scripts allow-forms"
+                title="Preview"
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
