@@ -1960,6 +1960,10 @@ export function ImageInpaintEditor({
                                         )}
                                     </button>
 
+                                    <p className="text-[10px] text-center text-muted-foreground">
+                                        Nano Banana 2（4K）エンジン使用
+                                    </p>
+
                                     <button
                                         onClick={onClose}
                                         disabled={isLoading}

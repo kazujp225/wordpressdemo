@@ -4184,7 +4184,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 </div>
                                 <div>
                                     <h3 className="text-xl font-black text-gray-900"><span>画像を編集</span></h3>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><span>Nano Banana エンジン</span></p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><span>Nano Banana 2（4K）エンジン</span></p>
                                 </div>
                             </div>
                             <p className="text-sm text-gray-500 mb-6 font-medium">
