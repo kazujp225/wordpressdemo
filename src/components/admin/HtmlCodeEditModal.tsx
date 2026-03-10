@@ -390,12 +390,16 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
     }
   };
 
-  // Quick actions
+  // Quick actions — LP制作に実用的なアクション
   const suggestions = [
-    { icon: '🎨', label: 'デザインを改善', prompt: 'デザインをよりモダンで洗練されたものに改善してください' },
-    { icon: '📱', label: 'モバイル最適化', prompt: 'モバイル表示を改善してスマートフォンでも見やすいレイアウトにしてください' },
-    { icon: '✨', label: 'アニメーション追加', prompt: 'スクロールアニメーションやホバーエフェクトを追加してください' },
-    { icon: '📝', label: 'コンテンツ追加', prompt: '新しいセクションを追加してください' },
+    { icon: '🔘', label: 'CTAボタンを追加', prompt: '目立つCTAボタンを追加してください。グラデーション背景、ホバーエフェクト（浮き上がり＋影）、パルスアニメーション付きで、「今すぐ無料で始める」のテキストにしてください。ボタンはページ内の適切な位置に配置してください。' },
+    { icon: '📋', label: 'お問い合わせフォーム', prompt: 'お問い合わせフォームのセクションを追加してください。お名前、メールアドレス、電話番号、お問い合わせ内容のフィールドを含め、必須マーク付きの見やすいデザインにしてください。' },
+    { icon: '⭐', label: 'お客様の声', prompt: '「お客様の声」セクションを追加してください。3つのレビューカードを横並びに配置し、写真（プレースホルダー）、名前、評価（星5つ）、コメントを含めてください。' },
+    { icon: '📊', label: '料金表', prompt: '料金プランの比較表セクションを追加してください。3プラン（ベーシック/スタンダード/プレミアム）を横並びカードで表示し、おすすめプランを強調してください。各プランに機能リスト、価格、CTAボタンを含めてください。' },
+    { icon: '❓', label: 'よくある質問', prompt: 'よくある質問（FAQ）のアコーディオンセクションを追加してください。5つのQ&Aを含め、クリックで開閉できるようにしてください。JavaScriptは最小限でCSSアニメーション付きにしてください。' },
+    { icon: '📱', label: 'モバイル最適化', prompt: 'モバイル表示を改善してください。スマートフォンでの表示を最適化し、タップしやすいボタンサイズ、読みやすいフォントサイズ、適切な余白にしてください。' },
+    { icon: '🎨', label: 'デザインを改善', prompt: 'デザインをよりモダンで洗練されたものに改善してください。余白、フォントサイズ、色のコントラスト、視覚的な階層を最適化してください。' },
+    { icon: '✨', label: 'アニメーション追加', prompt: 'スクロール連動のフェードインアニメーションとボタンのホバーエフェクトを追加してください。CSS＋最小限のJSで実装してください。' },
   ];
 
   // Auto-resize textarea
@@ -446,7 +450,8 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center px-8">
+            <div className="h-full flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+              <div className="flex-shrink-0 mt-4" />
               <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-5">
                 <Sparkles className="h-8 w-8 text-gray-300" />
               </div>
