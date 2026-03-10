@@ -329,6 +329,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     // HTMLコード編集モーダル
     const [showHtmlEditModal, setShowHtmlEditModal] = useState(false);
     const [htmlEditSectionId, setHtmlEditSectionId] = useState<string | null>(null);
+    const [fetchedPageHtml, setFetchedPageHtml] = useState<string | null>(null);
 
     // ページデプロイモーダル
     const [showPageDeployModal, setShowPageDeployModal] = useState(false);
@@ -5147,13 +5148,25 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
                                     action={
                                         <EditorActionButton
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 if (planLimits?.canAIGenerate === false) {
                                                     toast.error('有料プランにアップグレードしてご利用ください');
                                                     return;
                                                 }
                                                 if (sections.length > 0) {
                                                     setHtmlEditSectionId(String(sections[0].id));
+                                                }
+                                                // ページの完全なHTMLを取得してエディタに渡す
+                                                if (pageId !== 'new') {
+                                                    try {
+                                                        const res = await fetch(`/api/pages/${pageId}/deploy-html`);
+                                                        if (res.ok) {
+                                                            const data = await res.json();
+                                                            setFetchedPageHtml(data.html);
+                                                        }
+                                                    } catch (e) {
+                                                        console.error('Failed to fetch page HTML:', e);
+                                                    }
                                                 }
                                                 setShowHtmlEditModal(true);
                                             }}
@@ -7060,13 +7073,17 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     ? sections.find(s => String(s.id) === htmlEditSectionId && s.role === 'html-embed' && s.config?.htmlContent)
                     : null;
 
-                const currentHtml = targetSection?.config?.htmlContent || '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>ページ</title>\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }\n</style>\n</head>\n<body>\n\n</body>\n</html>';
+                // 優先順位: 1. html-embedセクションのHTML → 2. fetchしたページ全体のHTML → 3. 空テンプレート
+                const currentHtml = targetSection?.config?.htmlContent
+                    || fetchedPageHtml
+                    || '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>ページ</title>\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }\n</style>\n</head>\n<body>\n\n</body>\n</html>';
 
                 return (
                     <HtmlCodeEditModal
                         onClose={() => {
                             setShowHtmlEditModal(false);
                             setHtmlEditSectionId(null);
+                            setFetchedPageHtml(null);
                         }}
                         currentHtml={currentHtml}
                         templateType={targetSection?.config?.templateType}
