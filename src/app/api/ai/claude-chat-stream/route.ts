@@ -109,9 +109,21 @@ function buildSystemPrompt(options: {
     prompt += `\n【レイアウト: レスポンシブ対応必須】
 - PC: 画像・背景は100%全幅、テキストはmax-width:1200pxで中央配置
 - @media (max-width: 768px) でモバイル対応
-- モバイル: タップしやすいボタン（min-height: 48px）、フォントサイズ16px以上
 - 画像は width:100%, display:block で全幅表示（max-widthで縮めない）
-- img要素にはdisplay:blockを追加して余計な隙間を防ぐ\n`;
+- img要素にはdisplay:blockを追加して余計な隙間を防ぐ
+
+【★ モバイル表示の絶対ルール ★】
+- モバイルでは余白(padding/margin)を最小限にし、画面幅いっぱいに表示
+- 画像: width:100vw, margin-left:calc(-50vw + 50%) で親の制約を無視して全幅表示
+- ヒーロー/ファーストビュー: 画面全体を使う（height:100svhまたはmin-height:80vh）
+- ボタン: width:100%, min-height:52px, font-size:16px以上
+- フォーム入力欄: width:100%, font-size:16px（iOS拡大防止）, min-height:48px
+- ヘッダー: モバイルでもstickyを維持、CTAボタンはコンパクトに
+- セクション: padding:24px 16px（左右16pxで画面ギリギリまで使う）
+- テキスト: 見出しはfont-size:24px以上で太字、本文は14-16px
+- 追従CTA: 画面下部にfixed、width:100%、高さ60px以上の目立つバー
+- カード/グリッド: PCで横並びのものはモバイルで縦1列（flex-direction:column）
+- テーブル: モバイルでは横スクロールまたはカード形式に変換\n`;
   }
 
   if (designContext) {
