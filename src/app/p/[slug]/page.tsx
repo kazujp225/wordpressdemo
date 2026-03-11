@@ -8,6 +8,7 @@ import { ContactForm } from '@/components/public/ContactForm';
 import { InteractiveAreaOverlay } from '@/components/public/InteractiveAreaOverlay';
 import { VideoPlayer } from '@/components/public/VideoPlayer';
 import { OverlayElements } from '@/components/public/OverlayElements';
+import { AutoResizeIframe } from '@/components/public/AutoResizeIframe';
 
 export const dynamic = 'force-dynamic';
 
@@ -358,22 +359,16 @@ export default async function PublicPage({ params }: { params: { slug: string } 
 
                                     {section.role === 'html-embed' && config.htmlContent ? (
                                         <>
-                                            {/* デスクトップ用 - モバイル用がある場合のみ768px以上で表示 */}
-                                            <iframe
-                                                srcDoc={config.htmlContent}
-                                                className={`w-full border-0 ${config.mobileHtmlContent ? 'hidden md:block' : ''}`}
-                                                style={{ minHeight: '400px', height: '800px' }}
-                                                sandbox="allow-scripts allow-forms"
-                                                title="Embedded content (desktop)"
+                                            {/* デスクトップ用 */}
+                                            <AutoResizeIframe
+                                                htmlContent={config.htmlContent}
+                                                className={config.mobileHtmlContent ? 'hidden md:block' : ''}
                                             />
-                                            {/* モバイル用 - 768px未満で表示 */}
+                                            {/* モバイル用 */}
                                             {config.mobileHtmlContent && (
-                                                <iframe
-                                                    srcDoc={config.mobileHtmlContent}
-                                                    className="w-full border-0 md:hidden"
-                                                    style={{ minHeight: '400px', height: '800px' }}
-                                                    sandbox="allow-scripts allow-forms"
-                                                    title="Embedded content (mobile)"
+                                                <AutoResizeIframe
+                                                    htmlContent={config.mobileHtmlContent}
+                                                    className="md:hidden"
                                                 />
                                             )}
                                         </>

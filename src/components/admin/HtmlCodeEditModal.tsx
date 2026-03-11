@@ -640,14 +640,9 @@ export default function HtmlCodeEditModal({
   }, [modifiedHtml, layoutMode, designDefinition]);
 
   // エディタ起動時に自動診断
+  // 自動診断は無効化（クレジット消費を防止）
+  // 必要な場合はユーザーが手動で診断を実行できる
   const diagnosisRan = useRef(false);
-  useEffect(() => {
-    if (!diagnosisRan.current && modifiedHtml && !modifiedHtml.includes('<body>\n\n</body>')) {
-      diagnosisRan.current = true;
-      // 少し遅延してから診断開始（UIの初期表示を邪魔しない）
-      setTimeout(() => runDiagnosis(), 500);
-    }
-  }, [runDiagnosis, modifiedHtml]);
 
   // フォーム有効化
   const handleEnableFormSubmission = async () => {
