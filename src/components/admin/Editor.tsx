@@ -5182,7 +5182,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                     badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
                                     action={
                                         <EditorActionButton
-                                            onClick={async () => {
+                                            onClick={() => {
                                                 if (planLimits?.canAIGenerate === false) {
                                                     toast.error('有料プランにアップグレードしてご利用ください');
                                                     return;
@@ -5190,24 +5190,20 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 if (sections.length > 0) {
                                                     setHtmlEditSectionId(String(sections[0].id));
                                                 }
-                                                // ページの完全なHTMLを取得してエディタに渡す
-                                                if (pageId !== 'new') {
-                                                    try {
-                                                        const res = await fetch(`/api/pages/${pageId}/deploy-html`);
-                                                        if (res.ok) {
-                                                            const data = await res.json();
-                                                            setFetchedPageHtml(data.html);
-                                                        }
-                                                    } catch (e) {
-                                                        console.error('Failed to fetch page HTML:', e);
-                                                    }
-                                                }
+                                                // 先にモーダルを開く（即座に遷移）
                                                 setShowHtmlEditModal(true);
+                                                // ページHTMLは裏でフェッチ
+                                                if (pageId !== 'new') {
+                                                    fetch(`/api/pages/${pageId}/deploy-html`)
+                                                        .then(res => res.ok ? res.json() : null)
+                                                        .then(data => { if (data?.html) setFetchedPageHtml(data.html); })
+                                                        .catch(() => {});
+                                                }
                                             }}
                                             variant={planLimits?.canAIGenerate === false ? "default" : "primary"}
-                                            disabled={planLimits?.canAIGenerate === false}
+                                            disabled={planLimits?.canAIGenerate === false || showHtmlEditModal}
                                         >
-                                            {planLimits?.canAIGenerate === false ? 'アップグレード' : 'エディタを開く'}
+                                            {showHtmlEditModal ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> 起動中...</> : planLimits?.canAIGenerate === false ? 'アップグレード' : 'エディタを開く'}
                                         </EditorActionButton>
                                     }
                                 />
