@@ -397,11 +397,8 @@ export default function HtmlCodeEditModal({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // IME変換中はEnterで送信しない
-    if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      handleSend();
-    }
+    // Enterキーでは送信しない（送信ボタンのみ）
+    // Shift+Enterで改行
   };
 
   const handleCopy = () => {
@@ -865,7 +862,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               {/* 空ページ — シンプルな案内 */}
               {!isDiagnosing && !diagnosisText && (
                 <div className="w-full flex flex-col items-center justify-center py-16 px-6">
-                  <h3 className="text-[15px] font-bold text-gray-900 mb-2">生成したいものをなんでも言ってください</h3>
+                  <h3 className="text-[15px] font-bold text-gray-900 mb-2">生成したいものをお伝えください</h3>
                   <p className="text-[13px] text-gray-400 text-center leading-relaxed">
                     例: お問合せフォーム、ヘッダー、料金表、LP丸ごと作成 など
                   </p>
@@ -982,7 +979,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               onKeyDown={handleKeyDown}
               onCompositionStart={() => { isComposingRef.current = true; }}
               onCompositionEnd={() => { isComposingRef.current = false; }}
-              placeholder="変更内容を入力...（Shift+Enterで改行）"
+              placeholder="ご要望を入力してください..."
               rows={1}
               className="w-full px-4 pt-3 pb-1 bg-transparent text-[13px] text-gray-800 placeholder-gray-300 focus:outline-none resize-none"
               style={{ minHeight: '40px', maxHeight: '120px' }}
