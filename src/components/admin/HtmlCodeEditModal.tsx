@@ -370,6 +370,8 @@ export default function HtmlCodeEditModal({
 
               if (data.html) {
                 pushHtmlHistory(data.html);
+                // AI変更後に自動保存
+                try { const r = onSave(data.html); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch {}
               }
 
               setTimeout(() => {
@@ -537,11 +539,23 @@ export default function HtmlCodeEditModal({
     setDeployError('');
 
     try {
+      // ページ全体のHTMLを取得（画像LP＋AI生成コード含む）
+      let deployHtml = modifiedHtml;
+      if (pageId) {
+        try {
+          const fullPageRes = await fetch(`/api/pages/${pageId}/deploy-html`);
+          if (fullPageRes.ok) {
+            const fullPageData = await fullPageRes.json();
+            if (fullPageData?.html) deployHtml = fullPageData.html;
+          }
+        } catch {}
+      }
+
       const deployRes = await fetch('/api/deploy/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          html: modifiedHtml,
+          html: deployHtml,
           serviceName: deployServiceName.trim(),
           templateType: templateType || 'editor-deploy',
           prompt: `Editor deploy: ${pageTitle || 'page'}`,
