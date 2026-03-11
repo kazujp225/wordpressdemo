@@ -32,8 +32,8 @@ export default function SectionInsertModal({
             toast.error('画像ファイルを選択してください');
             return;
         }
-        if (file.size > 10 * 1024 * 1024) {
-            toast.error('10MB以下の画像を選択してください');
+        if (file.size > 50 * 1024 * 1024) {
+            toast.error('50MB以下の画像を選択してください');
             return;
         }
 

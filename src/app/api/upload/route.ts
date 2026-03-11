@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // 画像サイズ制限 (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-        return NextResponse.json({ error: 'ファイルサイズは10MB以下にしてください' }, { status: 400 });
+    // 画像サイズ制限 (50MB)
+    if (file.size > 50 * 1024 * 1024) {
+        return NextResponse.json({ error: 'ファイルサイズは50MB以下にしてください' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
