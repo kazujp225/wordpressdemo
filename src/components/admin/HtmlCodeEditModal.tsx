@@ -711,16 +711,16 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
     return `約${credits.toLocaleString()}クレジット`;
   };
 
-  // Quick actions — LP制作に実用的なアクション
+  // Quick actions — フルスタックLP制作アクション
   const suggestions = [
-    { icon: '🔘', label: 'CTAボタンを追加', prompt: '目立つCTAボタンを追加してください。グラデーション背景、ホバーエフェクト（浮き上がり＋影）、パルスアニメーション付きで、「今すぐ無料で始める」のテキストにしてください。ボタンはページ内の適切な位置に配置してください。' },
-    { icon: '📋', label: 'お問い合わせフォーム', prompt: 'お問い合わせフォームのセクションを追加してください。お名前、メールアドレス、電話番号、お問い合わせ内容のフィールドを含め、必須マーク付きの見やすいデザインにしてください。' },
-    { icon: '⭐', label: 'お客様の声', prompt: '「お客様の声」セクションを追加してください。3つのレビューカードを横並びに配置し、写真（プレースホルダー）、名前、評価（星5つ）、コメントを含めてください。' },
-    { icon: '📊', label: '料金表', prompt: '料金プランの比較表セクションを追加してください。3プラン（ベーシック/スタンダード/プレミアム）を横並びカードで表示し、おすすめプランを強調してください。各プランに機能リスト、価格、CTAボタンを含めてください。' },
-    { icon: '❓', label: 'よくある質問', prompt: 'よくある質問（FAQ）のアコーディオンセクションを追加してください。5つのQ&Aを含め、クリックで開閉できるようにしてください。JavaScriptは最小限でCSSアニメーション付きにしてください。' },
-    { icon: '📱', label: 'モバイル最適化', prompt: 'モバイル表示を改善してください。スマートフォンでの表示を最適化し、タップしやすいボタンサイズ、読みやすいフォントサイズ、適切な余白にしてください。' },
-    { icon: '🎨', label: 'デザインを改善', prompt: 'デザインをよりモダンで洗練されたものに改善してください。余白、フォントサイズ、色のコントラスト、視覚的な階層を最適化してください。' },
-    { icon: '✨', label: 'アニメーション追加', prompt: 'スクロール連動のフェードインアニメーションとボタンのホバーエフェクトを追加してください。CSS＋最小限のJSで実装してください。' },
+    { icon: '🚀', label: 'LP一括生成', description: 'プロ品質のLPを丸ごと作成', prompt: 'プロ品質のランディングページを一括生成してください。ヘッダー（sticky、ロゴ+CTAボタン）、ヒーロー（全幅背景+キャッチコピー+CTA）、特徴セクション（3カラム）、お客様の声、料金表、FAQ、お問い合わせフォーム、フッターを含む完全なLPを作ってください。モダンで洗練されたデザインにしてください。' },
+    { icon: '📋', label: 'お問い合わせフォーム', description: 'フォーム送信+バリデーション付き', prompt: 'お問い合わせフォームのセクションを追加してください。お名前、メールアドレス、電話番号、お問い合わせ内容のフィールドを含め、必須マーク付き、バリデーション付きの見やすいデザインにしてください。送信ボタンは大きく目立つように。' },
+    { icon: '🎯', label: 'ヘッダー + CTA', description: 'sticky追従ヘッダー+ボタン', prompt: 'stickyヘッダーを追加してください。ロゴテキスト、ナビゲーションリンク、目立つCTAボタンを含めてください。スクロール時に半透明背景になり、モバイルではハンバーガーメニューに切り替わるようにしてください。' },
+    { icon: '💰', label: '料金表', description: '3プラン比較テーブル', prompt: '料金プランの比較表セクションを追加してください。3プラン（ベーシック/スタンダード/プレミアム）を横並びカードで表示し、おすすめプランを強調してください。各プランに機能リスト、価格、CTAボタンを含めてください。' },
+    { icon: '⭐', label: 'お客様の声', description: 'レビューカード3枚', prompt: '「お客様の声」セクションを追加してください。3つのレビューカードを横並びに配置し、写真（プレースホルダー）、名前、会社名、評価（星5つ）、コメントを含めてください。' },
+    { icon: '❓', label: 'FAQ', description: 'アコーディオン形式', prompt: 'よくある質問（FAQ）のアコーディオンセクションを追加してください。5つのQ&Aを含め、クリックで開閉できるようにしてください。JavaScriptは最小限でCSSアニメーション付きにしてください。' },
+    { icon: '✨', label: 'アニメーション追加', description: 'スクロール連動フェードイン', prompt: 'スクロール連動のフェードインアニメーションとボタンのホバーエフェクトを追加してください。CSS＋最小限のJSで実装してください。' },
+    { icon: '📱', label: 'モバイル最適化', description: 'レスポンシブ完全対応', prompt: 'モバイル表示を改善してください。全セクションを画面幅100%で表示し、タップしやすいボタンサイズ(48px以上)、読みやすいフォントサイズ(16px以上)、適切な余白にしてください。' },
   ];
 
   // Auto-resize textarea
@@ -862,24 +862,43 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
                 </>
               )}
 
-              {/* 診断できない場合（空ページ） */}
+              {/* 空ページ — クイックアクション */}
               {!isDiagnosing && !diagnosisText && (
-                <div className="w-full flex flex-col items-center justify-center py-12">
-                  <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-4">
-                    <Sparkles className="h-7 w-7 text-gray-300" />
+                <div className="w-full flex flex-col py-6">
+                  <div className="text-center mb-5">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center mx-auto mb-3 shadow-lg">
+                      <Sparkles className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-[15px] font-bold text-gray-900">何を作りますか？</h3>
+                    <p className="text-xs text-gray-400 mt-1">タップで即生成、または下の入力欄に自由に指示</p>
                   </div>
-                  <h3 className="text-base font-semibold text-gray-900 mb-1">ページを作成しましょう</h3>
-                  <p className="text-sm text-gray-400 mb-6 text-center">チャットで指示すると、AIがHTMLを生成します</p>
 
-                  <div className="w-full grid grid-cols-2 gap-2">
-                    {suggestions.slice(0, 4).map((s, i) => (
+                  {/* メインアクション: LP一括生成 */}
+                  <button
+                    onClick={() => { setInputText(suggestions[0].prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
+                    className="w-full mb-3 flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gradient-to-r from-gray-900 to-gray-800 hover:from-black hover:to-gray-900 text-white text-left transition-all group shadow-lg"
+                  >
+                    <span className="text-lg">{suggestions[0].icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-bold">{suggestions[0].label}</p>
+                      <p className="text-[11px] text-gray-400 group-hover:text-gray-300">{suggestions[0].description}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-gray-500 group-hover:text-white transition-colors flex-shrink-0" />
+                  </button>
+
+                  {/* サブアクション */}
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {suggestions.slice(1, 7).map((s, i) => (
                       <button
                         key={i}
                         onClick={() => { setInputText(s.prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
-                        className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left transition-all group"
+                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left transition-all group"
                       >
-                        <span className="text-base mt-0.5">{s.icon}</span>
-                        <span className="text-[13px] text-gray-500 group-hover:text-gray-700">{s.label}</span>
+                        <span className="text-sm flex-shrink-0">{s.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-medium text-gray-700 group-hover:text-gray-900 truncate">{s.label}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{s.description}</p>
+                        </div>
                       </button>
                     ))}
                   </div>
