@@ -16,6 +16,7 @@ interface HtmlCodeEditModalProps {
   pageSlug?: string;
   pageId?: string;
   pageTitle?: string;
+  isLoadingHtml?: boolean;
 }
 
 type DeployPhase = 'idle' | 'generating' | 'uploading' | 'deploying' | 'done' | 'failed';
@@ -129,6 +130,7 @@ export default function HtmlCodeEditModal({
   pageSlug,
   pageId,
   pageTitle,
+  isLoadingHtml = false,
 }: HtmlCodeEditModalProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [modifiedHtml, setModifiedHtml] = useState(currentHtml);
@@ -170,6 +172,24 @@ export default function HtmlCodeEditModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // currentHtml propが後から更新された場合（バックグラウンドフェッチ完了時）にmodifiedHtmlを同期
+  const userHasEditedRef = useRef(false);
+  const prevCurrentHtmlRef = useRef(currentHtml);
+
+  useEffect(() => {
+    // propが変わった場合のみ（バックグラウンドフェッチ完了時）
+    if (currentHtml !== prevCurrentHtmlRef.current) {
+      prevCurrentHtmlRef.current = currentHtml;
+      // ユーザーがまだ編集していない場合のみ更新
+      if (!userHasEditedRef.current) {
+        setModifiedHtml(currentHtml);
+        setHtmlHistory([currentHtml]);
+        setHistoryIndex(0);
+        setHasChanges(false);
+      }
+    }
+  }, [currentHtml]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 会話復元
   useEffect(() => {
@@ -249,6 +269,7 @@ export default function HtmlCodeEditModal({
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text && uploadedImages.length === 0) return;
+    userHasEditedRef.current = true;
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -1111,6 +1132,16 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               <pre className="p-5 text-[12px] leading-relaxed font-mono text-gray-300">
                 <code>{modifiedHtml}</code>
               </pre>
+            </div>
+          ) : isLoadingHtml ? (
+            <div
+              className={`bg-white rounded-lg shadow-xl overflow-hidden transition-all flex items-center justify-center ${previewDevice === 'mobile' ? 'w-[375px]' : 'w-full'}`}
+              style={{ minHeight: 'calc(100vh - 80px)' }}
+            >
+              <div className="flex flex-col items-center gap-3 text-gray-400">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <p className="text-sm">ページを読み込み中...</p>
+              </div>
             </div>
           ) : (
             <div

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -331,6 +331,58 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [showHtmlEditModal, setShowHtmlEditModal] = useState(false);
     const [htmlEditSectionId, setHtmlEditSectionId] = useState<string | null>(null);
     const [fetchedPageHtml, setFetchedPageHtml] = useState<string | null>(null);
+
+    // セクションデータからプレビュー用HTMLをクライアント側で構築
+    const buildPreviewHtml = useCallback(() => {
+        console.log('[buildPreviewHtml] sections count:', sections.length, 'sample:', sections[0] ? { id: sections[0].id, hasImage: !!sections[0].image, filePath: sections[0].image?.filePath, role: sections[0].role } : 'none');
+        if (sections.length === 0) return null;
+        const hasImages = sections.some((s: any) => s.image?.filePath);
+        console.log('[buildPreviewHtml] hasImages:', hasImages);
+        if (!hasImages) return null;
+
+        const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const sectionsHtml = sections.map((section: any, idx: number) => {
+            let config: any = { text: '', textColor: 'white', position: 'middle', brightness: 100, grayscale: 0, overlayColor: 'transparent', overlayOpacity: 0 };
+            if (section.config) {
+                const parsed = typeof section.config === 'string' ? JSON.parse(section.config) : section.config;
+                config = { ...config, ...parsed };
+            }
+            if (section.role === 'html-embed' && config.htmlContent) return config.htmlContent;
+
+            const desktopSrc = section.image?.filePath || '';
+            const mobileSrc = section.mobileImage?.filePath || '';
+            if (!desktopSrc) return `<section style="position:relative;width:100%;overflow:hidden;"><div style="display:flex;height:200px;align-items:center;justify-content:center;background:#f3f4f6;color:#9ca3af;">セクション ${idx + 1}</div></section>`;
+
+            const filterStyle = `filter:brightness(${config.brightness}%)grayscale(${config.grayscale}%)`;
+            const overlayHtml = (config.overlayColor && config.overlayColor !== 'transparent' && config.overlayOpacity > 0)
+                ? `<div style="position:absolute;inset:0;z-index:10;pointer-events:none;background:${config.overlayColor};opacity:${config.overlayOpacity / 100}"></div>` : '';
+            const posStyles: Record<string, string> = { top: 'top:40px;align-items:flex-start;', middle: 'top:50%;transform:translateY(-50%);align-items:center;', bottom: 'bottom:40px;align-items:flex-end;' };
+            const posStyle = posStyles[config.position] || posStyles.middle;
+            const textColor = config.textColor === 'black' ? '#000' : '#fff';
+            const textShadow = config.textColor === 'black' ? 'none' : '0 2px 4px rgba(0,0,0,0.5)';
+            const textHtml = config.text
+                ? `<div style="position:absolute;left:0;right:0;z-index:20;padding:0 32px;display:flex;flex-direction:column;pointer-events:none;${posStyle}"><div style="max-width:560px;text-align:center;white-space:pre-wrap;font-size:clamp(1.5rem,4vw,2.5rem);font-weight:900;line-height:1.2;color:${textColor};text-shadow:${textShadow};">${escHtml(config.text).replace(/\n/g, '<br>')}</div></div>` : '';
+            const mobileImgHtml = mobileSrc ? `<img src="${mobileSrc}" alt="" style="display:none;width:100%;height:auto;${filterStyle}" class="mobile-img" />` : '';
+            return `<section style="position:relative;width:100%;overflow:hidden;">${overlayHtml}${textHtml}<img src="${desktopSrc}" alt="" style="display:block;width:100%;height:auto;${filterStyle}" class="desktop-img" />${mobileImgHtml}</section>`;
+        });
+
+        const hc = headerConfig;
+        const heightMap: Record<string, number> = { sm: 40, md: 64, lg: 80, xl: 96 };
+        const sizeMap: Record<string, string> = { sm: '1rem', md: '1.25rem', lg: '1.5rem', xl: '1.875rem' };
+        return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${escHtml(initialSlug || 'page')}</title><style>
+body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
+.header{${hc.sticky ? 'position:sticky;top:0;' : ''}z-index:50;display:flex;height:${heightMap[hc.headerHeight] || 64}px;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.9);padding:0 32px;box-shadow:0 1px 3px rgba(0,0,0,0.1);backdrop-filter:blur(8px)}
+.header-logo{font-size:${sizeMap[hc.logoSize] || '1.25rem'};font-weight:700;color:#2563eb}
+.header-cta{display:inline-block;background:#2563eb;color:#fff;padding:8px 24px;border-radius:9999px;font-size:0.875rem;font-weight:700;text-decoration:none}
+.main-content{max-width:768px;margin:0 auto;background:#fff;box-shadow:0 25px 50px -12px rgba(0,0,0,0.15)}
+.footer{background:#111827;padding:32px;text-align:center;color:#fff;font-size:0.875rem;opacity:0.7}
+@media(max-width:768px){.desktop-img{display:none!important}.mobile-img{display:block!important}}
+</style></head><body>
+<header class="header"><div class="header-logo">${escHtml(hc.logoText || initialSlug || '')}</div><a href="${escHtml(hc.ctaLink || '#contact')}" class="header-cta">${escHtml(hc.ctaText || 'お問い合わせ')}</a></header>
+<main class="main-content">${sectionsHtml.join('\n')}</main>
+<footer class="footer"><p>&copy; ${new Date().getFullYear()} ${escHtml(hc.logoText || initialSlug || '')}</p></footer>
+</body></html>`;
+    }, [sections, headerConfig, initialSlug]);
 
     // ページデプロイモーダル
     const [showPageDeployModal, setShowPageDeployModal] = useState(false);
@@ -5223,15 +5275,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 if (sections.length > 0) {
                                                     setHtmlEditSectionId(String(sections[0].id));
                                                 }
-                                                // 先にモーダルを開く（即座に遷移）
+                                                // 事前フェッチ済みなので即座にモーダルを開く
                                                 setShowHtmlEditModal(true);
-                                                // ページHTMLは裏でフェッチ
-                                                if (pageId !== 'new') {
-                                                    fetch(`/api/pages/${pageId}/deploy-html`)
-                                                        .then(res => res.ok ? res.json() : null)
-                                                        .then(data => { if (data?.html) setFetchedPageHtml(data.html); })
-                                                        .catch(() => {});
-                                                }
                                             }}
                                             variant={planLimits?.canAIGenerate === false ? "default" : "primary"}
                                             disabled={planLimits?.canAIGenerate === false || showHtmlEditModal}
@@ -7136,9 +7181,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                     ? sections.find(s => String(s.id) === htmlEditSectionId && s.role === 'html-embed' && s.config?.htmlContent)
                     : null;
 
-                // 優先順位: 1. html-embedセクションのHTML → 2. fetchしたページ全体のHTML → 3. 空テンプレート
+                // 優先順位: 1. html-embedセクションのHTML → 2. クライアント構築HTML → 3. 空テンプレート
+                const builtHtml = buildPreviewHtml();
+                console.log('[HtmlEditModal IIFE] targetSection:', !!targetSection, 'fetchedPageHtml:', !!fetchedPageHtml, 'builtHtml length:', builtHtml?.length);
                 const currentHtml = targetSection?.config?.htmlContent
                     || fetchedPageHtml
+                    || builtHtml
                     || '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>ページ</title>\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }\n</style>\n</head>\n<body>\n\n</body>\n</html>';
 
                 return (
@@ -7156,6 +7204,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         pageSlug={initialSlug || pageId}
                         pageId={pageId}
                         pageTitle={initialSlug || 'my-page'}
+                        isLoadingHtml={false}
                         onSave={async (newHtml) => {
                             if (targetSection) {
                                 // 既存のhtml-embedセクションを更新
