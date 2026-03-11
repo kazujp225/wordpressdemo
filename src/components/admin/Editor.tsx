@@ -224,7 +224,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         thumbnail: { title: 'サムネイル用に変換', keywords: ['サムネ', '画像', '変換'] },
         document: { title: '資料にする', keywords: ['スライド', 'PDF', '資料', 'ドキュメント'] },
         claude: { title: 'AIコード生成', keywords: ['AI', 'コード', '生成', 'Claude', 'HTML'] },
-        htmlEditor: { title: 'エディタを開く', keywords: ['エディタ', '編集', 'HTML', 'チャット', 'Claude'] },
+        htmlEditor: { title: 'AIで高度な編集をする', keywords: ['AI', '高度', 'エディタ', '編集', 'HTML', 'チャット', 'Claude'] },
         undo: { title: '操作をやり直す', keywords: ['戻す', '履歴', 'undo'] },
         regenerate: { title: 'まとめて作り直す', keywords: ['再生成', 'AI', 'リジェネ'] },
         seo: { title: 'SEO/LLMO対策', keywords: ['SEO', 'LLMO', '検索', '最適化', 'ChatGPT', 'Claude', 'メタ'] },
@@ -5175,8 +5175,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                             {isMenuItemVisible('htmlEditor') && (
                                 <EditorMenuItem
                                     icon={<Pencil className="h-3.5 w-3.5" />}
-                                    title="エディタを開く"
-                                    description="チャットでHTMLを編集・生成"
+                                    title="AIで高度な編集をする"
+                                    description="チャットでHTML/CSSを自在に編集・生成"
                                     tooltip="Claude AIとチャットしながらHTML/CSSを編集できます"
                                     iconVariant="dark"
                                     badge={planLimits?.canAIGenerate === false ? <EditorBadge variant="dark"><Crown className="h-2.5 w-2.5" /> Pro</EditorBadge> : undefined}
