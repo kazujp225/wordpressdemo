@@ -1171,8 +1171,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         const newItems: any[] = [];
 
         for (const file of files) {
+            const compressed = await compressImage(file);
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', compressed);
 
             try {
                 // 1. Upload to Supabase immediately
@@ -1233,8 +1234,9 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const handleSectionImageChange = async (sectionId: string, e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length) return;
         const file = e.target.files[0];
+        const compressed = await compressImage(file);
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', compressed);
 
         try {
             const res = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -1310,10 +1312,41 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         setShowInsertModal(true);
     };
 
+    // 画像圧縮（アップロード前にリサイズ+JPEG圧縮）
+    const compressImage = async (file: File, maxWidth = 2400, quality = 0.85): Promise<File> => {
+        // 小さいファイルや非画像はそのまま返す
+        if (file.size < 500 * 1024 || !file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml') {
+            return file;
+        }
+        return new Promise((resolve) => {
+            const img = new window.Image();
+            img.onload = () => {
+                let { width, height } = img;
+                if (width > maxWidth) {
+                    height = Math.round(height * (maxWidth / width));
+                    width = maxWidth;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) { resolve(file); return; }
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    if (!blob || blob.size >= file.size) { resolve(file); return; }
+                    resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = () => resolve(file);
+            img.src = URL.createObjectURL(file);
+        });
+    };
+
     const handleInsertSection = async (file: File, index: number) => {
-        // 画像をアップロード
+        // 画像を圧縮してアップロード
+        const compressed = await compressImage(file);
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', compressed);
 
         const uploadRes = await fetch('/api/upload', {
             method: 'POST',
