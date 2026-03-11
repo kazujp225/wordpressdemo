@@ -862,46 +862,13 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
                 </>
               )}
 
-              {/* 空ページ — クイックアクション */}
+              {/* 空ページ — シンプルな案内 */}
               {!isDiagnosing && !diagnosisText && (
-                <div className="w-full flex flex-col py-6">
-                  <div className="text-center mb-5">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center mx-auto mb-3 shadow-lg">
-                      <Sparkles className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="text-[15px] font-bold text-gray-900">何を作りますか？</h3>
-                    <p className="text-xs text-gray-400 mt-1">タップで即生成、または下の入力欄に自由に指示</p>
-                  </div>
-
-                  {/* メインアクション: LP一括生成 */}
-                  <button
-                    onClick={() => { setInputText(suggestions[0].prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
-                    className="w-full mb-3 flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gradient-to-r from-gray-900 to-gray-800 hover:from-black hover:to-gray-900 text-white text-left transition-all group shadow-lg"
-                  >
-                    <span className="text-lg">{suggestions[0].icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-bold">{suggestions[0].label}</p>
-                      <p className="text-[11px] text-gray-400 group-hover:text-gray-300">{suggestions[0].description}</p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-gray-500 group-hover:text-white transition-colors flex-shrink-0" />
-                  </button>
-
-                  {/* サブアクション */}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {suggestions.slice(1, 7).map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { setInputText(s.prompt); setTimeout(() => inputRef.current?.focus(), 100); }}
-                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left transition-all group"
-                      >
-                        <span className="text-sm flex-shrink-0">{s.icon}</span>
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-medium text-gray-700 group-hover:text-gray-900 truncate">{s.label}</p>
-                          <p className="text-[10px] text-gray-400 truncate">{s.description}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                <div className="w-full flex flex-col items-center justify-center py-16 px-6">
+                  <h3 className="text-[15px] font-bold text-gray-900 mb-2">生成したいものをなんでも言ってください</h3>
+                  <p className="text-[13px] text-gray-400 text-center leading-relaxed">
+                    例: お問合せフォーム、ヘッダー、料金表、LP丸ごと作成 など
+                  </p>
                 </div>
               )}
             </div>
