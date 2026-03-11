@@ -174,6 +174,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
     // セクション削除モード
     const [sectionDeleteMode, setSectionDeleteMode] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // 右サイドバータブ
     const [sidebarTab, setSidebarTab] = useState<'tools' | 'assets'>('tools');
@@ -3691,41 +3692,38 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
             {/* セクション削除モード: フローティングアクションバー */}
             {sectionDeleteMode && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom duration-300" style={{ transform: 'translateX(calc(-50% - 180px))' }}>
-                    <div className="flex items-center gap-3 bg-white rounded-2xl shadow-2xl border border-gray-200 px-5 py-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                            <span>セクション削除</span>
-                            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-bold">
-                                {selectedSectionsForDelete.size}件選択
+                <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center animate-in slide-in-from-bottom duration-300" style={{ paddingLeft: '210px', paddingRight: '210px' }}>
+                    <div className="flex items-center gap-2 bg-gray-900 rounded-2xl shadow-2xl px-5 py-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-white">
+                            <Trash2 className="h-4 w-4 text-red-400" />
+                            <span className="text-gray-300">削除モード</span>
+                            <span className="bg-red-500/20 text-red-300 px-2.5 py-0.5 rounded-full text-xs font-bold border border-red-500/30">
+                                {selectedSectionsForDelete.size}/{sections.length}
                             </span>
                         </div>
-                        <div className="h-6 w-px bg-gray-200" />
+                        <div className="h-5 w-px bg-gray-700 mx-1" />
                         <button
                             onClick={() => {
-                                // 全選択/全解除
                                 if (selectedSectionsForDelete.size === sections.length) {
                                     setSelectedSectionsForDelete(new Set());
                                 } else {
                                     setSelectedSectionsForDelete(new Set(sections.map(s => s.id)));
                                 }
                             }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="px-3 py-1.5 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
                         >
                             {selectedSectionsForDelete.size === sections.length ? '全解除' : '全選択'}
                         </button>
                         <button
                             onClick={() => {
-                                // 画像なしセクションを選択
                                 const noImageSections = sections.filter(s => !s.image?.filePath);
                                 if (noImageSections.length === 0) {
                                     toast('画像なしのセクションはありません');
                                     return;
                                 }
                                 setSelectedSectionsForDelete(new Set(noImageSections.map(s => s.id)));
-                                toast.success(`${noImageSections.length}件の画像なしセクションを選択しました`);
                             }}
-                            className="px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
+                            className="px-3 py-1.5 text-xs font-medium text-orange-300 hover:text-orange-200 hover:bg-gray-800 rounded-lg transition-colors"
                         >
                             画像なしを選択
                         </button>
@@ -3734,27 +3732,61 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                 setSectionDeleteMode(false);
                                 setSelectedSectionsForDelete(new Set());
                             }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
                         >
                             キャンセル
                         </button>
                         <button
                             onClick={() => {
                                 if (selectedSectionsForDelete.size > 0) {
-                                    if (confirm(`${selectedSectionsForDelete.size}件のセクションを削除しますか？`)) {
-                                        setSections(prev => prev.filter(s => !selectedSectionsForDelete.has(s.id)));
-                                        toast.success(`${selectedSectionsForDelete.size}件のセクションを削除しました`);
-                                        setSectionDeleteMode(false);
-                                        setSelectedSectionsForDelete(new Set());
-                                    }
+                                    setShowDeleteConfirm(true);
                                 }
                             }}
                             disabled={selectedSectionsForDelete.size === 0}
-                            className="px-4 py-1.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-bold rounded-lg hover:from-red-600 hover:to-rose-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 ml-1"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
-                            削除実行
+                            {selectedSectionsForDelete.size}件を削除
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 削除確認モーダル */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteConfirm(false); }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 text-center">
+                            <div className="mx-auto w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                                <Trash2 className="h-6 w-6 text-red-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">セクションを削除</h3>
+                            <p className="text-sm text-gray-500">
+                                <span className="font-bold text-red-600">{selectedSectionsForDelete.size}件</span>のセクションを削除します。<br />
+                                この操作は保存するまで取り消せます。
+                            </p>
+                        </div>
+                        <div className="flex gap-3 px-6 pb-6">
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                className="flex-1 py-3 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSections(prev => prev.filter(s => !selectedSectionsForDelete.has(s.id)));
+                                    toast.success(`${selectedSectionsForDelete.size}件のセクションを削除しました`);
+                                    setSectionDeleteMode(false);
+                                    setSelectedSectionsForDelete(new Set());
+                                    setShowDeleteConfirm(false);
+                                }}
+                                className="flex-1 py-3 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                削除する
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -4932,10 +4964,12 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                                                 toast('画像なしのセクションはありません');
                                                 return;
                                             }
-                                            if (confirm(`${noImageSections.length}件の画像なしセクションを削除しますか？`)) {
-                                                setSections(prev => prev.filter(s => s.image?.filePath));
-                                                toast.success(`${noImageSections.length}件の画像なしセクションを削除しました`);
-                                            }
+                                            setSelectedSectionsForDelete(new Set(noImageSections.map(s => s.id)));
+                                            setSectionDeleteMode(true);
+                                            setBatchRegenerateMode(false);
+                                            setBackgroundUnifyMode(false);
+                                            setBoundaryFixMode(false);
+                                            setShowDeleteConfirm(true);
                                         }}
                                         disabled={sections.filter(s => !s.image?.filePath).length === 0}
                                         icon={<ImageIcon className="h-3.5 w-3.5" />}
@@ -7092,6 +7126,7 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
                         layoutMode={sections[0]?.config?.layout === 'desktop' ? 'desktop' : 'responsive'}
                         pageSlug={initialSlug || pageId}
                         pageId={pageId}
+                        pageTitle={initialSlug || 'my-page'}
                         onSave={async (newHtml) => {
                             if (targetSection) {
                                 // 既存のhtml-embedセクションを更新

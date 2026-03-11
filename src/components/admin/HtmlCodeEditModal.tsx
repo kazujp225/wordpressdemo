@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2, ExternalLink, Globe, Sparkles, RotateCw, ChevronDown, ArrowRight, CheckCircle2, Circle, Zap, Search, AlertCircle, TrendingUp } from 'lucide-react';
+import { X, Copy, Check, Code2, Monitor, Smartphone, Loader2, ImagePlus, Send, Mail, Undo2, Redo2, ExternalLink, Globe, Sparkles, RotateCw, ChevronDown, ArrowRight, CheckCircle2, Circle, Zap, Search, AlertCircle, TrendingUp, Save, Rocket, Github, Server, FileCode, ArrowLeft } from 'lucide-react';
 import type { DesignContext } from '@/lib/claude-templates';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,18 @@ interface HtmlCodeEditModalProps {
   onSave: (newHtml: string) => void | Promise<void>;
   pageSlug?: string;
   pageId?: string;
+  pageTitle?: string;
+}
+
+type DeployPhase = 'idle' | 'generating' | 'uploading' | 'deploying' | 'done' | 'failed';
+
+interface DeploymentInfo {
+  id: number;
+  serviceName: string;
+  status: string;
+  siteUrl?: string;
+  githubRepoUrl?: string;
+  errorMessage?: string;
 }
 
 interface UploadedImage {
@@ -116,6 +128,7 @@ export default function HtmlCodeEditModal({
   onSave,
   pageSlug,
   pageId,
+  pageTitle,
 }: HtmlCodeEditModalProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [modifiedHtml, setModifiedHtml] = useState(currentHtml);
@@ -127,6 +140,18 @@ export default function HtmlCodeEditModal({
   const [isDeploying, setIsDeploying] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
+
+  // IME変換中フラグ
+  const isComposingRef = useRef(false);
+
+  // デプロイ状態
+  const [showDeployPanel, setShowDeployPanel] = useState(false);
+  const [deployPhase, setDeployPhase] = useState<DeployPhase>('idle');
+  const [deployServiceName, setDeployServiceName] = useState('');
+  const [deploymentInfo, setDeploymentInfo] = useState<DeploymentInfo | null>(null);
+  const [deployError, setDeployError] = useState('');
+  const [settingsReady, setSettingsReady] = useState<boolean | null>(null);
+  const deployPollRef = useRef<NodeJS.Timeout | null>(null);
 
   // 診断
   const [isDiagnosing, setIsDiagnosing] = useState(false);
@@ -372,7 +397,8 @@ export default function HtmlCodeEditModal({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // IME変換中はEnterで送信しない
+    if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSend();
     }
@@ -443,6 +469,104 @@ export default function HtmlCodeEditModal({
       localStorage.removeItem(key);
     } catch {}
     toast.success('リセットしました');
+  };
+
+  // --- デプロイ機能 ---
+  useEffect(() => {
+    if (showDeployPanel && settingsReady === null) {
+      fetch('/api/user/settings')
+        .then(res => res.json())
+        .then(data => setSettingsReady(!!data.hasRenderApiKey && !!data.hasGithubToken))
+        .catch(() => setSettingsReady(false));
+    }
+  }, [showDeployPanel, settingsReady]);
+
+  useEffect(() => {
+    if (showDeployPanel && !deployServiceName && pageTitle) {
+      const sanitized = (pageTitle || 'my-page')
+        .replace(/[^a-zA-Z0-9-]/g, '-')
+        .replace(/[^\x00-\x7F]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .toLowerCase()
+        .slice(0, 30);
+      setDeployServiceName(sanitized || 'my-page');
+    }
+  }, [showDeployPanel, pageTitle, deployServiceName]);
+
+  useEffect(() => {
+    return () => {
+      if (deployPollRef.current) clearInterval(deployPollRef.current);
+    };
+  }, []);
+
+  const handleDeploy = async () => {
+    if (!deployServiceName.trim()) {
+      toast.error('サイト名を入力してください');
+      return;
+    }
+
+    // まず保存
+    try {
+      await onSave(modifiedHtml);
+      setHasChanges(false);
+    } catch {
+      toast.error('保存に失敗しました');
+      return;
+    }
+
+    setDeployPhase('uploading');
+    setDeployError('');
+
+    try {
+      const deployRes = await fetch('/api/deploy/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          html: modifiedHtml,
+          serviceName: deployServiceName.trim(),
+          templateType: templateType || 'editor-deploy',
+          prompt: `Editor deploy: ${pageTitle || 'page'}`,
+          pageId: pageId ? parseInt(pageId) : undefined,
+        }),
+      });
+
+      const data = await deployRes.json();
+      if (!deployRes.ok) throw new Error(data.message || 'デプロイに失敗しました');
+
+      setDeployPhase('deploying');
+      setDeploymentInfo(data.deployment);
+
+      // ポーリング開始
+      if (deployPollRef.current) clearInterval(deployPollRef.current);
+      const pollStart = Date.now();
+      deployPollRef.current = setInterval(async () => {
+        if (Date.now() - pollStart > 5 * 60 * 1000) {
+          setDeployPhase('failed');
+          setDeployError('タイムアウトしました');
+          if (deployPollRef.current) clearInterval(deployPollRef.current);
+          return;
+        }
+        try {
+          const res = await fetch(`/api/deploy/${data.deployment.id}`);
+          if (res.ok) {
+            const status = await res.json();
+            setDeploymentInfo(prev => prev ? { ...prev, ...status } : status);
+            if (status.status === 'live') {
+              setDeployPhase('done');
+              if (deployPollRef.current) clearInterval(deployPollRef.current);
+            } else if (status.status === 'failed') {
+              setDeployPhase('failed');
+              setDeployError(status.errorMessage || 'ビルドに失敗しました');
+              if (deployPollRef.current) clearInterval(deployPollRef.current);
+            }
+          }
+        } catch {}
+      }, 4000);
+    } catch (error: any) {
+      setDeployPhase('failed');
+      setDeployError(error.message || 'デプロイに失敗しました');
+    }
   };
 
   // 自動ページ診断
@@ -619,10 +743,18 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
       <div className="w-[440px] flex flex-col bg-white border-r border-gray-200/80">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-black flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={onClose}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="編集画面に戻る"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="h-5 w-px bg-gray-200" />
+            <div className="w-7 h-7 rounded-lg bg-black flex items-center justify-center">
+              <Sparkles className="h-3.5 w-3.5 text-white" />
             </div>
             <div>
               <h2 className="text-[13px] font-semibold text-gray-900">CV導線オペレーター</h2>
@@ -639,13 +771,10 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
           </div>
           <div className="flex items-center gap-1">
             {hasChanges && (
-              <button onClick={handleReset} className="p-2 text-gray-300 hover:text-gray-500 rounded-lg transition-colors" title="リセット">
-                <RotateCw className="h-4 w-4" />
+              <button onClick={handleReset} className="p-1.5 text-gray-300 hover:text-gray-500 rounded-lg transition-colors" title="リセット">
+                <RotateCw className="h-3.5 w-3.5" />
               </button>
             )}
-            <button onClick={onClose} className="p-2 text-gray-300 hover:text-gray-500 rounded-lg transition-colors">
-              <X className="h-4 w-4" />
-            </button>
           </div>
         </div>
 
@@ -870,7 +999,9 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="変更内容を入力..."
+              onCompositionStart={() => { isComposingRef.current = true; }}
+              onCompositionEnd={() => { isComposingRef.current = false; }}
+              placeholder="変更内容を入力...（Shift+Enterで改行）"
               rows={1}
               className="w-full px-4 pt-3 pb-1 bg-transparent text-[13px] text-gray-800 placeholder-gray-300 focus:outline-none resize-none"
               style={{ minHeight: '40px', maxHeight: '120px' }}
@@ -902,25 +1033,22 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
           </div>
         </div>
 
-        {/* Save Footer */}
-        {hasChanges && (
-          <div className="px-4 pb-4 flex gap-2">
-            <button
-              onClick={handleSave}
-              disabled={isSaving || isDeploying}
-              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> 保存中...</> : '保存'}
-            </button>
-            <button
-              onClick={handleSaveAndDeploy}
-              disabled={isSaving || isDeploying}
-              className="flex-1 py-3 bg-black hover:bg-gray-800 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isDeploying ? <><Loader2 className="h-4 w-4 animate-spin" /> 公開中...</> : '保存して公開'}
-            </button>
-          </div>
-        )}
+        {/* Save / Deploy Footer - 常時表示 */}
+        <div className="px-4 pb-3 pt-1 flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={isSaving || !hasChanges}
+            className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[13px] font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+          >
+            {isSaving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> 保存中</> : <><Save className="h-3.5 w-3.5" /> 保存</>}
+          </button>
+          <button
+            onClick={() => setShowDeployPanel(true)}
+            className="flex-1 py-2.5 bg-black hover:bg-gray-800 text-white rounded-xl text-[13px] font-medium transition-all flex items-center justify-center gap-1.5"
+          >
+            <Rocket className="h-3.5 w-3.5" /> 公開
+          </button>
+        </div>
       </div>
 
       {/* ===== Right: Computer View ===== */}
@@ -1080,6 +1208,190 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
           })()}
         </div>
       </div>
+
+      {/* デプロイパネル */}
+      {showDeployPanel && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget && deployPhase === 'idle') setShowDeployPanel(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Deploy Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-gray-900 flex items-center justify-center">
+                  <Rocket className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-gray-900">ページを公開</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">GitHub + Render Static Site</p>
+                </div>
+              </div>
+              <button onClick={() => { if (deployPhase !== 'uploading' && deployPhase !== 'deploying') { setShowDeployPanel(false); setDeployPhase('idle'); setDeploymentInfo(null); setDeployError(''); }}} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                <X className="h-4 w-4 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* 設定未完了 */}
+              {settingsReady === false && (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-bold text-amber-900">初期設定が必要です</p>
+                        <p className="text-xs text-amber-700 mt-1">Render APIキーとGitHubトークンを設定画面で設定してください。</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200">
+                      <Github className="h-4 w-4 text-gray-600" />
+                      <span className="text-sm text-gray-700 flex-1">GitHub連携</span>
+                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">未設定</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200">
+                      <Server className="h-4 w-4 text-gray-600" />
+                      <span className="text-sm text-gray-700 flex-1">Render APIキー</span>
+                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">未設定</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading settings */}
+              {settingsReady === null && (
+                <div className="flex flex-col items-center py-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-300 mb-3" />
+                  <p className="text-sm text-gray-400">設定を確認中...</p>
+                </div>
+              )}
+
+              {/* Idle: 入力フォーム */}
+              {settingsReady === true && deployPhase === 'idle' && (
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">サイト名</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={deployServiceName}
+                        onChange={(e) => setDeployServiceName(e.target.value.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase())}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
+                        placeholder="my-landing-page"
+                      />
+                    </div>
+                    {deployServiceName && (
+                      <p className="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        {deployServiceName}.onrender.com
+                      </p>
+                    )}
+                  </div>
+                  {hasChanges && (
+                    <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                      未保存の変更があります。公開時に自動保存されます。
+                    </p>
+                  )}
+                  <button
+                    onClick={handleDeploy}
+                    className="w-full py-3 bg-gray-900 hover:bg-black text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Rocket className="h-4 w-4" />
+                    デプロイを開始
+                  </button>
+                </div>
+              )}
+
+              {/* Deploying progress */}
+              {settingsReady === true && (deployPhase === 'uploading' || deployPhase === 'deploying') && (
+                <div className="space-y-5">
+                  <div className="space-y-3">
+                    {[
+                      { key: 'uploading', icon: Github, label: 'リポジトリ作成', desc: 'GitHubにアップロード中' },
+                      { key: 'deploying', icon: Server, label: 'ビルド中', desc: 'Renderでサイトを構築中' },
+                    ].map((step) => {
+                      const isActive = deployPhase === step.key;
+                      const isDone = (step.key === 'uploading' && deployPhase === 'deploying');
+                      return (
+                        <div key={step.key} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${isActive ? 'bg-blue-50 border border-blue-100' : isDone ? 'bg-green-50 border border-green-100' : 'bg-gray-50 border border-gray-100'}`}>
+                          {isActive ? (
+                            <Loader2 className="h-5 w-5 text-blue-500 animate-spin flex-shrink-0" />
+                          ) : isDone ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />
+                          )}
+                          <div>
+                            <p className={`text-sm font-medium ${isActive ? 'text-blue-700' : isDone ? 'text-green-700' : 'text-gray-400'}`}>{step.label}</p>
+                            <p className={`text-[11px] ${isActive ? 'text-blue-500' : isDone ? 'text-green-500' : 'text-gray-300'}`}>{step.desc}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Done */}
+              {settingsReady === true && deployPhase === 'done' && deploymentInfo && (
+                <div className="space-y-5 text-center">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
+                    <CheckCircle2 className="h-7 w-7 text-green-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">公開完了</h3>
+                    <p className="text-sm text-gray-500 mt-1">サイトが公開されました</p>
+                  </div>
+                  {deploymentInfo.siteUrl && (
+                    <a
+                      href={deploymentInfo.siteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full py-3 bg-green-500 hover:bg-green-600 text-white font-bold text-sm rounded-xl transition-colors text-center"
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        サイトを開く
+                      </span>
+                    </a>
+                  )}
+                  {deploymentInfo.githubRepoUrl && (
+                    <a
+                      href={deploymentInfo.githubRepoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm rounded-xl transition-colors text-center"
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        <Github className="h-4 w-4" />
+                        GitHubリポジトリ
+                      </span>
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Failed */}
+              {settingsReady === true && deployPhase === 'failed' && (
+                <div className="space-y-4 text-center">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+                    <AlertCircle className="h-7 w-7 text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">デプロイ失敗</h3>
+                    <p className="text-sm text-red-500 mt-1">{deployError}</p>
+                  </div>
+                  <button
+                    onClick={() => { setDeployPhase('idle'); setDeployError(''); setDeploymentInfo(null); }}
+                    className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm rounded-xl transition-colors"
+                  >
+                    やり直す
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
