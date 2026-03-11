@@ -20,7 +20,9 @@ export default function SectionInsertModal({
     onSelectFromLibrary,
 }: Props) {
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadFailed, setUploadFailed] = useState(false);
     const [dragOver, setDragOver] = useState(false);
+    const [lastFile, setLastFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
@@ -30,12 +32,19 @@ export default function SectionInsertModal({
             toast.error('画像ファイルを選択してください');
             return;
         }
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('10MB以下の画像を選択してください');
+            return;
+        }
 
+        setLastFile(file);
         setIsUploading(true);
+        setUploadFailed(false);
         try {
             await onInsert(file, insertIndex);
             onClose();
         } catch (error: any) {
+            setUploadFailed(true);
             toast.error(error.message || '画像のアップロードに失敗しました');
         } finally {
             setIsUploading(false);
@@ -88,6 +97,36 @@ export default function SectionInsertModal({
                         <div className="py-12 flex flex-col items-center justify-center">
                             <Loader2 className="h-10 w-10 text-gray-900 animate-spin mb-3" />
                             <p className="text-sm text-gray-600">アップロード中...</p>
+                            <button
+                                onClick={() => { setIsUploading(false); setUploadFailed(true); }}
+                                className="mt-4 text-xs text-gray-400 hover:text-gray-600 underline"
+                            >
+                                キャンセル
+                            </button>
+                        </div>
+                    ) : uploadFailed ? (
+                        <div className="py-10 flex flex-col items-center justify-center">
+                            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
+                                <X className="h-6 w-6 text-red-500" />
+                            </div>
+                            <p className="text-sm font-medium text-gray-900 mb-1">アップロードに失敗しました</p>
+                            <p className="text-xs text-gray-400 mb-4">接続を確認してもう一度お試しください</p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => { setUploadFailed(false); }}
+                                    className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                                >
+                                    別の画像を選ぶ
+                                </button>
+                                {lastFile && (
+                                    <button
+                                        onClick={() => handleFileSelect(lastFile)}
+                                        className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-black rounded-xl transition-colors"
+                                    >
+                                        再試行
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ) : (
                         <>
