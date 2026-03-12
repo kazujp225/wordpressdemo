@@ -5,6 +5,7 @@ import { supabase as supabaseStorage } from '@/lib/supabase';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkFeatureAccess, checkVideoGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus } from '@/lib/security';
 
 // Veo 2 API (Gemini API経由)
 // https://ai.google.dev/gemini-api/docs/video
@@ -24,6 +25,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     try {
         // 動画生成機能のアクセスチェック（Enterpriseプランのみ）
@@ -315,7 +320,7 @@ export async function POST(request: NextRequest) {
         });
 
         return NextResponse.json(
-            { error: error.message || 'AI動画生成に失敗しました' },
+            { error: process.env.NODE_ENV === 'production' ? 'AI動画生成に失敗しました' : error.message },
             { status: 500 }
         );
     }

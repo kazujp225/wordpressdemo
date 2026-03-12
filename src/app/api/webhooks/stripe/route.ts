@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import crypto from 'crypto';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { constructWebhookEvent, getPlanIdFromPriceId } from '@/lib/stripe';
@@ -252,17 +253,8 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       userId = existingUser.id;
       console.log(`Existing user found: ${userId}`);
     } else {
-      // 新規ユーザー作成（自動生成パスワード付き）
-      // パスワードは8文字のランダム文字列を生成
-      const generatePassword = () => {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-        let password = '';
-        for (let i = 0; i < 8; i++) {
-          password += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return password;
-      };
-      const autoPassword = generatePassword();
+      // 新規ユーザー作成（暗号論的に安全なランダムパスワード）
+      const autoPassword = crypto.randomBytes(24).toString('base64url');
 
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
@@ -278,14 +270,13 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       userId = newUser.user.id;
       console.log(`New user created: ${userId}, email: ${email}, with auto-generated password`);
 
-      // Stripe CustomerメタデータにuserIdとパスワードを保存（Welcome画面で表示するため）
+      // Stripe Customerメタデータにuserを紐付け（パスワードは保存しない）
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
         apiVersion: '2025-12-15.clover',
       });
       await stripe.customers.update(customerId, {
         metadata: {
           userId,
-          tempPassword: autoPassword, // Welcome画面で取得して表示
         },
       });
     }

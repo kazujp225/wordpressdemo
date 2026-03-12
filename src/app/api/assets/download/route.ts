@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { createClient } from '@/lib/supabase/server';
+import { validateUrlForSSRF } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
     // ユーザー認証
@@ -16,6 +17,12 @@ export async function POST(request: NextRequest) {
 
         if (!url) {
             return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+        }
+
+        // SSRF防御: URLを検証
+        const ssrfError = validateUrlForSSRF(url);
+        if (ssrfError) {
+            return NextResponse.json({ error: ssrfError }, { status: 400 });
         }
 
         // 素材をダウンロード
@@ -35,7 +42,8 @@ export async function POST(request: NextRequest) {
         else if (contentType.includes('gif')) extension = 'gif';
         else if (contentType.includes('webp')) extension = 'webp';
 
-        const filename = `asset-${Date.now()}-${Math.round(Math.random() * 1E9)}.${extension}`;
+        const { randomBytes } = await import('crypto');
+        const filename = `asset-${Date.now()}-${randomBytes(8).toString('hex')}.${extension}`;
 
         // Supabaseにアップロード
         const { data: uploadData, error: uploadError } = await supabase
@@ -68,6 +76,7 @@ export async function POST(request: NextRequest) {
 
     } catch (error: any) {
         console.error('Asset download error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return NextResponse.json({ error: isProduction ? 'ダウンロードに失敗しました' : error.message }, { status: 500 });
     }
 }

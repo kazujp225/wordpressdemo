@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'デプロイに失敗しました', message: error.message },
+      { error: 'デプロイに失敗しました', ...(process.env.NODE_ENV !== 'production' ? { message: error.message } : {}) },
       { status: 500 }
     );
   }

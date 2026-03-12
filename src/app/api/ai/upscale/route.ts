@@ -14,6 +14,8 @@ import {
     updateGenerationRunStatus,
 } from '@/lib/rate-limit';
 import { v4 as uuidv4 } from 'uuid';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
+import { checkBanStatus, safeFetch } from '@/lib/security';
 
 interface UpscaleRequest {
     imageUrl?: string;
@@ -35,6 +37,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     const requestId = uuidv4();
     let creditDeducted = false;
@@ -126,7 +132,7 @@ export async function POST(request: NextRequest) {
             const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
             imageBuffer = Buffer.from(base64Data, 'base64');
         } else if (imageUrl) {
-            const imageResponse = await fetch(imageUrl);
+            const imageResponse = await safeFetch(imageUrl);
             if (!imageResponse.ok) {
                 throw new Error('画像の取得に失敗しました');
             }
@@ -166,10 +172,10 @@ Do NOT change any content, text, objects, or composition - only improve the qual
 Output the image at the highest possible resolution.`;
 
         const response = await fetchWithRetry(
-            `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GOOGLE_API_KEY}`,
+            googleAIUrl(MODEL),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(GOOGLE_API_KEY),
                 body: JSON.stringify({
                     contents: [{
                         parts: [
@@ -315,6 +321,6 @@ Output the image at the highest possible resolution.`;
             startTime
         });
 
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? '画像の高解像度化に失敗しました' : error.message }, { status: 500 });
     }
 }

@@ -359,7 +359,8 @@ export function fillPromptTemplate(
 ): string {
   let result = template;
   for (const [key, value] of Object.entries(variables)) {
-    result = result.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    // ReDoS防止: RegExpコンストラクタにユーザー入力を使わず、文字列のsplit/joinで置換
+    result = result.split(`{{${key}}}`).join(value);
   }
   return result;
 }

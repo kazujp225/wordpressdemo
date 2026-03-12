@@ -8,21 +8,10 @@ export async function GET() {
 
     return NextResponse.json({
       status: 'healthy',
-      timestamp: new Date().toISOString(),
-      services: {
-        database: 'up',
-      },
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      {
-        status: 'unhealthy',
-        error: error.message,
-        timestamp: new Date().toISOString(),
-        services: {
-          database: 'down',
-        },
-      },
+      { status: 'unhealthy' },
       { status: 503 }
     );
   }

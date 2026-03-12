@@ -13,6 +13,7 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { businessInfoSchema, enhancedContextSchema, designDefinitionSchema, validateRequest } from '@/lib/validations';
 import { checkImageGenerationLimit } from '@/lib/usage';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 // ============================================
 // モデル定数（停止・名称変更に対応しやすくする）
@@ -990,10 +991,10 @@ ${designDefinition.colorPreference}を基調とした配色で生成してくだ
             // Primary Model: Gemini 3 Pro Image (Nano Banana Pro)
             const usedModel: string = MODELS.IMAGE;
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.IMAGE}:generateContent?key=${apiKey}`,
+                googleAIUrl(MODELS.IMAGE),
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: googleAIHeaders(apiKey),
                     body: JSON.stringify({
                         contents: [{
                             parts: requestParts
@@ -1522,9 +1523,11 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
                 startTime
             });
 
+            if (process.env.NODE_ENV === 'development') {
+                console.error('[lp-builder] All image generation attempts failed');
+            }
             return NextResponse.json({
                 error: '画像生成に完全に失敗しました。API利用上限に達している可能性があります。しばらく待ってから再試行してください。',
-                details: process.env.NODE_ENV === 'development' ? 'All image generation attempts failed' : undefined
             }, { status: 500 });
         }
 
@@ -1613,9 +1616,9 @@ If the layout is 'Hero-focused', ensure the Hero section is dominant.
             userMessage = 'LP生成中に予期せぬエラーが発生しました。もう一度お試しください。問題が続く場合はサポートにご連絡ください。';
         }
 
-        return NextResponse.json({
-            error: userMessage,
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        }, { status: 500 });
+        if (process.env.NODE_ENV === 'development') {
+            console.error('[lp-builder] Error details:', error.message);
+        }
+        return NextResponse.json({ error: userMessage }, { status: 500 });
     }
 }

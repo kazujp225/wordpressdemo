@@ -52,7 +52,7 @@ export async function GET() {
         return NextResponse.json(result);
     } catch (error: any) {
         console.error('Failed to fetch templates:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'テンプレート処理に失敗しました' : error.message }, { status: 500 });
     }
 }
 
@@ -117,6 +117,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(template);
     } catch (error: any) {
         console.error('Failed to create template:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'テンプレート処理に失敗しました' : error.message }, { status: 500 });
     }
 }

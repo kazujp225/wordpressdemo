@@ -41,20 +41,23 @@ const nextConfig = {
           // HTTPSの強制（HSTS）
           {
             key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains',
+            value: 'max-age=31536000; includeSubDomains; preload',
           },
           // Permissions-Policy（旧Feature-Policy）
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
           },
-          // Content Security Policy
+          // Content Security Policy（環境別）
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
               // スクリプト: self + インラインスクリプト（Next.jsが必要） + Stripe + hCaptcha
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com",
+              // unsafe-eval は開発モードでのみ必要。本番ではwasm-unsafe-evalのみ許可
+              process.env.NODE_ENV === 'development'
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com"
+                : "script-src 'self' 'wasm-unsafe-eval' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com",
               // スタイル: self + インラインスタイル（Tailwind等が必要）
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               // フォント
@@ -67,14 +70,16 @@ const nextConfig = {
               "frame-src 'self' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com https://www.youtube.com https://youtube.com",
               // メディア
               "media-src 'self' blob: https://*.supabase.co https://*.supabase.com",
-              // オブジェクト
+              // オブジェクト（Flash/Java等のプラグイン完全禁止）
               "object-src 'none'",
-              // ベースURI
+              // ベースURI（ベースURL改ざん防止）
               "base-uri 'self'",
               // フォーム送信先
               "form-action 'self' https://*.stripe.com",
               // frame-ancestors（クリックジャッキング対策）
               "frame-ancestors 'self'",
+              // upgrade-insecure-requests（HTTP→HTTPS自動アップグレード）
+              "upgrade-insecure-requests",
             ].join('; '),
           },
         ],

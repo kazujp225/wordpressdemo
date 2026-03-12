@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { estimateClaudeCost } from '@/lib/ai-costs';
+import { checkBanStatus } from '@/lib/security';
 import type { DesignContext } from '@/lib/claude-templates';
 
 const MODEL_NAME = 'claude-haiku-4-5-20251001';
@@ -87,6 +88,10 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // BANチェック
+  const banResponse = await checkBanStatus(user.id);
+  if (banResponse) return banResponse;
 
   const body = await request.json();
   const { messages, currentHtml, layoutMode, designContext, templateType, mode } = body as {

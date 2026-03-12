@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
@@ -15,6 +16,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 1000, 4000);
     if (!limitCheck.allowed) {
@@ -43,8 +48,12 @@ export async function POST(request: NextRequest) {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
+        function escapeHtml(str: string): string {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+        }
+
         const navItemsHtml = navItems && navItems.length > 0
-            ? navItems.map((item: { label: string; href: string }) => `<a href="${item.href}">${item.label}</a>`).join('')
+            ? navItems.map((item: { label: string; href: string }) => `<a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a>`).join('')
             : '';
 
         const styleMap: Record<string, string> = {
@@ -140,9 +149,10 @@ ${navItemsHtml ? `- ナビ項目: ${navItems.map((n: any) => n.label).join('、'
             startTime
         });
 
+        const isProduction = process.env.NODE_ENV === 'production';
         return NextResponse.json({
             error: 'ヘッダー生成に失敗しました',
-            details: error.message,
+            ...(isProduction ? {} : { details: error.message }),
         }, { status: 500 });
     }
 }

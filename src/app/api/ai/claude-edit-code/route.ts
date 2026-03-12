@@ -5,6 +5,7 @@ import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import type { DesignContext } from '@/lib/claude-templates';
 import { estimateClaudeCost } from '@/lib/ai-costs';
+import { checkBanStatus } from '@/lib/security';
 
 const MODEL_NAME = 'claude-haiku-4-5-20251001';
 
@@ -75,6 +76,10 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // BANチェック
+  const banResponse = await checkBanStatus(user.id);
+  if (banResponse) return banResponse;
 
   const body = await request.json();
   const { currentHtml, editPrompt, layoutMode, designContext, templateType } = body as {

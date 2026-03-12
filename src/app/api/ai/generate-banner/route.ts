@@ -12,6 +12,8 @@ import {
     updateGenerationRunStatus,
 } from '@/lib/rate-limit';
 import { v4 as uuidv4 } from 'uuid';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
+import { checkBanStatus, safeFetch } from '@/lib/security';
 
 const ENDPOINT = '/api/ai/generate-banner';
 
@@ -27,6 +29,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     const requestId = uuidv4();
     let creditDeducted = false;
@@ -179,7 +185,7 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             });
         } else if (referenceImageUrl) {
             try {
-                const imageResponse = await fetch(referenceImageUrl);
+                const imageResponse = await safeFetch(referenceImageUrl);
                 if (imageResponse.ok) {
                     const arrayBuffer = await imageResponse.arrayBuffer();
                     const base64Data = Buffer.from(arrayBuffer).toString('base64');
@@ -205,10 +211,10 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             try {
                 console.log(`[BANNER-GEN] Attempt ${attempt}/${maxRetries}...`);
                 response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    googleAIUrl('gemini-3.1-flash-image-preview'),
                     {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: googleAIHeaders(GOOGLE_API_KEY),
                         body: JSON.stringify({
                             contents: [{ parts }],
                             generationConfig: {
@@ -344,7 +350,8 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             startTime,
         });
 
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return NextResponse.json({ error: isProduction ? 'バナー生成に失敗しました' : (error.message || 'Internal Server Error') }, { status: 500 });
     }
 }
 

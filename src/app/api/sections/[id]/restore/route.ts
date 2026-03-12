@@ -7,6 +7,7 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { z } from 'zod';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 const log = {
     info: (msg: string) => console.log(`\x1b[36m[RESTORE]\x1b[0m ${msg}`),
@@ -82,7 +83,21 @@ export async function POST(
     try {
         const startTime = createTimer();
 
-        // セクション取得
+        // 所有者確認を先に実施（IDOR防止）
+        const sectionOwner = await prisma.pageSection.findUnique({
+            where: { id: sectionId },
+            select: { page: { select: { userId: true } } },
+        });
+
+        if (!sectionOwner) {
+            return Response.json({ error: 'Section not found' }, { status: 404 });
+        }
+
+        if (sectionOwner.page.userId !== user.id) {
+            return Response.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        // セクション取得（認可確認済み）
         const section = await prisma.pageSection.findUnique({
             where: { id: sectionId },
             include: { image: true },
@@ -90,15 +105,6 @@ export async function POST(
 
         if (!section?.image?.filePath) {
             return Response.json({ error: 'Section or image not found' }, { status: 404 });
-        }
-
-        // 所有者確認（pageを取得して確認）
-        const page = await prisma.page.findUnique({
-            where: { id: section.pageId },
-        });
-
-        if (!page || page.userId !== user.id) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         log.info(`Restoring section ${sectionId}: ${direction} +${actualTopAmount}px top, +${actualBottomAmount}px bottom`);
@@ -265,7 +271,7 @@ export async function POST(
 
     } catch (error: any) {
         log.error(`Restore error: ${error.message}`);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ error: process.env.NODE_ENV === 'production' ? 'セクションの復元に失敗しました' : error.message }, { status: 500 });
     }
 }
 
@@ -328,10 +334,10 @@ ${userPrompt}
 
         // Gemini 3.0 Pro（画像生成・編集に最適）を使用
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
+            googleAIUrl('gemini-3.1-flash-image-preview'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(apiKey),
                 body: JSON.stringify({
                     contents: [{ parts }],
                     generationConfig: {

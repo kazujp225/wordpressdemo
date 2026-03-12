@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
+import { checkBanStatus } from '@/lib/security';
 
 export async function GET(request: NextRequest) {
     try {
@@ -13,9 +14,13 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // BANチェック
+        const banResponse = await checkBanStatus(user.id);
+        if (banResponse) return banResponse;
+
         const searchParams = request.nextUrl.searchParams;
-        const limit = parseInt(searchParams.get('limit') || '20');
-        const offset = parseInt(searchParams.get('offset') || '0');
+        const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20'), 1), 100);
+        const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
         const originalImage = searchParams.get('originalImage'); // 特定画像の履歴を取得
 
         // 必ずログインユーザーのデータのみを取得
@@ -54,7 +59,7 @@ export async function GET(request: NextRequest) {
     } catch (error: any) {
         console.error('Inpaint history fetch error:', error);
         return NextResponse.json(
-            { error: error.message || 'Internal Server Error' },
+            { error: process.env.NODE_ENV === 'production' ? 'インペイント履歴の取得に失敗しました' : (error.message || 'Internal Server Error') },
             { status: 500 }
         );
     }

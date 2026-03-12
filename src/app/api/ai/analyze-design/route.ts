@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus, validateUrlForSSRF } from '@/lib/security';
 
 // Type definitions for the design structure
 export interface DesignDefinition {
@@ -37,6 +38,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
+
     // クレジット残高チェック
     const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 1000, 2000);
     if (!limitCheck.allowed) {
@@ -53,7 +58,7 @@ export async function POST(request: NextRequest) {
     try {
         const { imageUrl } = await request.json();
 
-        if (!imageUrl) {
+        if (!imageUrl || typeof imageUrl !== 'string') {
             return NextResponse.json({ error: 'Image URL is required' }, { status: 400 });
         }
 
@@ -77,6 +82,14 @@ export async function POST(request: NextRequest) {
             // Regular URL - fetch the image
             const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
             const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${baseUrl}${imageUrl}`;
+
+            // SSRF防御: 外部URLの場合は検証
+            if (imageUrl.startsWith('http')) {
+                const ssrfError = validateUrlForSSRF(fullUrl);
+                if (ssrfError) {
+                    return NextResponse.json({ error: `URL検証エラー: ${ssrfError}` }, { status: 400 });
+                }
+            }
 
             const imgRes = await fetch(fullUrl);
             if (!imgRes.ok) {
@@ -169,9 +182,10 @@ export async function POST(request: NextRequest) {
             startTime
         });
 
+        const isProduction = process.env.NODE_ENV === 'production';
         return NextResponse.json({
             error: 'Design Analysis Failed',
-            details: error.message
+            details: isProduction ? undefined : error.message
         }, { status: 500 });
     }
 }

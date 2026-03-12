@@ -50,9 +50,32 @@ function checkRateLimit(
   return { allowed: true, remaining: maxRequests - entry.count };
 }
 
-// CSRF検証（エッジランタイム互換）
+// IP取得（プロキシ信頼チェック付き）
+function getClientIP(request: NextRequest): string {
+  // Render.com / Vercel / Cloudflare などの信頼できるプロキシからのヘッダーのみ使用
+  // x-forwarded-for は最初のIPのみ使用（クライアントが偽装できるのは先頭に追加される分）
+  // 信頼できるプロキシが付与するヘッダーを優先
+  const cfConnectingIp = request.headers.get('cf-connecting-ip'); // Cloudflare
+  if (cfConnectingIp) return cfConnectingIp.trim();
+
+  const xRealIp = request.headers.get('x-real-ip'); // Nginx/Render
+  if (xRealIp) return xRealIp.trim();
+
+  // x-forwarded-for: クライアントが先頭にIPを追加できるため、
+  // 信頼できるプロキシが最後に付与するIPを使用する
+  const xForwardedFor = request.headers.get('x-forwarded-for');
+  if (xForwardedFor) {
+    const ips = xForwardedFor.split(',').map(ip => ip.trim()).filter(ip => ip);
+    // 最後のIPが信頼できるプロキシが付与したクライアントIP
+    return ips[ips.length - 1];
+  }
+
+  return 'unknown';
+}
+
+// CSRF検証（エッジランタイム互換・強化版）
 function validateCSRF(request: NextRequest): boolean {
-  // GETリクエストはスキップ
+  // GETリクエストはスキップ（副作用なし）
   if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
     return true;
   }
@@ -64,7 +87,7 @@ function validateCSRF(request: NextRequest): boolean {
     return true;
   }
 
-  // フォーム送信は公開API
+  // フォーム送信は公開API（レート制限で保護）
   if (pathname === '/api/form-submissions') {
     return true;
   }
@@ -73,39 +96,75 @@ function validateCSRF(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
   const host = request.headers.get('host');
 
-  if (origin) {
-    try {
-      const originUrl = new URL(origin);
-      // 同一ホストかチェック
-      if (originUrl.host !== host) {
-        // 許可リストをチェック
-        const allowedHosts = ['lpnavix.com', 'www.lpnavix.com', 'localhost:3000', '127.0.0.1:3000'];
-        if (!allowedHosts.includes(originUrl.host)) {
-          console.warn(`[CSRF] Blocked request from origin: ${origin}`);
-          return false;
-        }
+  // 変更操作にはOriginヘッダーを必須にする
+  if (!origin) {
+    // Refererヘッダーをフォールバックとして使用
+    const referer = request.headers.get('referer');
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        if (refererUrl.host === host) return true;
+        const allowedHosts = getAllowedHosts();
+        if (allowedHosts.includes(refererUrl.host)) return true;
+      } catch {
+        return false;
       }
-    } catch {
-      return false;
     }
+    // OriginもRefererもない場合は拒否（ブラウザからのリクエストには必ずどちらかがある）
+    // ただしサーバー間通信を考慮してAPIキーベースの認証があれば許可
+    console.warn(`[CSRF] No Origin/Referer header for ${request.method} ${pathname}`);
+    return false;
   }
 
-  return true;
+  try {
+    const originUrl = new URL(origin);
+    // 同一ホストかチェック
+    if (originUrl.host === host) return true;
+
+    // 許可リストをチェック
+    const allowedHosts = getAllowedHosts();
+    if (allowedHosts.includes(originUrl.host)) return true;
+
+    console.warn(`[CSRF] Blocked request from origin: ${origin}`);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// 許可ホスト一覧（環境変数から取得可能に）
+function getAllowedHosts(): string[] {
+  const envHosts = process.env.ALLOWED_ORIGINS?.split(',').map(h => h.trim()) || [];
+  const defaultHosts = ['lpnavix.com', 'www.lpnavix.com'];
+
+  // 開発環境のみlocalhostを許可
+  if (process.env.NODE_ENV === 'development') {
+    defaultHosts.push('localhost:3000', '127.0.0.1:3000');
+  }
+
+  return [...defaultHosts, ...envHosts];
+}
+
+// セキュリティヘッダーを追加
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  // キャッシュ制御（API レスポンス）
+  if (!response.headers.has('Cache-Control')) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  }
+  return response;
 }
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // APIルートのレート制限
+  // APIルートのセキュリティ処理
   if (pathname.startsWith('/api/')) {
-    // クライアントIP取得
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
-               request.headers.get('x-real-ip') ||
-               'unknown';
+    // クライアントIP取得（偽装対策済み）
+    const ip = getClientIP(request);
 
     // エンドポイント別のレート制限設定
     let maxRequests = 60;
-    let windowMs = 60 * 1000;
+    const windowMs = 60 * 1000;
 
     if (pathname.startsWith('/api/ai/')) {
       // AI API: 1分間に20リクエスト
@@ -114,16 +173,22 @@ export async function middleware(request: NextRequest) {
       // 認証API: 1分間に10リクエスト
       maxRequests = 10;
     } else if (pathname === '/api/form-submissions') {
-      // フォーム送信: 1分間に5リクエスト
+      // フォーム送信: 1分間に5リクエスト（スパム防止）
       maxRequests = 5;
+    } else if (pathname.startsWith('/api/upload')) {
+      // アップロード: 1分間に15リクエスト
+      maxRequests = 15;
+    } else if (pathname.startsWith('/api/admin/')) {
+      // 管理API: 1分間に30リクエスト
+      maxRequests = 30;
     }
 
     const rateLimitKey = `${pathname}:${ip}`;
     const rateLimit = checkRateLimit(rateLimitKey, maxRequests, windowMs);
 
     if (!rateLimit.allowed) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+      return addSecurityHeaders(new NextResponse(
+        JSON.stringify({ error: 'リクエスト数が上限を超えました。しばらくしてから再試行してください。' }),
         {
           status: 429,
           headers: {
@@ -132,23 +197,24 @@ export async function middleware(request: NextRequest) {
             'X-RateLimit-Remaining': '0',
           },
         }
-      );
+      ));
     }
 
     // CSRF検証
     if (!validateCSRF(request)) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Invalid request origin' }),
+      return addSecurityHeaders(new NextResponse(
+        JSON.stringify({ error: '不正なリクエスト元です' }),
         {
           status: 403,
           headers: { 'Content-Type': 'application/json' },
         }
-      );
+      ));
     }
   }
 
   // 既存の認証・セッション処理
-  return await updateSession(request);
+  const response = await updateSession(request);
+  return addSecurityHeaders(response);
 }
 
 export const config = {

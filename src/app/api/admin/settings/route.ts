@@ -33,7 +33,7 @@ export async function GET() {
         }, {});
         return NextResponse.json(configMap);
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? '設定の処理に失敗しました' : error.message }, { status: 500 });
     }
 }
 
@@ -65,6 +65,6 @@ export async function POST(request: NextRequest) {
         await Promise.all(upserts);
         return NextResponse.json({ success: true });
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? '設定の処理に失敗しました' : error.message }, { status: 500 });
     }
 }

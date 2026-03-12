@@ -8,6 +8,7 @@ import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkGenerationLimit, checkFeatureAccess } from '@/lib/usage';
 // design-tokens.ts のインポートは不要になりました（editOptions方式に移行）
 import { z } from 'zod';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 // カラーログ
 const log = {
@@ -307,10 +308,10 @@ ${editPrompt}
         const temperature = editOptions.layout.enabled ? 0.35 : 0.15;
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
+            googleAIUrl('gemini-3.1-flash-image-preview'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(apiKey),
                 body: JSON.stringify({
                     contents: [{
                         parts
@@ -374,7 +375,7 @@ function createStreamResponse(processFunction: (send: (data: any) => void) => Pr
             try {
                 await processFunction(send);
             } catch (error: any) {
-                send({ type: 'error', error: error.message });
+                send({ type: 'error', error: process.env.NODE_ENV === 'production' ? 'リスタイルに失敗しました' : error.message });
             } finally {
                 controller.close();
             }

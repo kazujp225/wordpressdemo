@@ -10,6 +10,7 @@ import {
     tokensToPromptDescription,
 } from '@/lib/design-tokens';
 import { z } from 'zod';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 // カラーログ
 const log = {
@@ -97,7 +98,21 @@ export async function POST(
         log.info(`========== Starting Regenerate for Section ${sectionId} ==========`);
         log.info(`Section ID type: ${typeof sectionId}, value: ${sectionId}`);
 
-        // セクションを取得
+        // 所有者確認を先に実施（IDOR防止: DBクエリ前に認可チェック）
+        const sectionOwner = await prisma.pageSection.findUnique({
+            where: { id: sectionId },
+            select: { page: { select: { userId: true } } },
+        });
+
+        if (!sectionOwner) {
+            return Response.json({ error: 'Section not found' }, { status: 404 });
+        }
+
+        if (sectionOwner.page.userId !== user.id) {
+            return Response.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        // セクションを取得（認可確認済み）
         const section = await prisma.pageSection.findUnique({
             where: { id: sectionId },
             include: {
@@ -115,18 +130,7 @@ export async function POST(
         });
 
         if (!section) {
-            // デバッグ: 存在するセクションIDを確認
-            const allSections = await prisma.pageSection.findMany({
-                select: { id: true, pageId: true },
-                take: 20
-            });
-            log.error(`Section ${sectionId} not found. Existing sections: ${JSON.stringify(allSections)}`);
             return Response.json({ error: 'Section not found' }, { status: 404 });
-        }
-
-        // 所有者確認
-        if (section.page.userId !== user.id) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         // 対象画像を決定（desktop or mobile）
@@ -544,10 +548,10 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
 
         // Gemini API呼び出し
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${googleApiKey}`,
+            googleAIUrl('gemini-3.1-flash-image-preview'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(googleApiKey),
                 body: JSON.stringify({
                     contents: [{
                         parts
@@ -702,6 +706,10 @@ ${contextStyle ? `【コンテキストスタイル】${contextStyle}` : ''}
 
     } catch (error: any) {
         log.error(`Error: ${error.message}`);
-        return Response.json({ error: error.message }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return Response.json(
+            { error: isProduction ? 'AI processing failed' : error.message },
+            { status: 500 }
+        );
     }
 }

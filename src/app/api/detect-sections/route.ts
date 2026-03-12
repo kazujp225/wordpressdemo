@@ -4,6 +4,8 @@ import chromium from '@sparticuz/chromium';
 import sharp from 'sharp';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/db';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
+import { validateUrlForSSRF } from '@/lib/security';
 
 // カラーログ
 const log = {
@@ -134,10 +136,10 @@ async function detectSectionsWithAI(
 
     try {
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            googleAIUrl('gemini-2.0-flash'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(apiKey),
                 body: JSON.stringify({
                     contents: [{
                         parts: [
@@ -268,6 +270,13 @@ export async function POST(request: NextRequest) {
 
             if (deviceConfig.userAgent) {
                 await page.setUserAgent(deviceConfig.userAgent);
+            }
+
+            // SSRF validation before navigating
+            const ssrfError = validateUrlForSSRF(url);
+            if (ssrfError) {
+                await browser.close();
+                return Response.json({ error: `URL検証エラー: ${ssrfError}` }, { status: 400 });
             }
 
             // Navigate to URL
@@ -408,9 +417,10 @@ export async function POST(request: NextRequest) {
 
     } catch (error: any) {
         log.error(`Detection failed: ${error.message}`);
+        const isProduction = process.env.NODE_ENV === 'production';
         return Response.json({
             success: false,
-            error: error.message
+            error: isProduction ? 'セクション検出に失敗しました' : error.message
         }, { status: 500 });
     }
 }

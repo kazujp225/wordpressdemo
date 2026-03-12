@@ -171,6 +171,6 @@ export async function GET(request: NextRequest) {
         });
     } catch (error: any) {
         console.error('Stats API Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? '統計情報の取得に失敗しました' : error.message }, { status: 500 });
     }
 }

@@ -5,6 +5,7 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { suggestBenefitsSchema, validateRequest } from '@/lib/validations';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus } from '@/lib/security';
 
 const MODEL = 'gemini-2.0-flash';
 
@@ -16,6 +17,10 @@ export async function POST(req: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     // クレジット残高チェック
     const limitCheck = await checkTextGenerationLimit(user.id, MODEL, 1000, 3000);
@@ -282,9 +287,9 @@ ${prompt}
             userMessage = 'AI提案の生成中に予期せぬエラーが発生しました。入力内容を確認して再試行してください。';
         }
 
-        return NextResponse.json({
-            error: userMessage,
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        }, { status: 500 });
+        if (process.env.NODE_ENV === 'development') {
+            console.error('[suggest-benefits] Error details:', error.message);
+        }
+        return NextResponse.json({ error: userMessage }, { status: 500 });
     }
 }

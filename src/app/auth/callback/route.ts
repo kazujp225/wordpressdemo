@@ -6,7 +6,11 @@ export async function GET(request: Request) {
     const code = searchParams.get('code');
     const token = searchParams.get('token');
     const type = searchParams.get('type');
-    const next = searchParams.get('next') ?? '/admin';
+    // オープンリダイレクト防止: nextは内部パスのみ許可
+    let next = searchParams.get('next') ?? '/admin';
+    if (!next.startsWith('/') || next.startsWith('//') || next.includes('://')) {
+        next = '/admin';
+    }
 
     // パスワードリセット（recovery）の場合
     if (type === 'recovery' && token) {

@@ -49,7 +49,7 @@ export function AutoResizeIframe({ htmlContent, className = '' }: Props) {
       srcDoc={wrappedHtml}
       className={`w-full border-0 ${className}`}
       style={{ minHeight: '100vh', width: '100%', display: 'block' }}
-      sandbox="allow-scripts allow-forms"
+      sandbox="allow-same-origin"
       title="Embedded content"
     />
   );

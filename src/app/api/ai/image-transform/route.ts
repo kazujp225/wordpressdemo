@@ -4,6 +4,8 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { checkImageGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { logGeneration } from '@/lib/generation-logger';
 import { supabase } from '@/lib/supabase';
+import { checkBanStatus } from '@/lib/security';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 // OCR用システムプロンプト（元画像用）
 const SOURCE_OCR_PROMPT = `この画像を詳細に分析してください。
@@ -111,6 +113,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     try {
         const {
@@ -347,10 +353,10 @@ async function analyzeImageWithOCR(
         try {
             console.log(`[OCR] Attempt ${attempt}/${maxRetries}...`);
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+                googleAIUrl('gemini-2.0-flash'),
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: googleAIHeaders(apiKey),
                     body: JSON.stringify({
                         contents: [{
                             parts: [
@@ -437,10 +443,10 @@ async function generateImageWithGemini(
     }
 
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
+        googleAIUrl('gemini-3.1-flash-image-preview'),
         {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: googleAIHeaders(apiKey),
             body: JSON.stringify({
                 contents: [{ parts }],
                 generationConfig: {

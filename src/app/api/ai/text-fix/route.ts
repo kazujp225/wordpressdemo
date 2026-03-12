@@ -6,6 +6,8 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { estimateImageCost } from '@/lib/ai-costs';
 import { checkImageGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus, safeFetch } from '@/lib/security';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 interface MaskArea {
     x: number;      // 選択範囲の左上X（0-1の比率）
@@ -34,6 +36,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     // クレジット残高チェック（4K出力のため4K料金で計算）
     const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3.1-flash-image-preview', 1, undefined, '4K');
@@ -77,7 +83,7 @@ export async function POST(request: NextRequest) {
         if (imageBase64) {
             base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
         } else if (imageUrl) {
-            const imageResponse = await fetch(imageUrl);
+            const imageResponse = await safeFetch(imageUrl);
             if (!imageResponse.ok) {
                 throw new Error('画像の取得に失敗しました');
             }
@@ -159,10 +165,10 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
 
         // Gemini 3.0 Pro Image で画像生成
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+            googleAIUrl('gemini-3.1-flash-image-preview'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(GOOGLE_API_KEY),
                 body: JSON.stringify({
                     contents: [{
                         parts: [
@@ -309,6 +315,6 @@ Generate the edited image with pixel-perfect, crystal-clear Japanese text now.`;
             startTime
         });
 
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'テキスト修正に失敗しました' : error.message }, { status: 500 });
     }
 }

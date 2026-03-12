@@ -52,7 +52,8 @@ function createStreamResponse(processFunction: (send: (data: any) => void) => Pr
             try {
                 await processFunction(send);
             } catch (error: any) {
-                send({ type: 'error', error: error.message });
+                const isProduction = process.env.NODE_ENV === 'production';
+                send({ type: 'error', error: isProduction ? 'スクリーンショットの取得に失敗しました' : error.message });
             } finally {
                 controller.close();
             }

@@ -28,6 +28,7 @@ export async function GET() {
         return NextResponse.json(templates);
     } catch (error: any) {
         console.error('Failed to fetch public templates:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return NextResponse.json({ error: isProduction ? 'テンプレートの取得に失敗しました' : error.message }, { status: 500 });
     }
 }

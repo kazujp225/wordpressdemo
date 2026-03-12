@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus, safeFetch } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
@@ -18,6 +19,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     // クレジット残高チェック
     const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 1000, 2000);
@@ -56,7 +61,7 @@ export async function POST(request: NextRequest) {
             if (s.base64 && s.base64.includes('base64,')) {
                 buffer = Buffer.from(s.base64.split(',')[1], 'base64');
             } else if (s.image?.filePath) {
-                const res = await fetch(s.image.filePath);
+                const res = await safeFetch(s.image.filePath);
                 buffer = Buffer.from(await res.arrayBuffer());
             } else {
                 return null;
@@ -168,9 +173,10 @@ export async function POST(request: NextRequest) {
             startTime
         });
 
+        const isProduction = process.env.NODE_ENV === 'production';
         return NextResponse.json({
-            error: 'AI Nav Generation Failed',
-            details: error.message,
+            error: isProduction ? 'ナビゲーション生成に失敗しました' : 'AI Nav Generation Failed',
+            ...(isProduction ? {} : { details: error.message }),
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         }, { status: 500 });
     }

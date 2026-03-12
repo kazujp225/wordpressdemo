@@ -212,7 +212,7 @@ export async function GET(
     } catch (error: any) {
         log('Error', { error: error.message });
         console.error('Failed to fetch history:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ error: process.env.NODE_ENV === 'production' ? '処理に失敗しました' : error.message }, { status: 500 });
     }
 }
 
@@ -299,7 +299,7 @@ export async function POST(
         });
     } catch (error: any) {
         console.error('Failed to revert:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ error: process.env.NODE_ENV === 'production' ? '処理に失敗しました' : error.message }, { status: 500 });
     }
 }
 
@@ -359,6 +359,6 @@ export async function PUT(
         return Response.json({ success: true });
     } catch (error: any) {
         console.error('Failed to save history:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ error: process.env.NODE_ENV === 'production' ? '処理に失敗しました' : error.message }, { status: 500 });
     }
 }

@@ -5,7 +5,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus, safeFetch } from '@/lib/security';
 import sharp from 'sharp';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 const log = {
     info: (msg: string) => console.log(`\x1b[36m[DESIGN-UNIFY]\x1b[0m ${msg}`),
@@ -38,6 +40,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     // クレジットチェック
     const limitCheck = await checkGenerationLimit(user.id);
@@ -73,10 +79,10 @@ export async function POST(request: NextRequest) {
 
         log.info(`Design unify: section ${targetSectionId}, ${masks.length} mask(s)`);
 
-        // 画像を取得
+        // 画像を取得（SSRF防御付き）
         const [refResponse, targetResponse] = await Promise.all([
-            fetch(referenceImageUrl),
-            fetch(targetImageUrl),
+            safeFetch(referenceImageUrl),
+            safeFetch(targetImageUrl),
         ]);
 
         if (!refResponse.ok || !targetResponse.ok) {
@@ -133,10 +139,10 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
 
         // Gemini API呼び出し
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+            googleAIUrl('gemini-3.1-flash-image-preview'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(GOOGLE_API_KEY),
                 body: JSON.stringify({
                     contents: [{
                         parts: [
@@ -296,7 +302,7 @@ ${prompt ? `\n【追加指示】${prompt}` : ''}
 
     } catch (error: any) {
         log.error(`Error: ${error.message}`);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'デザイン統一に失敗しました' : error.message }, { status: 500 });
     }
 }
 

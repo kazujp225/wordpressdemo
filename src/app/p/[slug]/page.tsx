@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import DOMPurify from 'isomorphic-dompurify';
 import type { ClickableArea } from '@/types';
 import type { Metadata } from 'next';
 import { ContactForm } from '@/components/public/ContactForm';
@@ -47,9 +48,9 @@ interface SEOData {
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
     const page = await prisma.page.findUnique({
         where: { slug: params.slug },
-        select: { title: true, seoData: true }
+        select: { title: true, seoData: true, status: true }
     });
-    if (!page) return { title: 'Not Found' };
+    if (!page || page.status !== 'published') return { title: 'Not Found' };
 
     // SEOデータをパース
     let seoData: SEOData = {};
@@ -104,7 +105,13 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                 { id: isNaN(id) ? -1 : id }
             ]
         },
-        include: {
+        select: {
+            id: true,
+            title: true,
+            slug: true,
+            status: true,
+            seoData: true,
+            headerConfig: true,
             sections: {
                 include: { image: true, mobileImage: true },
                 orderBy: { order: 'asc' },
@@ -113,6 +120,9 @@ export default async function PublicPage({ params }: { params: { slug: string } 
     });
 
     if (!page) return notFound();
+
+    // 公開ステータスチェック（draft等の非公開ページは表示しない）
+    if (page.status !== 'published') return notFound();
 
     // SEO/LLMOデータをパース
     let seoData: SEOData = {};
@@ -242,7 +252,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
 
             {/* Dynamic Header */}
             {headerConfig.headerHtml ? (
-                <div className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50`} dangerouslySetInnerHTML={{ __html: headerConfig.headerHtml }} />
+                <div className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50`} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(headerConfig.headerHtml, { ALLOWED_TAGS: ['div', 'span', 'a', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'nav', 'header', 'footer', 'section', 'img', 'button', 'strong', 'em', 'br', 'hr', 'small', 'sup', 'sub', 'svg', 'path', 'circle', 'rect', 'g', 'defs', 'clipPath', 'use'], ALLOWED_ATTR: ['class', 'style', 'href', 'src', 'alt', 'title', 'id', 'target', 'rel', 'width', 'height', 'viewBox', 'fill', 'stroke', 'stroke-width', 'd', 'cx', 'cy', 'r', 'x', 'y', 'xmlns', 'role', 'aria-label', 'aria-hidden', 'data-*'], ALLOW_DATA_ATTR: true }) }} />
             ) : (
             <header
                 className={`${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex items-center justify-between bg-white/90 px-3 md:px-8 shadow-sm backdrop-blur-md gap-2`}

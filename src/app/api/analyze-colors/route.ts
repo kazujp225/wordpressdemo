@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
+import { safeFetch } from '@/lib/security';
 
 /**
  * 画像からカラーパレットを抽出するAPI
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 画像をダウンロード
-        const imageResponse = await fetch(imageUrl);
+        const imageResponse = await safeFetch(imageUrl);
         const imageArrayBuffer = await imageResponse.arrayBuffer();
         const imageBuffer = Buffer.from(imageArrayBuffer);
         const base64Data = imageBuffer.toString('base64');
@@ -52,10 +54,10 @@ export async function POST(request: NextRequest) {
 色は実際に画像で使われている色を正確に抽出してください。`;
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${googleApiKey}`,
+            googleAIUrl('gemini-2.0-flash'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(googleApiKey),
                 body: JSON.stringify({
                     contents: [{
                         parts: [
@@ -104,6 +106,6 @@ export async function POST(request: NextRequest) {
 
     } catch (error: any) {
         console.error('[AnalyzeColors] Error:', error.message);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ error: process.env.NODE_ENV === 'production' ? 'カラー分析に失敗しました' : error.message }, { status: 500 });
     }
 }

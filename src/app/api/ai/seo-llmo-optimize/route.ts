@@ -3,6 +3,7 @@ import { getClaudeClient } from '@/lib/claude';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { createClient } from '@/lib/supabase/server';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus, safeFetch } from '@/lib/security';
 import {
   SEO_ANALYSIS_PROMPT,
   LLMO_ANALYSIS_PROMPT,
@@ -164,7 +165,7 @@ async function getImageBase64(imageUrl: string): Promise<{ base64: string; media
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${baseUrl}${imageUrl}`;
 
-  const imgRes = await fetch(fullUrl);
+  const imgRes = await safeFetch(fullUrl);
   if (!imgRes.ok) {
     throw new Error(`Failed to fetch image: ${imgRes.statusText}`);
   }
@@ -271,6 +272,10 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // BANチェック
+  const banResponse = await checkBanStatus(user.id);
+  if (banResponse) return banResponse;
 
   // クレジット残高チェック (Claude Sonnetは高コストなので余裕を持たせる)
   const limitCheck = await checkTextGenerationLimit(user.id, MODEL_NAME, 2000, 4096);

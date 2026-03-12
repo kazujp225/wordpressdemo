@@ -13,6 +13,8 @@ import {
     getRateLimitHeaders,
 } from '@/lib/rate-limit';
 import { v4 as uuidv4 } from 'uuid';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
+import { checkBanStatus, safeFetch } from '@/lib/security';
 
 const ENDPOINT = '/api/ai/edit-image';
 
@@ -28,6 +30,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     // リクエストID生成（冪等性キー）
     const requestId = uuidv4();
@@ -168,7 +174,7 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
         if (imageBase64) {
             base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
         } else if (imageUrl) {
-            const imageResponse = await fetch(imageUrl);
+            const imageResponse = await safeFetch(imageUrl);
             if (!imageResponse.ok) {
                 if (creditDeducted) {
                     await refundCredit(user.id, estimatedCostUsd, requestId, '画像取得失敗');
@@ -202,10 +208,10 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             try {
                 console.log(`[EDIT-IMAGE] Attempt ${attempt}/${maxRetries}...`);
                 response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    googleAIUrl('gemini-3.1-flash-image-preview'),
                     {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: googleAIHeaders(GOOGLE_API_KEY),
                         body: JSON.stringify({
                             contents: [{
                                 parts: [
@@ -359,7 +365,8 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
             startTime
         });
 
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return NextResponse.json({ error: isProduction ? '画像編集に失敗しました' : (error.message || 'Internal Server Error') }, { status: 500 });
     }
 }
 

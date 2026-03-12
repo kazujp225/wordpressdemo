@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus, validateUrlForSSRF } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     // クレジット残高チェック
     const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 1000, 2000);
@@ -42,6 +47,14 @@ export async function POST(request: NextRequest) {
         // 画像のBase64取得（絶対URLを想定）
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${baseUrl}${imageUrl}`;
+
+        // SSRF防御: 外部URLの場合は検証
+        if (imageUrl.startsWith('http')) {
+            const ssrfError = validateUrlForSSRF(fullUrl);
+            if (ssrfError) {
+                return NextResponse.json({ error: `URL検証エラー: ${ssrfError}` }, { status: 400 });
+            }
+        }
 
         const imgRes = await fetch(fullUrl);
         const buffer = await imgRes.arrayBuffer();

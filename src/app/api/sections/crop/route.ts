@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
 
     } catch (error: any) {
         console.error('Crop API error:', error);
-        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return NextResponse.json({ error: isProduction ? '画像処理に失敗しました' : (error.message || 'Internal server error') }, { status: 500 });
     }
 }

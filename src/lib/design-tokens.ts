@@ -6,6 +6,7 @@
  */
 
 import { DesignTokens, DesignTokensGenerationResult } from '@/types';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 // ========================================
 // デフォルトトークン定義（スタイル別）
@@ -343,10 +344,10 @@ export async function extractDesignTokensFromImage(
         const base64Data = imageBuffer.toString('base64');
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            googleAIUrl('gemini-2.0-flash'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(apiKey),
                 body: JSON.stringify({
                     contents: [{
                         parts: [

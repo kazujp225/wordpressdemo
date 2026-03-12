@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
         console.error('Video insert error:', error);
         return NextResponse.json(
-            { error: error.message || 'Failed to insert video' },
+            { error: process.env.NODE_ENV === 'production' ? '動画の挿入に失敗しました' : (error.message || 'Failed to insert video') },
             { status: 500 }
         );
     }
@@ -161,7 +161,7 @@ export async function DELETE(request: NextRequest) {
     } catch (error: any) {
         console.error('Video delete error:', error);
         return NextResponse.json(
-            { error: error.message || 'Failed to delete video' },
+            { error: process.env.NODE_ENV === 'production' ? '動画の削除に失敗しました' : (error.message || 'Failed to delete video') },
             { status: 500 }
         );
     }

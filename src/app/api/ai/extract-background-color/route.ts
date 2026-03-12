@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus, safeFetch } from '@/lib/security';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 const log = {
     info: (msg: string) => console.log(`\x1b[36m[EXTRACT-BG]\x1b[0m ${msg}`),
@@ -24,6 +26,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     // クレジット残高チェック
     const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 500, 500);
@@ -56,7 +62,7 @@ export async function POST(request: NextRequest) {
         log.info(`Extracting background color from image`);
 
         // 画像を取得してBase64に変換
-        const imageResponse = await fetch(imageUrl);
+        const imageResponse = await safeFetch(imageUrl);
         if (!imageResponse.ok) {
             return NextResponse.json({ error: '画像の取得に失敗しました' }, { status: 500 });
         }
@@ -89,10 +95,10 @@ export async function POST(request: NextRequest) {
 JSONのみを返してください。説明文は不要です。`;
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`,
+            googleAIUrl('gemini-2.0-flash'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(GOOGLE_API_KEY),
                 body: JSON.stringify({
                     contents: [{
                         parts: [
@@ -190,6 +196,6 @@ JSONのみを返してください。説明文は不要です。`;
             startTime
         });
 
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? '背景色の抽出に失敗しました' : error.message }, { status: 500 });
     }
 }

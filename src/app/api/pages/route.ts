@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { checkPageLimit } from '@/lib/usage';
+import { z } from 'zod';
+
+// ページ作成時のセクション設定スキーマ
+const createSectionSchema = z.object({
+    role: z.string().max(100).default('other'),
+    imageId: z.number().nullable().optional(),
+    mobileImageId: z.number().nullable().optional(),
+    config: z.record(z.string(), z.unknown()).nullable().optional(),
+    boundaryOffsetTop: z.number().optional().default(0),
+    boundaryOffsetBottom: z.number().optional().default(0),
+});
+
+const createPageBodySchema = z.object({
+    title: z.string().max(500).optional(),
+    slug: z.string().max(200).regex(/^[a-z0-9-]+$/).optional(),
+    sections: z.array(createSectionSchema).max(100).default([]),
+    headerConfig: z.record(z.string(), z.unknown()).optional(),
+});
 
 // GET /api/pages (List)
 export async function GET() {
@@ -10,15 +28,17 @@ export async function GET() {
         const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-        // 未認証の場合は空配列を返す
+        // 未認証の場合は401を返す
         if (!user) {
-            return NextResponse.json([]);
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // ログインユーザーのページのみ取得
+        // ログインユーザーのページのみ取得（ページネーション付き）
+        const MAX_PAGES = 200;
         const pages = await prisma.page.findMany({
             where: { userId: user.id },
-            orderBy: { updatedAt: 'desc' }
+            orderBy: { updatedAt: 'desc' },
+            take: MAX_PAGES,
         });
 
         return NextResponse.json(pages);
@@ -56,8 +76,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const body = await request.json();
-        const { sections, headerConfig, ...rest } = body;
+        const rawBody = await request.json();
+        const parseResult = createPageBodySchema.safeParse(rawBody);
+        if (!parseResult.success) {
+            return NextResponse.json(
+                { error: 'Invalid request body', details: parseResult.error.issues },
+                { status: 400 }
+            );
+        }
+        const { sections, headerConfig, ...rest } = parseResult.data;
 
         log.info(`========== Creating New Page ==========`);
         log.info(`Title: ${rest.title}`);

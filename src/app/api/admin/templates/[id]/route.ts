@@ -46,7 +46,7 @@ export async function GET(
         return NextResponse.json(template);
     } catch (error: any) {
         console.error('Failed to fetch template:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'テンプレート処理に失敗しました' : error.message }, { status: 500 });
     }
 }
 
@@ -148,7 +148,7 @@ export async function PUT(
         return NextResponse.json(template);
     } catch (error: any) {
         console.error('Failed to update template:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'テンプレート処理に失敗しました' : error.message }, { status: 500 });
     }
 }
 
@@ -178,6 +178,6 @@ export async function DELETE(
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error('Failed to delete template:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'テンプレート処理に失敗しました' : error.message }, { status: 500 });
     }
 }

@@ -131,8 +131,24 @@ export const pageSectionsUpdateSchema = z.object({
         ]).nullable().optional(),
         boundaryOffsetTop: z.number().optional(),
         boundaryOffsetBottom: z.number().optional(),
-    }).passthrough()), // passthrough allows additional fields
-    headerConfig: z.record(z.string(), z.unknown()).optional(),
+    })),
+    headerConfig: z.object({
+        logoText: z.string().max(200).optional(),
+        sticky: z.boolean().optional(),
+        ctaText: z.string().max(200).optional(),
+        ctaLink: z.string().max(500).optional(),
+        navItems: z.array(z.object({
+            id: z.string(),
+            label: z.string().max(100),
+            href: z.string().max(500),
+        })).max(20).optional(),
+        headerHeight: z.enum(['sm', 'md', 'lg', 'xl']).optional(),
+        logoSize: z.enum(['sm', 'md', 'lg', 'xl']).optional(),
+        headerHtml: z.string().max(50000).optional(),
+        backgroundColor: z.string().max(50).optional(),
+        textColor: z.string().max(50).optional(),
+        logoImageUrl: z.string().max(2000).optional(),
+    }).passthrough().optional(),
     status: z.enum(['draft', 'published']).optional(),
     designDefinition: z.record(z.string(), z.unknown()).nullable().optional(),
 });

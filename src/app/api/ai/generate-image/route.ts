@@ -9,6 +9,8 @@ import { estimateImageCost } from '@/lib/ai-costs';
 import { deductCreditAtomic, refundCredit } from '@/lib/credits';
 import { checkAllRateLimits, createOrGetGenerationRun, updateGenerationRunStatus } from '@/lib/rate-limit';
 import { v4 as uuidv4 } from 'uuid';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
+import { checkBanStatus } from '@/lib/security';
 
 // LPデザイナーとしてのシステムプロンプト
 const LP_DESIGNER_SYSTEM_PROMPT = `あなたはプロフェッショナルなLPデザイナーです。
@@ -68,6 +70,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
+
     // リクエストボディを先に読む
     let body: any;
     try {
@@ -76,8 +82,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    // requestIdはクライアントから送られてくるか、サーバーで生成
-    requestId = body.request_id || uuidv4();
+    // requestIdはサーバー側で常に生成（クライアント指定による重複悪用を防止）
+    requestId = uuidv4();
 
     // レート制限チェック（同時実行数 + リクエスト/分）
     const rateLimitResult = await checkAllRateLimits(user.id, '/api/ai/generate-image');
@@ -284,10 +290,10 @@ Generate the image to EXACTLY match this visual style and color palette.
             try {
                 console.log(`[GENERATE-IMAGE] Attempt ${attempt}/${maxRetries}...`);
                 response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                    googleAIUrl('gemini-3.1-flash-image-preview'),
                     {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: googleAIHeaders(GOOGLE_API_KEY),
                         body: JSON.stringify({
                             systemInstruction: {
                                 parts: [{ text: LP_DESIGNER_SYSTEM_PROMPT }]
@@ -384,8 +390,9 @@ Generate the image to EXACTLY match this visual style and color palette.
             durationMs,
         });
 
+        const isProduction = process.env.NODE_ENV === 'production';
         return NextResponse.json({
-            error: error.message || 'Internal Server Error',
+            error: isProduction ? '画像生成に失敗しました' : (error.message || 'Internal Server Error'),
             request_id: requestId,
         }, { status: 500 });
     }

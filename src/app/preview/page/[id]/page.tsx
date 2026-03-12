@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Monitor, Smartphone } from 'lucide-react';
+import DOMPurify from 'isomorphic-dompurify';
 import type { ClickableArea } from '@/types';
 import { OverlayElements } from '@/components/public/OverlayElements';
 
@@ -143,7 +144,7 @@ export default function PagePreviewPage() {
                     {/* Header */}
                     {pageData.headerConfig && (
                         pageData.headerConfig.headerHtml ? (
-                            <div className={`${pageData.headerConfig.sticky !== false ? 'sticky top-0' : 'relative'} z-40`} dangerouslySetInnerHTML={{ __html: pageData.headerConfig.headerHtml }} />
+                            <div className={`${pageData.headerConfig.sticky !== false ? 'sticky top-0' : 'relative'} z-40`} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pageData.headerConfig.headerHtml, { ALLOWED_TAGS: ['div', 'span', 'a', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'nav', 'header', 'footer', 'section', 'img', 'button', 'strong', 'em', 'br', 'hr', 'small', 'sup', 'sub', 'svg', 'path', 'circle', 'rect', 'g', 'defs', 'clipPath', 'use'], ALLOWED_ATTR: ['class', 'style', 'href', 'src', 'alt', 'title', 'id', 'target', 'rel', 'width', 'height', 'viewBox', 'fill', 'stroke', 'stroke-width', 'd', 'cx', 'cy', 'r', 'x', 'y', 'xmlns', 'role', 'aria-label', 'aria-hidden', 'data-*'], ALLOW_DATA_ATTR: true }) }} />
                         ) : (
                         <header
                             className={`${pageData.headerConfig.sticky !== false ? 'sticky top-0' : 'relative'} z-40 flex items-center justify-between bg-white/95 px-4 shadow-sm backdrop-blur-md ${viewMode === 'mobile' ? 'px-3' : 'md:px-8'}`}
@@ -222,7 +223,7 @@ export default function PagePreviewPage() {
                                         srcDoc={parsedConfig.htmlContent}
                                         className="w-full border-0"
                                         style={{ minHeight: '400px', height: '800px' }}
-                                        sandbox="allow-scripts allow-forms"
+                                        sandbox="allow-same-origin"
                                         title="Embedded content"
                                     />
                                 </div>
@@ -337,7 +338,10 @@ export default function PagePreviewPage() {
                                 {clickableAreas.map((area, idx) => {
                                     const getHref = () => {
                                         switch (area.actionType) {
-                                            case 'url': return area.actionValue || '#';
+                                            case 'url':
+                                                // javascript:, data:, vbscript: プロトコルを拒否（XSS防止）
+                                                if (!/^(https?:|\/|#)/i.test(area.actionValue || '')) return '#';
+                                                return area.actionValue || '#';
                                             case 'email': return `mailto:${area.actionValue}`;
                                             case 'phone': return `tel:${area.actionValue}`;
                                             case 'scroll': return `#${area.actionValue}`;

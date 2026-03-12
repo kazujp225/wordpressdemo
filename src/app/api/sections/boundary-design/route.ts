@@ -7,6 +7,7 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { z } from 'zod';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 const log = {
     info: (msg: string) => console.log(`\x1b[36m[BOUNDARY]\x1b[0m ${msg}`),
@@ -134,10 +135,10 @@ ${targetWidth}x${boundaryHeight}pxの画像を1枚だけ生成してください
         log.info(`Generating boundary: ${targetWidth}x${boundaryHeight}px`);
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
+            googleAIUrl('gemini-3.1-flash-image-preview'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(apiKey),
                 body: JSON.stringify({
                     contents: [{ parts }],
                     generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
@@ -214,7 +215,8 @@ function createStreamResponse(processFunction: (send: (data: any) => void) => Pr
             try {
                 await processFunction(send);
             } catch (error: any) {
-                send({ type: 'error', error: error.message });
+                const isProduction = process.env.NODE_ENV === 'production';
+                send({ type: 'error', error: isProduction ? 'デザイン生成に失敗しました' : error.message });
             } finally {
                 controller.close();
             }

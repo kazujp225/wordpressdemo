@@ -66,7 +66,30 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // 入力サイズ制限（DoS防止）
+    const bodyStr = JSON.stringify(body);
+    if (bodyStr.length > 10000) {
+        return NextResponse.json({ error: 'リクエストが大きすぎます' }, { status: 400 });
+    }
+
+    // セキュリティ: role, plan, isBanned などの権限フィールドの変更を防止
+    const PROTECTED_FIELDS = ['role', 'plan', 'isBanned', 'bannedAt', 'bannedBy', 'banReason', 'id', 'userId'];
+    for (const field of PROTECTED_FIELDS) {
+        if (field in body) {
+            return NextResponse.json({ error: `${field}フィールドは変更できません` }, { status: 403 });
+        }
+    }
+
     const { googleApiKey, renderApiKey, githubToken, githubDeployOwner, resendApiKey, notificationEmail, resendFromDomain } = body;
+
+    // メールアドレスのバリデーション（RFC 5321準拠の基本チェック）
+    if (notificationEmail) {
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+        if (!emailRegex.test(notificationEmail) || notificationEmail.length > 254) {
+            return NextResponse.json({ error: '有効なメールアドレスを入力してください' }, { status: 400 });
+        }
+    }
 
     // プランを確認してAPIキー設定が許可されているかチェック
     const currentSettings = await prisma.userSettings.findUnique({

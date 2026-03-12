@@ -22,6 +22,10 @@ export function InteractiveAreaOverlay({ areas, pageSlug }: InteractiveAreaOverl
                 return area.actionValue.startsWith('#') ? area.actionValue : `#${area.actionValue}`;
             case 'url':
             default:
+                // javascript:, data:, vbscript: プロトコルを拒否（XSS防止）
+                if (!/^(https?:|\/|#)/i.test(area.actionValue)) {
+                    return '#';
+                }
                 return area.actionValue;
         }
     };

@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
         console.error('Video upload error:', error);
         return NextResponse.json(
-            { error: error.message || 'Video upload failed' },
+            { error: process.env.NODE_ENV === 'production' ? '動画アップロードに失敗しました' : (error.message || 'Video upload failed') },
             { status: 500 }
         );
     }

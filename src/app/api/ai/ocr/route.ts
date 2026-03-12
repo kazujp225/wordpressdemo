@@ -4,6 +4,8 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import sharp from 'sharp';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus, safeFetch } from '@/lib/security';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 interface CropArea {
     x: number;
@@ -31,6 +33,10 @@ export async function POST(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
 
     // クレジット残高チェック（テキスト生成）
     const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 1000, 2000);
@@ -71,7 +77,7 @@ export async function POST(request: NextRequest) {
             const base64Clean = imageBase64.replace(/^data:image\/\w+;base64,/, '');
             imageBuffer = Buffer.from(base64Clean, 'base64');
         } else if (imageUrl) {
-            const imageResponse = await fetch(imageUrl);
+            const imageResponse = await safeFetch(imageUrl);
             if (!imageResponse.ok) {
                 throw new Error('画像の取得に失敗しました');
             }
@@ -177,10 +183,10 @@ export async function POST(request: NextRequest) {
         const parts: any[] = [...imageParts, { text: ocrPrompt }];
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`,
+            googleAIUrl('gemini-2.0-flash'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(GOOGLE_API_KEY),
                 body: JSON.stringify({
                     contents: [{
                         parts: parts
@@ -241,6 +247,6 @@ export async function POST(request: NextRequest) {
             startTime
         });
 
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'OCR処理に失敗しました' : error.message }, { status: 500 });
     }
 }

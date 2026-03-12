@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { decrypt } from '@/lib/encryption';
 import { sendFormNotification } from '@/lib/email';
+import { sanitizeHtml, checkBanStatus } from '@/lib/security';
 
 interface FormSubmissionRequest {
     pageSlug: string;
@@ -11,12 +12,20 @@ interface FormSubmissionRequest {
         fieldLabel: string;
         value: string;
     }>;
+    // ハニーポットフィールド（スパムボット検出用）
+    _hp_field?: string;
 }
 
 export async function POST(request: NextRequest) {
     try {
         const body: FormSubmissionRequest = await request.json();
-        const { pageSlug, formTitle, formFields } = body;
+        const { pageSlug, formTitle, formFields, _hp_field } = body;
+
+        // ハニーポットチェック（ボットはhidden fieldに値を入力する）
+        if (_hp_field) {
+            // スパムボットと判断、成功レスポンスを返す（攻撃者に検出を知らせない）
+            return NextResponse.json({ success: true, message: '送信が完了しました' });
+        }
 
         if (!pageSlug || !formFields || formFields.length === 0) {
             return NextResponse.json(
@@ -24,6 +33,21 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
+
+        // フィールド数の上限チェック（DoS防止）
+        if (formFields.length > 50) {
+            return NextResponse.json(
+                { success: false, error: 'フィールド数が多すぎます（上限50）' },
+                { status: 400 }
+            );
+        }
+
+        // 各フィールドの値をサニタイズ（XSS防止）
+        const sanitizedFields = formFields.map((f: { fieldName: string; fieldLabel: string; value: string }) => ({
+            fieldName: sanitizeHtml(String(f.fieldName || '').slice(0, 200)),
+            fieldLabel: sanitizeHtml(String(f.fieldLabel || '').slice(0, 200)),
+            value: sanitizeHtml(String(f.value || '').slice(0, 5000)),
+        }));
 
         // ページの存在確認
         const page = await prisma.page.findFirst({
@@ -43,21 +67,39 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // メールフィールドを抽出
-        const emailField = formFields.find(
-            (f) => f.fieldName === 'email' || f.fieldLabel.toLowerCase().includes('email') || f.fieldLabel.includes('メール')
+        // ページ所有者のBANチェック（BAN済みユーザーのページへの送信を防止）
+        if (page.userId) {
+            const banResponse = await checkBanStatus(page.userId);
+            if (banResponse) return banResponse;
+        }
+
+        // メールフィールドを抽出（サニタイズ済みデータから）
+        const emailField = sanitizedFields.find(
+            (f: { fieldName: string; fieldLabel: string; value: string }) => f.fieldName === 'email' || f.fieldLabel.toLowerCase().includes('email') || f.fieldLabel.includes('メール')
         );
-        const nameField = formFields.find(
-            (f) => f.fieldName === 'name' || f.fieldLabel.toLowerCase().includes('name') || f.fieldLabel.includes('名前') || f.fieldLabel.includes('お名前')
+        const nameField = sanitizedFields.find(
+            (f: { fieldName: string; fieldLabel: string; value: string }) => f.fieldName === 'name' || f.fieldLabel.toLowerCase().includes('name') || f.fieldLabel.includes('名前') || f.fieldLabel.includes('お名前')
         );
 
-        // DBに保存
+        // メールアドレスのバリデーション（RFC 5321準拠の基本チェック）
+        if (emailField?.value) {
+            const email = emailField.value;
+            const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+            if (!emailRegex.test(email) || email.length > 254) {
+                return NextResponse.json(
+                    { success: false, error: '有効なメールアドレスを入力してください' },
+                    { status: 400 }
+                );
+            }
+        }
+
+        // DBに保存（サニタイズ済み）
         const submission = await prisma.formSubmission.create({
             data: {
                 pageId: page.id,
-                pageSlug,
-                formTitle: formTitle || 'お問い合わせ',
-                fields: JSON.stringify(formFields),
+                pageSlug: sanitizeHtml(pageSlug),
+                formTitle: sanitizeHtml(formTitle || 'お問い合わせ'),
+                fields: JSON.stringify(sanitizedFields),
                 senderEmail: emailField?.value || null,
                 senderName: nameField?.value || null,
             },
@@ -79,8 +121,8 @@ export async function POST(request: NextRequest) {
                         fromDomain: userSettings.resendFromDomain,
                         pageTitle: page.title,
                         pageSlug,
-                        formTitle: formTitle || 'お問い合わせ',
-                        fields: formFields,
+                        formTitle: sanitizeHtml(formTitle || 'お問い合わせ'),
+                        fields: sanitizedFields,
                         senderEmail: emailField?.value,
                         senderName: nameField?.value,
                     });

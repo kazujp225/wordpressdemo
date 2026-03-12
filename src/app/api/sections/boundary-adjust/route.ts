@@ -238,6 +238,6 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
         log.error(`Failed: ${error.message}`);
         log.error(`Stack: ${error.stack}`);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? '境界調整に失敗しました' : error.message }, { status: 500 });
     }
 }

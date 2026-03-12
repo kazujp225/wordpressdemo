@@ -3,6 +3,23 @@ import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { generateExportCSS } from '@/lib/export-styles';
 
+// サーバーサイドHTMLサニタイズ（XSS防止）
+function sanitizeHtmlContent(html: string): string {
+  return html
+    // <script>タグとその内容を除去
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    // イベントハンドラ属性を除去 (onclick, onerror, onload, etc.)
+    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+    // javascript: プロトコルを除去
+    .replace(/javascript\s*:/gi, 'blocked:')
+    // vbscript: プロトコルを除去
+    .replace(/vbscript\s*:/gi, 'blocked:')
+    // data: URIでtext/htmlを除去（XSSベクトル）
+    .replace(/data\s*:\s*text\/html/gi, 'blocked:text/html')
+    // <iframe src="javascript:..."> 等を防止
+    .replace(/<iframe\b[^>]*\bsrc\s*=\s*["']?\s*(?:javascript|data|vbscript)\s*:/gi, '<iframe src="blocked:');
+}
+
 // デプロイ用スタンドアロンHTMLを生成（画像は絶対URL）
 export async function GET(
   request: NextRequest,
@@ -84,9 +101,9 @@ export async function GET(
       if (section.config) config = { ...config, ...JSON.parse(section.config) };
     } catch {}
 
-    // html-embedセクション
+    // html-embedセクション（スクリプト・イベントハンドラを除去）
     if (section.role === 'html-embed' && config.htmlContent) {
-      return config.htmlContent;
+      return sanitizeHtmlContent(config.htmlContent);
     }
 
     const positionClasses: Record<string, string> = {
@@ -175,7 +192,7 @@ export async function GET(
   </style>
 </head>
 <body>
-  ${headerConfig.headerHtml ? headerConfig.headerHtml : `<header class="header">
+  ${headerConfig.headerHtml ? sanitizeHtmlContent(headerConfig.headerHtml) : `<header class="header">
     <div class="header-logo">${escapeHtml(headerConfig.logoText)}</div>
     <a href="${escapeHtml(headerConfig.ctaLink)}" class="header-cta">${escapeHtml(headerConfig.ctaText)}</a>
   </header>`}

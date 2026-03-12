@@ -10,6 +10,8 @@ import { checkImageGenerationLimit, incrementFreeBannerEditCount } from '@/lib/u
 import { deductCreditAtomic, refundCredit } from '@/lib/credits';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
+import { checkBanStatus, safeFetch } from '@/lib/security';
 
 interface MaskArea {
     x: number;      // 選択範囲の左上X（0-1の比率）
@@ -157,6 +159,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
+
     // バナー操作かどうかをヘッダーで判定
     const isBannerEdit = request.headers.get('x-source') === 'banner';
 
@@ -264,7 +270,7 @@ export async function POST(request: NextRequest) {
             }
             base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
         } else if (imageUrl) {
-            const imageResponse = await fetch(imageUrl);
+            const imageResponse = await safeFetch(imageUrl);
             if (!imageResponse.ok) {
                 throw new Error('画像の取得に失敗しました');
             }
@@ -519,10 +525,10 @@ User instruction: ${prompt}`;
         let response: Response;
         try {
             response = await fetchWithRetry(
-                `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${GOOGLE_API_KEY}`,
+                googleAIUrl(MODEL_ID),
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: googleAIHeaders(GOOGLE_API_KEY),
                     body: JSON.stringify({
                         contents: [{
                             parts: requestParts
@@ -635,7 +641,8 @@ User instruction: ${prompt}`;
             startTime
         });
 
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return NextResponse.json({ error: isProduction ? 'インペイント処理に失敗しました' : (error.message || 'Internal Server Error') }, { status: 500 });
     }
 }
 

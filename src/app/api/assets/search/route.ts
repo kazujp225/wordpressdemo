@@ -579,6 +579,7 @@ export async function GET(request: NextRequest) {
         });
     } catch (error: any) {
         console.error('Asset search error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return NextResponse.json({ error: isProduction ? 'アセット検索に失敗しました' : error.message }, { status: 500 });
     }
 }

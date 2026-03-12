@@ -7,6 +7,8 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { estimateImageCost } from '@/lib/ai-costs';
 import { checkImageGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
+import { safeFetch } from '@/lib/security';
 
 // テンプレートの各セクション画像内テキストをユーザー商材情報で差し替えるプロンプト
 function buildTextReplacePrompt(productInfo: {
@@ -262,7 +264,7 @@ export async function POST(
 
                         try {
                             // 画像を取得してBase64化
-                            const imgRes = await fetch(sec.image.filePath);
+                            const imgRes = await safeFetch(sec.image.filePath);
                             if (!imgRes.ok) throw new Error('画像取得失敗');
                             const imgBuffer = await imgRes.arrayBuffer();
                             const base64Data = Buffer.from(imgBuffer).toString('base64');
@@ -271,10 +273,10 @@ export async function POST(
                             // Gemini API でテキスト差し替え
                             const startTime = createTimer();
                             const geminiRes = await fetch(
-                                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+                                googleAIUrl('gemini-3.1-flash-image-preview'),
                                 {
                                     method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
+                                    headers: googleAIHeaders(GOOGLE_API_KEY),
                                     body: JSON.stringify({
                                         contents: [{
                                             parts: [
@@ -406,7 +408,7 @@ export async function POST(
                     send({ type: 'complete', pageId: page.id, slug: page.slug });
                 } catch (error: any) {
                     console.error('Template copy with text replace error:', error);
-                    send({ type: 'error', error: error.message || 'テンプレートの処理に失敗しました' });
+                    send({ type: 'error', error: process.env.NODE_ENV === 'production' ? 'テンプレートの処理に失敗しました' : error.message });
                 }
 
                 controller.close();
@@ -422,6 +424,7 @@ export async function POST(
         });
     } catch (error: any) {
         console.error('Failed to copy template:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const isProduction = process.env.NODE_ENV === 'production';
+        return NextResponse.json({ error: isProduction ? 'テンプレートのコピーに失敗しました' : error.message }, { status: 500 });
     }
 }

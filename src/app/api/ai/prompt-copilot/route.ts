@@ -3,9 +3,8 @@ import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
-
-// 管理者負担のAPIキー（フォールバック用）
-const ADMIN_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+import { checkBanStatus } from '@/lib/security';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 const SYSTEM_PROMPT = `あなたはLP（ランディングページ）画像生成のプロンプト作成を支援するコパイロットです。
 
@@ -40,6 +39,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
+
     // クレジット残高チェック
     const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 500, 1024);
     if (!limitCheck.allowed) {
@@ -57,23 +60,20 @@ export async function POST(request: NextRequest) {
         const { messages } = await request.json();
         inputPrompt = messages.map((m: any) => `${m.role}: ${m.content}`).join('\n');
 
-        // ユーザーのAPIキーを優先、なければ管理者キーを使用
         let apiKey = await getGoogleApiKeyForUser(user.id);
         if (!apiKey) {
-            apiKey = ADMIN_API_KEY || null;
-        }
-        if (!apiKey) {
-            return NextResponse.json({
-                error: 'APIキーが設定されていません。設定画面でAPIキーを設定してください。'
-            }, { status: 500 });
+            return NextResponse.json(
+                { error: '設定画面でAPIキーを設定してください。' },
+                { status: 400 }
+            );
         }
 
         // Gemini 2.0 Flash（高速・低コストモデル）でAPI呼び出し
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            googleAIUrl('gemini-2.0-flash'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(apiKey),
                 body: JSON.stringify({
                     systemInstruction: {
                         parts: [{ text: SYSTEM_PROMPT }]
@@ -133,6 +133,6 @@ export async function POST(request: NextRequest) {
             startTime
         });
 
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? 'プロンプト生成に失敗しました' : error.message }, { status: 500 });
     }
 }

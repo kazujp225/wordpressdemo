@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { PLANS } from '@/lib/plans';
 import { getUserUsage } from '@/lib/usage';
+import { validatePasswordStrength, safeErrorResponse, maskSensitive } from '@/lib/security';
 
 // 管理者かどうかをチェック（DBのroleフィールドで判定）
 async function isAdmin(userId: string): Promise<boolean> {
@@ -36,7 +37,7 @@ export async function GET() {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 });
         if (error) throw error;
 
         // UserSettingsとSubscriptionを取得
@@ -84,7 +85,8 @@ export async function GET() {
         return NextResponse.json(usersWithInfo);
     } catch (error: any) {
         console.error('Failed to fetch users:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const safeError = safeErrorResponse(error, 'ユーザー一覧の取得に失敗しました');
+        return NextResponse.json({ error: safeError.message }, { status: safeError.status });
     }
 }
 
@@ -108,8 +110,18 @@ export async function PUT(request: NextRequest) {
     try {
         const { userId, action, reason } = await request.json();
 
-        if (!userId || !['ban', 'unban'].includes(action)) {
+        if (!userId || typeof userId !== 'string' || !['ban', 'unban'].includes(action)) {
             return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+        }
+
+        // reasonフィールドの長さ制限
+        if (reason && (typeof reason !== 'string' || reason.length > 500)) {
+            return NextResponse.json({ error: 'Reason must be a string of 500 characters or less' }, { status: 400 });
+        }
+
+        // 自分自身をBANできないようにする
+        if (userId === user.id) {
+            return NextResponse.json({ error: '自分自身をBANすることはできません' }, { status: 400 });
         }
 
         const isBanned = action === 'ban';
@@ -131,10 +143,14 @@ export async function PUT(request: NextRequest) {
             },
         });
 
+        // 監査ログ: BAN操作を記録
+        console.log(`[AUDIT] User ${action}: admin=${user.id} (${maskSensitive(user.email || '', 3)}), target=${userId}, reason=${reason || 'N/A'}, at=${new Date().toISOString()}`);
+
         return NextResponse.json({ success: true, userId, isBanned });
     } catch (error: any) {
         console.error('Failed to update user ban status:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const safeError = safeErrorResponse(error, 'ユーザーステータスの更新に失敗しました');
+        return NextResponse.json({ error: safeError.message }, { status: safeError.status });
     }
 }
 
@@ -160,8 +176,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'userId and password are required' }, { status: 400 });
         }
 
-        if (password.length < 6) {
-            return NextResponse.json({ error: 'パスワードは6文字以上である必要があります' }, { status: 400 });
+        // 自分自身のパスワード変更は別のフローで行う
+        if (userId === user.id) {
+            return NextResponse.json({ error: '自分のパスワードはプロフィール設定から変更してください' }, { status: 400 });
+        }
+
+        // パスワード強度チェック
+        const passwordError = validatePasswordStrength(password);
+        if (passwordError) {
+            return NextResponse.json({ error: passwordError }, { status: 400 });
         }
 
         // Supabase Admin APIでパスワードを更新
@@ -178,9 +201,13 @@ export async function POST(request: NextRequest) {
             throw error;
         }
 
+        // 監査ログ: パスワード変更を記録
+        console.log(`[AUDIT] Admin password reset: admin=${user.id} (${maskSensitive(user.email || '', 3)}), target=${userId}, at=${new Date().toISOString()}`);
+
         return NextResponse.json({ success: true, userId });
     } catch (error: any) {
         console.error('Failed to set user password:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const safeError = safeErrorResponse(error, 'パスワードの設定に失敗しました');
+        return NextResponse.json({ error: safeError.message }, { status: safeError.status });
     }
 }

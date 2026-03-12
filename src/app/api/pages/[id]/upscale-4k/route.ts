@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkGenerationLimit, checkFeatureAccess } from '@/lib/usage';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 const log = {
     info: (msg: string) => console.log(`\x1b[35m[HD-UPSCALE]\x1b[0m ${msg}`),
@@ -32,7 +33,7 @@ function createStreamResponse(processFunction: (send: (data: any) => void) => Pr
             try {
                 await processFunction(send);
             } catch (error: any) {
-                send({ type: 'error', error: error.message });
+                send({ type: 'error', error: process.env.NODE_ENV === 'production' ? '4Kアップスケールに失敗しました' : error.message });
             } finally {
                 controller.close();
             }
@@ -431,10 +432,10 @@ ${customPrompt ? '- 正しいテキストに従って文字を修正してくだ
 
         // Gemini 3 Pro Image (最新モデル)
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
+            googleAIUrl('gemini-3.1-flash-image-preview'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(apiKey),
                 body: JSON.stringify({
                     contents: [{
                         parts: [

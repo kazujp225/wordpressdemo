@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkTextGenerationLimit, recordApiUsage } from '@/lib/usage';
+import { checkBanStatus } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
   const startTime = createTimer();
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // BANチェック
+  const banResponse = await checkBanStatus(user.id);
+  if (banResponse) return banResponse;
 
   // クレジット残高チェック
   const limitCheck = await checkTextGenerationLimit(user.id, 'gemini-2.0-flash', 1000, 2000);

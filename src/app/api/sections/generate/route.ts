@@ -7,6 +7,7 @@ import { getGoogleApiKeyForUser } from '@/lib/apiKeys';
 import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { z } from 'zod';
+import { googleAIUrl, googleAIHeaders } from '@/lib/google-ai';
 
 const log = {
     info: (msg: string) => console.log(`\x1b[36m[GENERATE]\x1b[0m ${msg}`),
@@ -155,10 +156,10 @@ ${width}x${height}pxの画像を1枚だけ生成してください。`;
         const parts: any[] = [...contextParts, { text: fullPrompt }];
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${googleApiKey}`,
+            googleAIUrl('gemini-3.1-flash-image-preview'),
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: googleAIHeaders(googleApiKey),
                 body: JSON.stringify({
                     contents: [{ parts }],
                     generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
@@ -257,6 +258,6 @@ ${width}x${height}pxの画像を1枚だけ生成してください。`;
 
     } catch (error: any) {
         log.error(`Generate error: ${error.message}`);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ error: process.env.NODE_ENV === 'production' ? 'セクション生成に失敗しました' : error.message }, { status: 500 });
     }
 }

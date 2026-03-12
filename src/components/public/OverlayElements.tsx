@@ -278,9 +278,11 @@ export function OverlayElements({ overlays, editorBaseWidth }: OverlayElementsPr
                     const action = overlay.action;
                     if (action?.url) {
                         const isExternal = action.type === 'external' || action.type === 'line';
-                        const href = action.type === 'anchor' && !action.url.startsWith('#')
-                            ? `#${action.url}`
-                            : action.url;
+                        // javascript:, data:, vbscript: プロトコルを拒否（XSS防止）
+                        const safeUrl = /^(https?:|\/|#)/i.test(action.url) ? action.url : '#';
+                        const href = action.type === 'anchor' && !safeUrl.startsWith('#')
+                            ? `#${safeUrl}`
+                            : safeUrl;
 
                         return (
                             <a

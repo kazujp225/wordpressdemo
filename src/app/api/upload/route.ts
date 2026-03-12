@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { createClient } from '@/lib/supabase/server';
+import { validateFileUpload, checkBanStatus } from '@/lib/security';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
@@ -44,6 +45,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // BANチェック
+    const banResponse = await checkBanStatus(user.id);
+    if (banResponse) return banResponse;
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
@@ -59,10 +64,23 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    // ファイルタイプ検証（MIMEタイプ + マジックバイト）
+    const fileValidationError = validateFileUpload(file, buffer, 'image');
+    if (fileValidationError) {
+        return NextResponse.json({ error: fileValidationError }, { status: 400 });
+    }
+
     // Upload to Supabase Storage (リトライ付き)
+    // セキュリティ: クライアント提供のファイル名を使わず、ランダム生成
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = file.name.replace(/[^a-zA-Z0-9.]/g, '_'); // Sanitize
-    const finalFilename = `${uniqueSuffix}-${filename}`;
+    // 拡張子はMIMEタイプから安全に導出
+    const MIME_TO_EXT: Record<string, string> = {
+      'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
+      'image/webp': '.webp', 'image/svg+xml': '.svg', 'image/avif': '.avif',
+      'image/heic': '.heic', 'image/heif': '.heif',
+    };
+    const ext = MIME_TO_EXT[file.type] || '.bin';
+    const finalFilename = `${uniqueSuffix}${ext}`;
 
     const { error: uploadError } = await uploadWithRetry(finalFilename, buffer, file.type);
 
