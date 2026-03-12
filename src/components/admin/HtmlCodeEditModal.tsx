@@ -39,17 +39,17 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   images?: string[];
-  actions?: string[];
+  suggestions?: string[];
 }
 
 type AgentStatus = 'idle' | 'diagnosing' | 'thinking' | 'generating' | 'updating' | 'done';
 
 const STATUS_LABELS: Record<AgentStatus, string> = {
   idle: '',
-  diagnosing: 'ページを診断中...',
-  thinking: '導線を分析中...',
-  generating: 'パーツを生成中...',
-  updating: 'プレビューを更新中...',
+  diagnosing: 'ページを分析中...',
+  thinking: '考え中...',
+  generating: '作成中...',
+  updating: '反映中...',
   done: '完了',
 };
 
@@ -266,10 +266,58 @@ export default function HtmlCodeEditModal({
     });
   };
 
+  // URL検出: テキストがURLのみ or URLで始まる場合
+  const detectUrl = (text: string): string | null => {
+    const urlMatch = text.match(/^(https?:\/\/[^\s]+)/);
+    return urlMatch ? urlMatch[1] : null;
+  };
+
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text && uploadedImages.length === 0) return;
     userHasEditedRef.current = true;
+
+    // URL検出: URLのみの入力の場合、HTMLを取得してプレビューに表示
+    const detectedUrl = detectUrl(text);
+    if (detectedUrl && text === detectedUrl) {
+      const userMessage: ChatMessage = { role: 'user', content: text };
+      setMessages(prev => [...prev, userMessage]);
+      setInputText('');
+      setIsGenerating(true);
+      setAgentStatus('thinking');
+
+      try {
+        const res = await fetch('/api/fetch-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: detectedUrl }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.html) {
+            pushHtmlHistory(data.html);
+            try { const r = onSave(data.html); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch {}
+            setAgentStatus('done');
+            setTimeout(() => setAgentStatus('idle'), 2000);
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: `${detectedUrl} のHTMLを取得しました。プレビューに表示しています。\n\nこのページをベースに編集できます。何をしますか？`,
+              suggestions: ['ヘッダーを追加する', 'お問い合わせフォームを追加する', 'デザインを改善する'],
+            }]);
+          } else {
+            setMessages(prev => [...prev, { role: 'assistant', content: 'HTMLの取得に失敗しました。' }]);
+          }
+        } else {
+          setMessages(prev => [...prev, { role: 'assistant', content: 'URLの取得に失敗しました。URLが正しいか確認してください。' }]);
+        }
+      } catch {
+        setMessages(prev => [...prev, { role: 'assistant', content: '接続エラーが発生しました。' }]);
+      } finally {
+        setIsGenerating(false);
+        setAgentStatus('idle');
+      }
+      return;
+    }
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -330,7 +378,6 @@ export default function HtmlCodeEditModal({
         const errorMsg: ChatMessage = {
           role: 'assistant',
           content: `エラー: ${data.message || '修正に失敗しました'}`,
-          actions: ['エラー'],
         };
         setMessages(prev => [...prev, errorMsg]);
         return;
@@ -379,7 +426,6 @@ export default function HtmlCodeEditModal({
                 setTimeout(() => setAgentStatus('idle'), 2000);
               }, 500);
 
-              const actions = ['コード生成', 'HTML更新', 'プレビュー反映'];
               let assistantContent = data.message || '変更を適用しました。';
               if (data.estimatedCost) {
                 const credits = Math.ceil(data.estimatedCost * 1500);
@@ -388,7 +434,7 @@ export default function HtmlCodeEditModal({
               const successMsg: ChatMessage = {
                 role: 'assistant',
                 content: assistantContent,
-                actions,
+                suggestions: data.suggestions,
               };
               setMessages(prev => [...prev, successMsg]);
             } else if (data.type === 'error') {
@@ -397,7 +443,6 @@ export default function HtmlCodeEditModal({
               const errorMsg: ChatMessage = {
                 role: 'assistant',
                 content: `エラー: ${data.message}`,
-                actions: ['エラー'],
               };
               setMessages(prev => [...prev, errorMsg]);
             }
@@ -423,6 +468,21 @@ export default function HtmlCodeEditModal({
     // Enterキーでは送信しない（送信ボタンのみ）
     // Shift+Enterで改行
   };
+
+  // フォローアップ提案クリック: inputTextを経由せず直接送信
+  const pendingSuggestionRef = useRef<string | null>(null);
+  const handleSuggestionClick = (suggestion: string) => {
+    pendingSuggestionRef.current = suggestion;
+    setInputText(suggestion);
+  };
+
+  // pendingSuggestionが設定されたら即送信
+  useEffect(() => {
+    if (pendingSuggestionRef.current && inputText === pendingSuggestionRef.current) {
+      pendingSuggestionRef.current = null;
+      handleSend();
+    }
+  }, [inputText]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCopy = () => {
     navigator.clipboard.writeText(modifiedHtml);
@@ -711,7 +771,6 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'フォームを有効化しました。送信データは管理画面で確認できます。',
-        actions: ['フォーム解析', 'スクリプト追加', 'プレビュー更新'],
       }]);
     } catch (error) {
       toast.error('フォーム有効化に失敗しました');
@@ -784,7 +843,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               <Sparkles className="h-3.5 w-3.5 text-white" />
             </div>
             <div>
-              <h2 className="text-[13px] font-semibold text-gray-900">CV導線オペレーター</h2>
+              <h2 className="text-[13px] font-semibold text-gray-900">LP制作エージェント</h2>
               {agentStatus !== 'idle' && (
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="relative flex h-2 w-2">
@@ -894,13 +953,52 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
                 </>
               )}
 
-              {/* 空ページ — シンプルな案内 */}
+              {/* 空ページ — Manus風の案内 + クイックアクション */}
               {!isDiagnosing && !diagnosisText && (
-                <div className="w-full flex flex-col items-center justify-center py-16 px-6">
-                  <h3 className="text-[15px] font-bold text-gray-900 mb-2">生成したいものをお伝えください</h3>
-                  <p className="text-[13px] text-gray-400 text-center leading-relaxed">
-                    例: お問合せフォーム、ヘッダー、料金表、LP丸ごと作成 など
-                  </p>
+                <div className="w-full flex flex-col py-8 px-2">
+                  <div className="text-center mb-6">
+                    <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center mx-auto mb-3">
+                      <Sparkles className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-[15px] font-bold text-gray-900 mb-1">LP制作エージェント</h3>
+                    <p className="text-[12px] text-gray-400 leading-relaxed">
+                      プロ品質のLPを自律的に作成・編集します
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {suggestions.slice(0, 4).map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSuggestionClick(s.prompt)}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 hover:bg-gray-50 text-left transition-all group"
+                      >
+                        <span className="text-base flex-shrink-0">{s.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[13px] font-medium text-gray-700 group-hover:text-gray-900 block">{s.label}</span>
+                          <span className="text-[11px] text-gray-400 block">{s.description}</span>
+                        </div>
+                        <ArrowRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" />
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {suggestions.slice(4).map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSuggestionClick(s.prompt)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100 hover:border-gray-300 text-[11px] text-gray-500 hover:text-gray-700 transition-all"
+                      >
+                        <span>{s.icon}</span>
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 px-2">
+                    <p className="text-[11px] text-gray-300 text-center">URLを入力するとページを取り込めます</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -924,20 +1022,24 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
                   ) : (
                     <div className="flex justify-start">
                       <div className="max-w-[90%]">
-                        {/* Action Pills */}
-                        {msg.actions && msg.actions.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {msg.actions.map((action, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-100 text-[11px] text-green-700 font-medium">
-                                <CheckCircle2 className="h-3 w-3" />
-                                {action}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                         <div className="bg-gray-50 border border-gray-100 text-gray-700 px-4 py-2.5 rounded-2xl rounded-bl-md text-[13px] leading-relaxed">
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
+                        {/* Follow-up Suggestions */}
+                        {msg.suggestions && msg.suggestions.length > 0 && idx === messages.length - 1 && !isGenerating && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {msg.suggestions.map((suggestion, i) => (
+                              <button
+                                key={i}
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 hover:border-gray-400 hover:bg-gray-50 text-[12px] text-gray-600 font-medium transition-all"
+                              >
+                                <ArrowRight className="h-3 w-3 text-gray-400" />
+                                {suggestion}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -948,15 +1050,8 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               {isGenerating && streamingText && (
                 <div className="flex justify-start">
                   <div className="max-w-[90%]">
-                    {/* Live Status Pills */}
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[11px] text-blue-600 font-medium">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        {STATUS_LABELS[agentStatus] || 'コード生成中...'}
-                      </span>
-                    </div>
                     <div className="bg-gray-50 border border-gray-100 text-gray-600 px-4 py-2.5 rounded-2xl rounded-bl-md text-[13px]">
-                      <p className="whitespace-pre-wrap">{streamingText}</p>
+                      <p className="whitespace-pre-wrap">{streamingText.replace(/\[SUGGEST\][\s\S]*?\[\/SUGGEST\]/g, '').replace(/\[SUGGEST\][\s\S]*$/, '')}</p>
                       <span className="inline-block w-1.5 h-4 bg-black/30 animate-pulse ml-0.5 align-middle rounded-sm" />
                     </div>
                   </div>
@@ -966,12 +1061,6 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               {isGenerating && !streamingText && (
                 <div className="flex justify-start">
                   <div className="max-w-[90%]">
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[11px] text-blue-600 font-medium">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        {STATUS_LABELS[agentStatus] || '考え中...'}
-                      </span>
-                    </div>
                     <div className="bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl rounded-bl-md">
                       <div className="flex gap-1">
                         <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '0ms' }} />

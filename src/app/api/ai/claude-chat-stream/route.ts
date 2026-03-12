@@ -152,8 +152,18 @@ function buildSystemPrompt(options: {
 ユーザーの指示が曖昧な場合でも、プロとして最善の判断でコードを生成してください。
 質問が必要な場合のみ質問しますが、基本的にはすぐに実行してください。
 特に「ヘッダー」「フォーム」「CTA」など一般的な要素は質問せずにプロ品質で生成してください。
+質問する時はHTMLコードブロックを出力しないでください。
 
-質問する時はHTMLコードブロックを出力しないでください。\n`;
+【フォローアップ提案（必須）】
+回答の最後に、次のアクションとして2-3個の提案を以下の形式で出力してください:
+[SUGGEST]提案テキスト[/SUGGEST]
+
+例:
+[SUGGEST]追従CTAボタンを追加する[/SUGGEST]
+[SUGGEST]モバイル表示を最適化する[/SUGGEST]
+[SUGGEST]お問い合わせフォームを追加する[/SUGGEST]
+
+提案はユーザーが次にやりたそうなことを予測して、具体的かつ簡潔に。\n`;
 
   return prompt;
 }
@@ -211,11 +221,25 @@ export async function POST(request: NextRequest) {
       templateType,
     });
 
+    // HTML圧縮: トークン制限対策
+    let compressedHtml = currentHtml;
+    if (currentHtml) {
+      compressedHtml = currentHtml
+        .replace(/<!--[\s\S]*?-->/g, '')  // コメント削除
+        .replace(/<script[\s\S]*?<\/script>/gi, '<script>/* ... */</script>')  // JS圧縮
+        .replace(/\s{2,}/g, ' ')  // 連続空白を1つに
+        .replace(/\n\s*\n/g, '\n');  // 空行削除
+      // 150Kを超える場合は切り詰め
+      if (compressedHtml.length > 150000) {
+        compressedHtml = compressedHtml.slice(0, 150000) + '\n<!-- ... truncated ... -->';
+      }
+    }
+
     const apiMessages = messages.map((msg, i) => {
-      if (i === 0 && msg.role === 'user' && currentHtml) {
+      if (i === 0 && msg.role === 'user' && compressedHtml) {
         return {
           role: msg.role as 'user' | 'assistant',
-          content: `【現在のHTMLコード】\n\`\`\`html\n${currentHtml}\n\`\`\`\n\n【指示】\n${msg.content}`,
+          content: `【現在のHTMLコード】\n\`\`\`html\n${compressedHtml}\n\`\`\`\n\n【指示】\n${msg.content}`,
         };
       }
       return { role: msg.role as 'user' | 'assistant', content: msg.content };
@@ -224,7 +248,7 @@ export async function POST(request: NextRequest) {
     // ストリーミングレスポンス
     const stream = claude.messages.stream({
       model: MODEL_NAME,
-      max_tokens: 8192,
+      max_tokens: 16384,
       system: systemPrompt,
       messages: apiMessages,
     });
@@ -280,6 +304,16 @@ export async function POST(request: NextRequest) {
             message = fullText.replace(/\[RECOMMEND\][\s\S]*?\[\/RECOMMEND\]/g, '').trim();
           }
 
+          // フォローアップ提案抽出（全モード共通）
+          let suggestions: string[] = [];
+          const suggestMatches = message.matchAll(/\[SUGGEST\]([\s\S]*?)\[\/SUGGEST\]/g);
+          for (const match of suggestMatches) {
+            const text = match[1].trim();
+            if (text) suggestions.push(text);
+          }
+          // [SUGGEST]タグを表示テキストから除去
+          message = message.replace(/\[SUGGEST\][\s\S]*?\[\/SUGGEST\]/g, '').trim();
+
           // ログ記録
           const logResult = await logGeneration({
             userId: user.id,
@@ -306,6 +340,7 @@ export async function POST(request: NextRequest) {
             html,
             message,
             recommendations: recommendations.length > 0 ? recommendations : undefined,
+            suggestions: suggestions.length > 0 ? suggestions : undefined,
             usage: { inputTokens, outputTokens },
             estimatedCost,
           })}\n\n`));
