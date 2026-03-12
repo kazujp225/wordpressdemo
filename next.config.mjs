@@ -57,7 +57,7 @@ const nextConfig = {
               // unsafe-eval は開発モードでのみ必要。本番ではwasm-unsafe-evalのみ許可
               process.env.NODE_ENV === 'development'
                 ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com"
-                : "script-src 'self' 'wasm-unsafe-eval' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com",
+                : "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://js.stripe.com https://*.stripe.com https://hcaptcha.com https://*.hcaptcha.com https://challenges.cloudflare.com",
               // スタイル: self + インラインスタイル（Tailwind等が必要）
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               // フォント
