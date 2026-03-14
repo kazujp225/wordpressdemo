@@ -66,6 +66,7 @@ export default function UsersPage() {
     const [expandedUser, setExpandedUser] = useState<string | null>(null);
     const [creditInfoMap, setCreditInfoMap] = useState<Map<string, CreditInfo>>(new Map());
     const [tokenAmount, setTokenAmount] = useState<string>('10000');
+    const [setBalanceAmount, setSetBalanceAmount] = useState<string>('');
     const [passwordInput, setPasswordInput] = useState<string>('');
     const [showPassword, setShowPassword] = useState<boolean>(false);
     const [settingPassword, setSettingPassword] = useState<string | null>(null);
@@ -174,10 +175,10 @@ export default function UsersPage() {
         }
     };
 
-    // クレジット付与（内部でUSDに変換してAPI呼び出し）
+    // クレジット付与/減額（内部でUSDに変換してAPI呼び出し）
     const handleTokenGrant = async (userId: string, tokens: number) => {
-        if (tokens <= 0) {
-            alert('クレジット数は0より大きい値を入力してください');
+        if (tokens === 0) {
+            alert('クレジット数を入力してください');
             return;
         }
 
@@ -185,24 +186,24 @@ export default function UsersPage() {
 
         try {
             setProcessing(userId);
+            const action = tokens > 0 ? '付与' : '減額';
             const res = await fetch('/api/admin/credits', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     userId,
                     amount: amountUsd,
-                    description: `サービスクレジット付与 ${formatTokens(tokens)}クレジット`,
+                    description: `管理者によるクレジット${action} ${formatTokens(Math.abs(tokens))}クレジット`,
                 }),
             });
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || 'Failed to grant credits');
+                throw new Error(data.error || 'Failed to adjust credits');
             }
 
             const data = await res.json();
             const newBalanceTokens = usdToTokens(data.newBalance);
-            // 既存の情報を保持しながら残高だけ更新
             setCreditInfoMap(prev => {
                 const newMap = new Map(prev);
                 const existing = prev.get(userId);
@@ -215,15 +216,36 @@ export default function UsersPage() {
                 });
                 return newMap;
             });
-            // 履歴を最新に更新
             fetchCreditInfo(userId);
 
-            alert(`${formatTokens(tokens)} クレジットを付与しました。新残高: ${formatTokens(newBalanceTokens)} クレジット`);
+            alert(`${formatTokens(Math.abs(tokens))} クレジットを${action}しました。新残高: ${formatTokens(newBalanceTokens)} クレジット`);
         } catch (err: any) {
             alert(err.message);
         } finally {
             setProcessing(null);
         }
+    };
+
+    // クレジット残高を直接設定
+    const handleSetBalance = async (userId: string, targetTokens: number) => {
+        if (targetTokens < 0) {
+            alert('残高は0以上で設定してください');
+            return;
+        }
+
+        const currentTokens = creditInfoMap.get(userId)?.currentBalanceTokens || 0;
+        const diff = targetTokens - currentTokens;
+
+        if (diff === 0) {
+            alert('残高は変更されていません');
+            return;
+        }
+
+        if (!confirm(`残高を ${formatTokens(currentTokens)} → ${formatTokens(targetTokens)} クレジットに変更しますか？`)) {
+            return;
+        }
+
+        await handleTokenGrant(userId, diff);
     };
 
     // パスワード設定
@@ -606,20 +628,56 @@ export default function UsersPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* クレジット付与 */}
+                                                {/* 残高を直接設定 */}
+                                                <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                                    <label className="text-xs font-medium text-amber-700 mb-2 block">残高を直接設定 (クレジット)</label>
+                                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
+                                                        <div className="flex-1 relative">
+                                                            <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400" />
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="1000"
+                                                                value={setBalanceAmount}
+                                                                onChange={(e) => setSetBalanceAmount(e.target.value)}
+                                                                className="w-full pl-9 pr-4 py-2.5 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[44px]"
+                                                                placeholder={formatTokens(creditInfoMap.get(user.id)?.currentBalanceTokens || 0)}
+                                                            />
+                                                        </div>
+                                                        <div className="flex gap-2 flex-wrap">
+                                                            {[0, 25000, 75000, 125000].map((amount) => (
+                                                                <button
+                                                                    key={amount}
+                                                                    onClick={() => setSetBalanceAmount(amount.toString())}
+                                                                    className="px-3 py-2 text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 rounded transition-colors min-h-[36px]"
+                                                                >
+                                                                    {formatTokens(amount)}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleSetBalance(user.id, parseInt(setBalanceAmount) || 0)}
+                                                            disabled={processing === user.id || setBalanceAmount === ''}
+                                                            className="px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                                                        >
+                                                            設定
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* クレジット付与/減額 */}
                                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                                                     <div className="flex-1">
-                                                        <label className="text-xs text-gray-500 mb-1 block">付与数 (クレジット)</label>
+                                                        <label className="text-xs text-gray-500 mb-1 block">付与/減額 (クレジット)</label>
                                                         <div className="relative">
                                                             <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                                             <input
                                                                 type="number"
-                                                                min="100"
                                                                 step="100"
                                                                 value={tokenAmount}
                                                                 onChange={(e) => setTokenAmount(e.target.value)}
                                                                 className="w-full pl-9 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[44px]"
-                                                                placeholder="10000"
+                                                                placeholder="10000（マイナス値で減額）"
                                                             />
                                                         </div>
                                                     </div>
@@ -630,17 +688,17 @@ export default function UsersPage() {
                                                                 onClick={() => setTokenAmount(amount.toString())}
                                                                 className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors min-h-[36px]"
                                                             >
-                                                                {formatTokens(amount)}
+                                                                +{formatTokens(amount)}
                                                             </button>
                                                         ))}
                                                     </div>
                                                     <button
                                                         onClick={() => handleTokenGrant(user.id, parseInt(tokenAmount) || 0)}
-                                                        disabled={processing === user.id || !tokenAmount || parseInt(tokenAmount) <= 0}
-                                                        className="px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                                                        disabled={processing === user.id || !tokenAmount || parseInt(tokenAmount) === 0}
+                                                        className={`px-4 py-2.5 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center gap-2 transition-colors min-h-[44px] ${parseInt(tokenAmount) < 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-amber-500 hover:bg-amber-600'}`}
                                                     >
                                                         <Plus className="w-4 h-4" />
-                                                        付与
+                                                        {parseInt(tokenAmount) < 0 ? '減額' : '付与'}
                                                     </button>
                                                 </div>
 
