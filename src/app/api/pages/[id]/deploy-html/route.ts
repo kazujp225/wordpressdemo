@@ -177,6 +177,20 @@ export async function GET(
 
   const cssContent = generateExportCSS();
 
+  // html-embedセクションが既にヘッダー/フッターを含んでいる場合、自動生成をスキップ
+  const joinedSections = sectionsHtml.join('\n    ');
+  const htmlEmbedHasHeader = sectionsHtml.some(h => /<header[\s>]/i.test(h));
+  const htmlEmbedHasFooter = sectionsHtml.some(h => /<footer[\s>]/i.test(h));
+
+  const autoHeader = htmlEmbedHasHeader ? '' : (headerConfig.headerHtml ? sanitizeHtmlContent(headerConfig.headerHtml) : `<header class="header">
+    <div class="header-logo">${escapeHtml(headerConfig.logoText)}</div>
+    <a href="${escapeHtml(headerConfig.ctaLink)}" class="header-cta">${escapeHtml(headerConfig.ctaText)}</a>
+  </header>`);
+
+  const autoFooter = htmlEmbedHasFooter ? '' : `<footer class="footer">
+    <p>&copy; ${new Date().getFullYear()} ${escapeHtml(headerConfig.logoText)}</p>
+  </footer>`;
+
   const htmlContent = `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -196,16 +210,11 @@ export async function GET(
   </style>
 </head>
 <body>
-  ${headerConfig.headerHtml ? sanitizeHtmlContent(headerConfig.headerHtml) : `<header class="header">
-    <div class="header-logo">${escapeHtml(headerConfig.logoText)}</div>
-    <a href="${escapeHtml(headerConfig.ctaLink)}" class="header-cta">${escapeHtml(headerConfig.ctaText)}</a>
-  </header>`}
+  ${autoHeader}
   <main class="main-content">
-    ${sectionsHtml.join('\n    ')}
+    ${joinedSections}
   </main>
-  <footer class="footer">
-    <p>&copy; ${new Date().getFullYear()} ${escapeHtml(headerConfig.logoText)}</p>
-  </footer>
+  ${autoFooter}
 </body>
 </html>`;
 
