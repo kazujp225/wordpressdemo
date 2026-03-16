@@ -217,7 +217,7 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                 <script
                     key={`structured-data-${index}`}
                     type="application/ld+json"
-                    dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\\u003c') }}
                 />
             ))}
 

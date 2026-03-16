@@ -130,19 +130,23 @@ export async function GET(
         : `${supabaseUrl}/storage/v1/object/public/images/${section.mobileImage.filePath}`;
     }
 
+    // CSSインジェクション防止: CSS値をサニタイズ
+    const safeColor = (val: string) => val?.replace(/[^a-zA-Z0-9#(),.\s%]/g, '') || '';
+    const safeNum = (val: number) => Math.max(0, Math.min(200, Number(val) || 0));
+
     const overlayHtml = (config.overlayColor && config.overlayColor !== 'transparent' && config.overlayOpacity > 0)
-      ? `<div style="position:absolute;inset:0;z-index:10;pointer-events:none;background-color:${config.overlayColor};opacity:${config.overlayOpacity / 100}"></div>`
+      ? `<div style="position:absolute;inset:0;z-index:10;pointer-events:none;background-color:${safeColor(config.overlayColor)};opacity:${safeNum(config.overlayOpacity) / 100}"></div>`
       : '';
 
     const textHtml = config.text
       ? `<div style="position:absolute;left:0;right:0;z-index:20;padding:0 32px;display:flex;flex-direction:column;pointer-events:none;${posStyle}">
-          <div style="max-width:560px;text-align:center;white-space:pre-wrap;font-size:clamp(1.5rem,4vw,2.5rem);font-weight:900;letter-spacing:-0.025em;line-height:1.2;color:${textColor};text-shadow:${textShadow};">
+          <div style="max-width:560px;text-align:center;white-space:pre-wrap;font-size:clamp(1.5rem,4vw,2.5rem);font-weight:900;letter-spacing:-0.025em;line-height:1.2;color:${safeColor(textColor)};text-shadow:${textShadow};">
             ${escapeHtml(config.text).replace(/\n/g, '<br>')}
           </div>
         </div>`
       : '';
 
-    const filterStyle = `filter: brightness(${config.brightness}%) grayscale(${config.grayscale}%)`;
+    const filterStyle = `filter: brightness(${safeNum(config.brightness)}%) grayscale(${safeNum(config.grayscale)}%)`;
 
     if (!desktopSrc) {
       return `<section style="position:relative;width:100%;overflow:hidden;">

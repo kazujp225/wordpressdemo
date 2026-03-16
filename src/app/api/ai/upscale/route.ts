@@ -75,9 +75,8 @@ export async function POST(request: NextRequest) {
 
         const safeScale = scale >= 3 ? 4 : 2;
 
-        // 2. クレジット残高チェック
-        const isBannerEdit = request.headers.get('x-source') === 'banner';
-        const limitCheck = await checkImageGenerationLimit(user.id, MODEL, 1, { isBannerEdit });
+        // 2. クレジット残高チェック（バナー無料枠はgenerate-bannerルートのみ適用）
+        const limitCheck = await checkImageGenerationLimit(user.id, MODEL, 1);
         if (!limitCheck.allowed) {
             if (limitCheck.needApiKey) {
                 return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });

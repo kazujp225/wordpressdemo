@@ -278,7 +278,19 @@ export async function middleware(request: NextRequest) {
   }
 
   // ========================================
-  // 5. APIルートのセキュリティ処理
+  // 5. リクエストボディサイズチェック（DoS防止）
+  // ========================================
+  const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
+  const MAX_BODY_SIZE = pathname.startsWith('/api/upload') ? 52_428_800 : 10_485_760; // upload=50MB, その他=10MB
+  if (contentLength > MAX_BODY_SIZE) {
+    return new NextResponse(
+      JSON.stringify({ error: 'リクエストが大きすぎます' }),
+      { status: 413, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // ========================================
+  // 6. APIルートのセキュリティ処理
   // ========================================
   if (pathname.startsWith('/api/')) {
     // エンドポイント別のレート制限設定

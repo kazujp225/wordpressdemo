@@ -223,7 +223,7 @@ export default function PagePreviewPage() {
                                         srcDoc={parsedConfig.htmlContent}
                                         className="w-full border-0"
                                         style={{ minHeight: '400px', height: '800px' }}
-                                        sandbox="allow-same-origin"
+                                        sandbox="allow-scripts"
                                         title="Embedded content"
                                     />
                                 </div>

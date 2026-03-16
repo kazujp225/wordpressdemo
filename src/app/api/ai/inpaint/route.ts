@@ -163,11 +163,8 @@ export async function POST(request: NextRequest) {
     const banResponse = await checkBanStatus(user.id);
     if (banResponse) return banResponse;
 
-    // バナー操作かどうかをヘッダーで判定
-    const isBannerEdit = request.headers.get('x-source') === 'banner';
-
-    // クレジット残高チェック（先にチェックのみ）
-    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3.1-flash-image-preview', 1, { isBannerEdit });
+    // クレジット残高チェック（バナー無料枠はgenerate-bannerルートのみ適用）
+    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3.1-flash-image-preview', 1);
     if (!limitCheck.allowed) {
         if (limitCheck.needApiKey) {
             return NextResponse.json({

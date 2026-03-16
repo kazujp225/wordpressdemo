@@ -4,6 +4,19 @@ import AdmZip from 'adm-zip';
 import { generateExportCSS } from '@/lib/export-styles';
 import { createClient } from '@/lib/supabase/server';
 
+// HTMLエスケープ
+function escapeHtml(str: string): string {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+// CSSインジェクション防止
+function safeColor(val: string): string { return val?.replace(/[^a-zA-Z0-9#(),.\s%]/g, '') || ''; }
+function safeNum(val: number): number { return Math.max(0, Math.min(200, Number(val) || 0)); }
+
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     try {
         // 認証チェック
@@ -133,25 +146,25 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             }
 
             return `
-        <section id="${section.role}-${index}" class="relative w-full overflow-hidden">
-            <div class="absolute inset-0 z-10 pointer-events-none" style="background-color: ${config.overlayColor}; opacity: ${(config.overlayOpacity || 0) / 100}"></div>
+        <section id="${escapeHtml(section.role)}-${index}" class="relative w-full overflow-hidden">
+            <div class="absolute inset-0 z-10 pointer-events-none" style="background-color: ${safeColor(config.overlayColor)}; opacity: ${safeNum(config.overlayOpacity) / 100}"></div>
             <div class="absolute inset-x-0 z-20 px-8 flex flex-col pointer-events-none ${positionClasses}">
                 ${config.text ? `
                     <div class="max-w-xl text-center whitespace-pre-wrap text-2xl md:text-4xl font-black tracking-tight leading-tight ${colorClasses} ${shadowClasses}">
-                        ${config.text.replace(/\n/g, '<br>')}
+                        ${escapeHtml(config.text).replace(/\n/g, '<br>')}
                     </div>
                 ` : ''}
             </div>
             ${imagePath ? `
                 <img
                     src="${imagePath}"
-                    alt="${section.role}"
+                    alt="${escapeHtml(section.role)}"
                     class="block w-full h-auto"
-                    style="filter: brightness(${config.brightness}%) grayscale(${config.grayscale}%)"
+                    style="filter: brightness(${safeNum(config.brightness)}%) grayscale(${safeNum(config.grayscale)}%)"
                 />
             ` : `
                 <div class="flex h-48 items-center justify-center bg-gray-100 text-gray-400">
-                    セクション: ${section.role} (画像なし)
+                    セクション: ${escapeHtml(section.role)} (画像なし)
                 </div>
             `}
         </section>`;
@@ -162,7 +175,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${page.title}</title>
+    <title>${escapeHtml(page.title)}</title>
     <link rel="stylesheet" href="./style.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
 </head>

@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { CTA_TEMPLATES, getTemplateStyle } from '@/lib/cta-templates';
 
+// リンクのプロトコル検証（javascript:/data:/vbscript:をブロック）
+function sanitizeLink(link: string | undefined): string | undefined {
+    if (!link) return undefined;
+    if (/^(https?:|\/|#|mailto:|tel:)/i.test(link)) return link;
+    return '#';
+}
+
 interface OverlayItem {
     id: string;
     type: 'image' | 'lottie' | 'text' | 'button';
@@ -129,7 +136,7 @@ export function OverlayElements({ overlays, editorBaseWidth }: OverlayElementsPr
                         return (
                             <Link
                                 key={overlay.id}
-                                href={overlay.link}
+                                href={sanitizeLink(overlay.link) || '#'}
                                 target={overlay.link.startsWith('http') ? '_blank' : undefined}
                                 rel={overlay.link.startsWith('http') ? 'noopener noreferrer' : undefined}
                             >
@@ -155,7 +162,7 @@ export function OverlayElements({ overlays, editorBaseWidth }: OverlayElementsPr
                         return (
                             <Link
                                 key={overlay.id}
-                                href={overlay.link}
+                                href={sanitizeLink(overlay.link) || '#'}
                                 target={overlay.link.startsWith('http') ? '_blank' : undefined}
                                 rel={overlay.link.startsWith('http') ? 'noopener noreferrer' : undefined}
                             >
@@ -184,7 +191,7 @@ export function OverlayElements({ overlays, editorBaseWidth }: OverlayElementsPr
                         return (
                             <Link
                                 key={overlay.id}
-                                href={overlay.link}
+                                href={sanitizeLink(overlay.link) || '#'}
                                 target={overlay.link.startsWith('http') ? '_blank' : undefined}
                                 rel={overlay.link.startsWith('http') ? 'noopener noreferrer' : undefined}
                                 className="block hover:opacity-90 transition-opacity"
@@ -302,7 +309,7 @@ export function OverlayElements({ overlays, editorBaseWidth }: OverlayElementsPr
                         return (
                             <Link
                                 key={overlay.id}
-                                href={overlay.link}
+                                href={sanitizeLink(overlay.link) || '#'}
                                 target={overlay.link.startsWith('http') ? '_blank' : undefined}
                                 rel={overlay.link.startsWith('http') ? 'noopener noreferrer' : undefined}
                             >

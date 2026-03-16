@@ -79,6 +79,17 @@ export function validateUrlForSSRF(urlString: string): string | null {
     }
   }
 
+  // 0.0.0.0 / [::] ブロック
+  if (hostname === '0.0.0.0' || normalizedHostname === '::' || normalizedHostname === '0000::') {
+    return 'プライベートIPアドレスへのアクセスは許可されていません';
+  }
+
+  // 10進数/8進数/16進数 IP表現のブロック（DNS rebinding対策）
+  // 例: 0x7f000001 (127.0.0.1), 2130706433 (127.0.0.1), 0177.0.0.1
+  if (/^0x[0-9a-f]+$/i.test(hostname) || /^\d{8,}$/.test(hostname) || /^0\d+\./.test(hostname)) {
+    return 'IPアドレスの特殊表現は許可されていません';
+  }
+
   // 空のホスト名
   if (!hostname || hostname === '') {
     return 'ホスト名が指定されていません';

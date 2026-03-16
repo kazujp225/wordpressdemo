@@ -289,17 +289,23 @@ export async function POST(request: NextRequest) {
             });
 
             try {
-                // セクションを取得
+                // セクションを取得（所有権チェック付き）
                 const [upperSection, lowerSection] = await Promise.all([
                     prisma.pageSection.findUnique({
                         where: { id: boundary.upperSectionId },
-                        include: { image: true },
+                        include: { image: true, page: { select: { userId: true } } },
                     }),
                     prisma.pageSection.findUnique({
                         where: { id: boundary.lowerSectionId },
-                        include: { image: true },
+                        include: { image: true, page: { select: { userId: true } } },
                     }),
                 ]);
+
+                // 所有権検証: ログインユーザーのセクションのみ許可
+                if (upperSection?.page?.userId !== user.id || lowerSection?.page?.userId !== user.id) {
+                    log.error(`Boundary ${i + 1}: Unauthorized section access by ${user.id}`);
+                    continue;
+                }
 
                 if (!upperSection?.image?.filePath || !lowerSection?.image?.filePath) {
                     log.error(`Boundary ${i + 1}: Missing images`);
