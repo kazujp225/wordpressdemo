@@ -12,6 +12,14 @@ const MAX_STORE_SIZE = 10000;
 let lastCleanup = Date.now();
 const CLEANUP_INTERVAL = 30 * 1000; // 30秒ごと
 
+// ========================================
+// 自動ブロックリスト（不審IP）
+// ========================================
+const blockedIPs = new Map<string, number>(); // IP → ブロック解除時刻
+const BLOCK_DURATION = 10 * 60 * 1000; // 10分間ブロック
+const suspiciousHitCount = new Map<string, number>(); // IP → 不審ヒット数
+const SUSPICIOUS_THRESHOLD = 5; // 5回不審行動でブロック
+
 function cleanupExpiredEntries() {
   const now = Date.now();
   if (now - lastCleanup < CLEANUP_INTERVAL) return;
@@ -19,6 +27,13 @@ function cleanupExpiredEntries() {
   for (const [key, entry] of rateLimitStore.entries()) {
     if (now > entry.resetTime) {
       rateLimitStore.delete(key);
+    }
+  }
+  // ブロックリストのクリーンアップ
+  for (const [ip, expiry] of blockedIPs.entries()) {
+    if (now > expiry) {
+      blockedIPs.delete(ip);
+      suspiciousHitCount.delete(ip);
     }
   }
   // サイズ上限を超えた場合は全クリア（安全弁）
@@ -52,30 +67,96 @@ function checkRateLimit(
 
 // IP取得（プロキシ信頼チェック付き）
 function getClientIP(request: NextRequest): string {
-  // Render.com / Vercel / Cloudflare などの信頼できるプロキシからのヘッダーのみ使用
-  // x-forwarded-for は最初のIPのみ使用（クライアントが偽装できるのは先頭に追加される分）
-  // 信頼できるプロキシが付与するヘッダーを優先
-  const cfConnectingIp = request.headers.get('cf-connecting-ip'); // Cloudflare
+  const cfConnectingIp = request.headers.get('cf-connecting-ip');
   if (cfConnectingIp) return cfConnectingIp.trim();
 
-  const xRealIp = request.headers.get('x-real-ip'); // Nginx/Render
+  const xRealIp = request.headers.get('x-real-ip');
   if (xRealIp) return xRealIp.trim();
 
-  // x-forwarded-for: クライアントが先頭にIPを追加できるため、
-  // 信頼できるプロキシが最後に付与するIPを使用する
   const xForwardedFor = request.headers.get('x-forwarded-for');
   if (xForwardedFor) {
     const ips = xForwardedFor.split(',').map(ip => ip.trim()).filter(ip => ip);
-    // 最後のIPが信頼できるプロキシが付与したクライアントIP
     return ips[ips.length - 1];
   }
 
   return 'unknown';
 }
 
+// ========================================
+// Bot検出（悪意のあるスクレイパー・攻撃ツール）
+// ========================================
+const BLOCKED_USER_AGENTS = [
+  // スクレイピングツール
+  'scrapy', 'httpclient', 'python-requests', 'go-http-client',
+  'java/', 'libwww-perl', 'wget', 'curl/',
+  // 攻撃ツール
+  'nikto', 'sqlmap', 'nmap', 'masscan', 'zgrab',
+  'nuclei', 'dirbuster', 'gobuster', 'wfuzz', 'ffuf',
+  // 悪質ボット
+  'semrushbot', 'ahrefsbot', 'dotbot', 'mj12bot',
+  'blexbot', 'seekport', 'petalbot', 'bytespider',
+  'megaindex', 'zoominfobot', 'dataforseo',
+];
+
+// 正当なボット（許可）
+const ALLOWED_BOTS = [
+  'googlebot', 'bingbot', 'slurp', 'duckduckbot',
+  'facebot', 'twitterbot', 'linkedinbot',
+  'chatgpt-user', 'gptbot', 'claude-web', 'perplexitybot', 'applebot',
+];
+
+function checkUserAgent(request: NextRequest): { blocked: boolean; reason?: string } {
+  const ua = (request.headers.get('user-agent') || '').toLowerCase();
+
+  // User-Agentが空の場合（ツールによるアクセス）
+  if (!ua || ua.length < 5) {
+    return { blocked: true, reason: 'Empty or suspicious User-Agent' };
+  }
+
+  // 許可ボットは通す
+  if (ALLOWED_BOTS.some(bot => ua.includes(bot))) {
+    return { blocked: false };
+  }
+
+  // ブロックリストに一致するか
+  for (const blocked of BLOCKED_USER_AGENTS) {
+    if (ua.includes(blocked)) {
+      return { blocked: true, reason: `Blocked bot: ${blocked}` };
+    }
+  }
+
+  return { blocked: false };
+}
+
+// ========================================
+// パス探索（脆弱性スキャン）検出
+// ========================================
+const SUSPICIOUS_PATHS = [
+  '/.env', '/.git', '/wp-admin', '/wp-login', '/wp-content',
+  '/phpmyadmin', '/admin.php', '/xmlrpc.php', '/wp-json',
+  '/.htaccess', '/.htpasswd', '/config.php', '/database.yml',
+  '/server-status', '/server-info', '/.well-known/security.txt',
+  '/cgi-bin/', '/shell', '/cmd', '/eval',
+  '/../', '/etc/passwd', '/proc/self',
+];
+
+function isSuspiciousPath(pathname: string): boolean {
+  const lower = pathname.toLowerCase();
+  return SUSPICIOUS_PATHS.some(p => lower.includes(p));
+}
+
+// 不審行動をカウントし、閾値超えでブロック
+function markSuspicious(ip: string): void {
+  const count = (suspiciousHitCount.get(ip) || 0) + 1;
+  suspiciousHitCount.set(ip, count);
+  if (count >= SUSPICIOUS_THRESHOLD) {
+    blockedIPs.set(ip, Date.now() + BLOCK_DURATION);
+    console.warn(`[SECURITY] Auto-blocked IP: ${ip} (${count} suspicious hits)`);
+  }
+}
+
 // CSRF検証（エッジランタイム互換・強化版）
 function validateCSRF(request: NextRequest): boolean {
-  // GETリクエストはスキップ（副作用なし）
   if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
     return true;
   }
@@ -92,13 +173,10 @@ function validateCSRF(request: NextRequest): boolean {
     return true;
   }
 
-  // Originヘッダーの検証
   const origin = request.headers.get('origin');
   const host = request.headers.get('host');
 
-  // 変更操作にはOriginヘッダーを必須にする
   if (!origin) {
-    // Refererヘッダーをフォールバックとして使用
     const referer = request.headers.get('referer');
     if (referer) {
       try {
@@ -110,21 +188,15 @@ function validateCSRF(request: NextRequest): boolean {
         return false;
       }
     }
-    // OriginもRefererもない場合は拒否（ブラウザからのリクエストには必ずどちらかがある）
-    // ただしサーバー間通信を考慮してAPIキーベースの認証があれば許可
     console.warn(`[CSRF] No Origin/Referer header for ${request.method} ${pathname}`);
     return false;
   }
 
   try {
     const originUrl = new URL(origin);
-    // 同一ホストかチェック
     if (originUrl.host === host) return true;
-
-    // 許可リストをチェック
     const allowedHosts = getAllowedHosts();
     if (allowedHosts.includes(originUrl.host)) return true;
-
     console.warn(`[CSRF] Blocked request from origin: ${origin}`);
     return false;
   } catch {
@@ -132,23 +204,24 @@ function validateCSRF(request: NextRequest): boolean {
   }
 }
 
-// 許可ホスト一覧（環境変数から取得可能に）
+// 許可ホスト一覧
 function getAllowedHosts(): string[] {
   const envHosts = process.env.ALLOWED_ORIGINS?.split(',').map(h => h.trim()) || [];
   const defaultHosts = ['lpnavix.com', 'www.lpnavix.com'];
 
-  // 開発環境のみlocalhostを許可
   if (process.env.NODE_ENV === 'development') {
-    defaultHosts.push('localhost:3000', '127.0.0.1:3000');
+    defaultHosts.push('localhost:3000', 'localhost:3002', '127.0.0.1:3000', '127.0.0.1:3002');
   }
 
   return [...defaultHosts, ...envHosts];
 }
 
 // セキュリティヘッダーを追加
-function addSecurityHeaders(response: NextResponse): NextResponse {
-  // キャッシュ制御（API レスポンス）
-  if (!response.headers.has('Cache-Control')) {
+function addSecurityHeaders(response: NextResponse, pathname?: string): NextResponse {
+  // 公開ページにはキャッシュ設定（スクレイピング負荷軽減）
+  if (pathname?.startsWith('/p/')) {
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  } else if (!response.headers.has('Cache-Control')) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   }
   return response;
@@ -156,30 +229,71 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const ip = getClientIP(request);
 
-  // APIルートのセキュリティ処理
+  // ========================================
+  // 1. IPブロックリストチェック
+  // ========================================
+  const blockExpiry = blockedIPs.get(ip);
+  if (blockExpiry && Date.now() < blockExpiry) {
+    return new NextResponse('Access Denied', { status: 403 });
+  }
+
+  // ========================================
+  // 2. 脆弱性スキャン検出（全ルート）
+  // ========================================
+  if (isSuspiciousPath(pathname)) {
+    markSuspicious(ip);
+    console.warn(`[SECURITY] Suspicious path access: ${pathname} from ${ip}`);
+    return new NextResponse('Not Found', { status: 404 });
+  }
+
+  // ========================================
+  // 3. Bot検出（全ルート）
+  // ========================================
+  const botCheck = checkUserAgent(request);
+  if (botCheck.blocked) {
+    // 公開ページ以外のボットアクセスはブロック
+    if (!pathname.startsWith('/p/')) {
+      markSuspicious(ip);
+      console.warn(`[SECURITY] Bot blocked: ${botCheck.reason} from ${ip}`);
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+  }
+
+  // ========================================
+  // 4. 公開ページのスクレイピング防御
+  // ========================================
+  if (pathname.startsWith('/p/')) {
+    const pageRateKey = `page:${ip}`;
+    // 公開ページ: 1分間に30リクエスト（通常ユーザーは十分、スクレイパーはブロック）
+    const pageRate = checkRateLimit(pageRateKey, 30, 60 * 1000);
+    if (!pageRate.allowed) {
+      markSuspicious(ip);
+      return new NextResponse('Too Many Requests', {
+        status: 429,
+        headers: { 'Retry-After': '60' },
+      });
+    }
+  }
+
+  // ========================================
+  // 5. APIルートのセキュリティ処理
+  // ========================================
   if (pathname.startsWith('/api/')) {
-    // クライアントIP取得（偽装対策済み）
-    const ip = getClientIP(request);
-
     // エンドポイント別のレート制限設定
     let maxRequests = 60;
     const windowMs = 60 * 1000;
 
     if (pathname.startsWith('/api/ai/')) {
-      // AI API: 1分間に20リクエスト
       maxRequests = 20;
     } else if (pathname.startsWith('/api/auth/')) {
-      // 認証API: 1分間に10リクエスト
       maxRequests = 10;
     } else if (pathname === '/api/form-submissions') {
-      // フォーム送信: 1分間に5リクエスト（スパム防止）
       maxRequests = 5;
     } else if (pathname.startsWith('/api/upload')) {
-      // アップロード: 1分間に15リクエスト
       maxRequests = 15;
     } else if (pathname.startsWith('/api/admin/')) {
-      // 管理API: 1分間に30リクエスト
       maxRequests = 30;
     }
 
@@ -187,6 +301,8 @@ export async function middleware(request: NextRequest) {
     const rateLimit = checkRateLimit(rateLimitKey, maxRequests, windowMs);
 
     if (!rateLimit.allowed) {
+      // レート制限に繰り返し引っかかる場合は不審行動としてカウント
+      markSuspicious(ip);
       return addSecurityHeaders(new NextResponse(
         JSON.stringify({ error: 'リクエスト数が上限を超えました。しばらくしてから再試行してください。' }),
         {
@@ -197,7 +313,7 @@ export async function middleware(request: NextRequest) {
             'X-RateLimit-Remaining': '0',
           },
         }
-      ));
+      ), pathname);
     }
 
     // CSRF検証
@@ -208,24 +324,17 @@ export async function middleware(request: NextRequest) {
           status: 403,
           headers: { 'Content-Type': 'application/json' },
         }
-      ));
+      ), pathname);
     }
   }
 
   // 既存の認証・セッション処理
   const response = await updateSession(request);
-  return addSecurityHeaders(response);
+  return addSecurityHeaders(response, pathname);
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json)$).*)',
   ],
 };

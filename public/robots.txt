@@ -1,9 +1,7 @@
-# *
+# Default
 User-agent: *
 Allow: /
-
-# Sitemaps
-Sitemap: ${NEXT_PUBLIC_APP_URL}/sitemap.xml
+Crawl-delay: 5
 
 # Disallow admin/edit pages
 Disallow: /admin/
@@ -16,28 +14,38 @@ Disallow: /api/
 # Allow public pages
 Allow: /p/
 
-# Common bots
+# Trusted search engines
 User-agent: Googlebot
 Allow: /
+Crawl-delay: 2
 
 User-agent: Bingbot
 Allow: /
+Crawl-delay: 2
 
 User-agent: Slurp
 Allow: /
 
-# AI/LLM Crawlers
+# AI/LLM Crawlers (allowed)
 User-agent: ChatGPT-User
-Allow: /
+Allow: /p/
+Disallow: /admin/
+Disallow: /api/
 
 User-agent: GPTBot
-Allow: /
+Allow: /p/
+Disallow: /admin/
+Disallow: /api/
 
 User-agent: Claude-Web
-Allow: /
+Allow: /p/
+Disallow: /admin/
+Disallow: /api/
 
 User-agent: PerplexityBot
-Allow: /
+Allow: /p/
+Disallow: /admin/
+Disallow: /api/
 
 User-agent: Applebot
 Allow: /
@@ -51,3 +59,27 @@ Disallow: /
 
 User-agent: DotBot
 Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: BLEXBot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: MegaIndex
+Disallow: /
+
+User-agent: DataForSeoBot
+Disallow: /
+
+User-agent: ZoominfoBot
+Disallow: /
+
+# Sitemap
+Sitemap: https://wordpressdemo-6qpn.onrender.com/sitemap.xml
