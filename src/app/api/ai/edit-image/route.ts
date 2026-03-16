@@ -66,8 +66,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Prompt or productInfo is required' }, { status: 400 });
         }
 
-        // 2. クレジット残高チェック（バナー無料枠はgenerate-bannerルートのみ適用）
-        const limitCheck = await checkImageGenerationLimit(user.id, modelUsed, 1);
+        // バナー操作判定（Freeプランの無料枠用、最大3回制限）
+        const isBannerEdit = request.headers.get('x-source') === 'banner';
+
+        // 2. クレジット残高チェック
+        const limitCheck = await checkImageGenerationLimit(user.id, modelUsed, 1, { isBannerEdit });
         if (!limitCheck.allowed) {
             if (limitCheck.needApiKey) {
                 return NextResponse.json({ error: 'API_KEY_REQUIRED', message: limitCheck.reason }, { status: 402 });

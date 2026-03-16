@@ -163,8 +163,12 @@ export async function POST(request: NextRequest) {
     const banResponse = await checkBanStatus(user.id);
     if (banResponse) return banResponse;
 
-    // クレジット残高チェック（バナー無料枠はgenerate-bannerルートのみ適用）
-    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3.1-flash-image-preview', 1);
+    // バナー操作判定（Freeプランの無料枠用。有料プランではクレジット消費が必ず発生するため影響なし）
+    // Freeプランの無料枠は最大3回に制限されているため、ヘッダー偽装のリスクは限定的
+    const isBannerEdit = request.headers.get('x-source') === 'banner';
+
+    // クレジット残高チェック
+    const limitCheck = await checkImageGenerationLimit(user.id, 'gemini-3.1-flash-image-preview', 1, { isBannerEdit });
     if (!limitCheck.allowed) {
         if (limitCheck.needApiKey) {
             return NextResponse.json({
