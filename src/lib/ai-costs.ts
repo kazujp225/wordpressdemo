@@ -8,12 +8,26 @@
 // 画像出力解像度の型定義
 export type ImageResolution = '1K' | '2K' | '4K';
 
-// 解像度別の画像生成コスト（USD/枚）— ユーザー課金額（据え置き）
-// ※ 実際のAPI原価: 1K=$0.067, 2K=$0.101, 4K=$0.151（gemini-3.1-flash-image-preview, $60/1M tokens）
+// ========================================
+// 粗利率マルチプライヤー
+// ========================================
+// 画像生成: 粗利率25% → ユーザー課金 = API原価 ÷ 0.75
+const IMAGE_MARGIN_MULTIPLIER = 1 / 0.75;  // ×1.333
+// テキスト/動画/Claude: 粗利率50% → ユーザー課金 = API原価 ÷ 0.50
+const TEXT_MARGIN_MULTIPLIER = 1 / 0.50;   // ×2.0
+
+// 画像API原価（USD/枚）
+const IMAGE_RAW_COST: Record<ImageResolution, number> = {
+  '1K': 0.067,  // gemini-3.1-flash-image-preview
+  '2K': 0.101,
+  '4K': 0.151,
+};
+
+// 解像度別の画像生成コスト（USD/枚）— 粗利率25%適用
 const IMAGE_COST_BY_RESOLUTION: Record<ImageResolution, number> = {
-  '1K': 0.134,  // 据え置き（API原価: $0.067）
-  '2K': 0.134,  // 据え置き（API原価: $0.101）
-  '4K': 0.24,   // 据え置き（API原価: $0.151）
+  '1K': IMAGE_RAW_COST['1K'] * IMAGE_MARGIN_MULTIPLIER,  // $0.089
+  '2K': IMAGE_RAW_COST['2K'] * IMAGE_MARGIN_MULTIPLIER,  // $0.135
+  '4K': IMAGE_RAW_COST['4K'] * IMAGE_MARGIN_MULTIPLIER,  // $0.201
 };
 
 export const AI_COSTS = {
@@ -66,9 +80,6 @@ export const CLAUDE_PRICING = {
   },
 } as const;
 
-// Claudeクレジット消費の減価率（50% = 半額で課金）
-const CLAUDE_DISCOUNT_RATE = 0.5;
-
 export function estimateClaudeCost(
   model: string,
   inputTokens: number,
@@ -79,7 +90,7 @@ export function estimateClaudeCost(
 
   const rawCost = (inputTokens / 1_000_000) * pricing.input +
                   (outputTokens / 1_000_000) * pricing.output;
-  return rawCost * CLAUDE_DISCOUNT_RATE;
+  return rawCost * TEXT_MARGIN_MULTIPLIER; // 粗利率50%
 }
 
 export type ModelName = keyof typeof GEMINI_PRICING;
@@ -92,8 +103,9 @@ export function estimateTextCost(
   const pricing = GEMINI_PRICING[model as ModelName];
   if (!pricing || pricing.type !== 'text') return 0;
 
-  return (inputTokens / 1_000_000) * pricing.input +
-         (outputTokens / 1_000_000) * pricing.output;
+  const rawCost = (inputTokens / 1_000_000) * pricing.input +
+                  (outputTokens / 1_000_000) * pricing.output;
+  return rawCost * TEXT_MARGIN_MULTIPLIER; // 粗利率50%
 }
 
 export function estimateImageCost(model: string, imageCount: number, resolution: ImageResolution = '1K'): number {
@@ -108,7 +120,7 @@ export function estimateVideoCost(model: string, durationSeconds: number): numbe
   const pricing = GEMINI_PRICING[model as ModelName];
   if (!pricing || pricing.type !== 'video') return 0;
 
-  return durationSeconds * pricing.perSecond;
+  return durationSeconds * pricing.perSecond * IMAGE_MARGIN_MULTIPLIER; // 粗利率25%
 }
 
 // Rough token estimation (4 chars = 1 token for English, 2 chars = 1 token for Japanese)
