@@ -86,6 +86,18 @@ export async function GET(
   const escapeHtml = (str: string) =>
     str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
+  // html-embedセクションが完全なHTMLドキュメントを含む場合、それを直接使用
+  // （LP制作エージェントが編集した完全なページHTML）
+  for (const section of page.sections) {
+    if (section.role === 'html-embed') {
+      let config: any = {};
+      try { if (section.config) config = JSON.parse(section.config); } catch {}
+      if (config.htmlContent && /<!DOCTYPE|<html[\s>]/i.test(config.htmlContent)) {
+        return NextResponse.json({ html: sanitizeHtmlContent(config.htmlContent), title: page.title });
+      }
+    }
+  }
+
   // セクションHTMLを構築（画像は絶対URL）
   const sectionsHtml = page.sections.map((section, index) => {
     let config: any = {
