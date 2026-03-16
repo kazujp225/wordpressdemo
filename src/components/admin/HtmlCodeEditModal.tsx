@@ -765,7 +765,7 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
       const data = await response.json();
       if (!response.ok) { toast.error(data.message || 'フォーム有効化に失敗しました'); setAgentStatus('idle'); return; }
       setAgentStatus('updating');
-      if (data.html) { pushHtmlHistory(data.html); }
+      if (data.html) { pushHtmlHistory(data.html); try { const r = onSave(data.html); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch {} }
       setTimeout(() => { setAgentStatus('done'); setTimeout(() => setAgentStatus('idle'), 2000); }, 500);
       toast.success('フォームを有効化しました');
       setMessages(prev => [...prev, {
