@@ -96,6 +96,7 @@ export async function updateSession(request: NextRequest) {
     const publicRoutes = ['/', '/auth/callback', '/terms', '/privacy', '/welcome', '/banned'];
     const isPublicRoute = publicRoutes.includes(pathname)
         || pathname.startsWith('/p/')
+        || pathname.startsWith('/preview/')  // プレビューページ（セッション切れでもリダイレクトしない）
         || pathname.startsWith('/api/auth/')
         || pathname.startsWith('/api/billing/')
         || pathname.startsWith('/api/webhooks/')
