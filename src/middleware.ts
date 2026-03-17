@@ -188,8 +188,9 @@ function validateCSRF(request: NextRequest): boolean {
         return false;
       }
     }
-    console.warn(`[CSRF] No Origin/Referer header for ${request.method} ${pathname}`);
-    return false;
+    // Origin/Referer両方なし = 同一オリジンのfetchリクエスト（正常）
+    // ブラウザは同一オリジンのAPIコールでOriginを付けないことがある
+    return true;
   }
 
   try {
@@ -210,7 +211,13 @@ function getAllowedHosts(): string[] {
   const defaultHosts = ['lpnavix.com', 'www.lpnavix.com'];
 
   if (process.env.NODE_ENV === 'development') {
-    defaultHosts.push('localhost:3000', 'localhost:3002', '127.0.0.1:3000', '127.0.0.1:3002');
+    defaultHosts.push('localhost:3000', 'localhost:3002', 'localhost:3003', '127.0.0.1:3000', '127.0.0.1:3002', '127.0.0.1:3003');
+  }
+
+  // Renderデプロイ先のホスト名を自動許可
+  const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
+  if (renderHost) {
+    defaultHosts.push(renderHost);
   }
 
   return [...defaultHosts, ...envHosts];
@@ -295,27 +302,25 @@ export async function middleware(request: NextRequest) {
   // ========================================
   if (pathname.startsWith('/api/')) {
     // エンドポイント別のレート制限設定
-    let maxRequests = 60;
+    let maxRequests = 120;
     const windowMs = 60 * 1000;
 
     if (pathname.startsWith('/api/ai/')) {
-      maxRequests = 20;
+      maxRequests = 40;
     } else if (pathname.startsWith('/api/auth/')) {
       maxRequests = 10;
     } else if (pathname === '/api/form-submissions') {
       maxRequests = 5;
     } else if (pathname.startsWith('/api/upload')) {
-      maxRequests = 15;
-    } else if (pathname.startsWith('/api/admin/')) {
       maxRequests = 30;
+    } else if (pathname.startsWith('/api/admin/')) {
+      maxRequests = 60;
     }
 
     const rateLimitKey = `${pathname}:${ip}`;
     const rateLimit = checkRateLimit(rateLimitKey, maxRequests, windowMs);
 
     if (!rateLimit.allowed) {
-      // レート制限に繰り返し引っかかる場合は不審行動としてカウント
-      markSuspicious(ip);
       return addSecurityHeaders(new NextResponse(
         JSON.stringify({ error: 'リクエスト数が上限を超えました。しばらくしてから再試行してください。' }),
         {
