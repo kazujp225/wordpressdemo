@@ -113,6 +113,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     const { sections, headerConfig, status, designDefinition } = validation.data;
 
+    // セクション数上限チェック
+    const MAX_SECTIONS = 20;
+    if (sections && sections.length > MAX_SECTIONS) {
+        return NextResponse.json(
+            { error: `セクション数が上限(${MAX_SECTIONS})を超えています` },
+            { status: 400 }
+        );
+    }
+
     try {
         await prisma.$transaction([
             prisma.pageSection.deleteMany({ where: { pageId: id } }),

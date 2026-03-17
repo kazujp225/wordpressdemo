@@ -90,6 +90,15 @@ export async function POST(request: NextRequest) {
         log.info(`Title: ${rest.title}`);
         log.info(`Sections count: ${sections?.length || 0}`);
 
+        // セクション数上限チェック
+        const MAX_SECTIONS = 20;
+        if (sections && sections.length > MAX_SECTIONS) {
+            return NextResponse.json(
+                { error: `セクション数が上限(${MAX_SECTIONS})を超えています` },
+                { status: 400 }
+            );
+        }
+
         // セクションごとのimageId確認
         if (sections && sections.length > 0) {
             sections.forEach((sec: any, idx: number) => {

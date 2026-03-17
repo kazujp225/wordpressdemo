@@ -189,7 +189,7 @@ async function detectSectionsWithAI(
         }
 
         // セクションを整形
-        const sections: DetectedSection[] = parsed.sections.map((s: any, idx: number) => ({
+        let sections: DetectedSection[] = parsed.sections.map((s: any, idx: number) => ({
             index: idx,
             startY: Math.round(s.startY),
             endY: Math.round(s.endY),
@@ -212,6 +212,21 @@ async function detectSectionsWithAI(
             sections[0].height = sections[0].endY - sections[0].startY;
             sections[sections.length - 1].endY = pageHeight;
             sections[sections.length - 1].height = sections[sections.length - 1].endY - sections[sections.length - 1].startY;
+        }
+
+        // セクション数上限（20セクションまで）
+        const MAX_SECTIONS = 20;
+        if (sections.length > MAX_SECTIONS) {
+            log.warn(`Too many sections detected (${sections.length}), merging to ${MAX_SECTIONS}`);
+            // 均等に再分割
+            const step = pageHeight / MAX_SECTIONS;
+            sections = Array.from({ length: MAX_SECTIONS }, (_, i) => ({
+                index: i,
+                startY: Math.round(i * step),
+                endY: Math.round((i + 1) * step),
+                height: Math.round(step),
+                label: `セクション ${i + 1}`,
+            }));
         }
 
         log.success(`AI detected ${sections.length} semantic sections`);

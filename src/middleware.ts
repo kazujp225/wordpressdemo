@@ -86,9 +86,6 @@ function getClientIP(request: NextRequest): string {
 // Bot検出（悪意のあるスクレイパー・攻撃ツール）
 // ========================================
 const BLOCKED_USER_AGENTS = [
-  // スクレイピングツール
-  'scrapy', 'httpclient', 'python-requests', 'go-http-client',
-  'java/', 'libwww-perl', 'wget', 'curl/',
   // 攻撃ツール
   'nikto', 'sqlmap', 'nmap', 'masscan', 'zgrab',
   'nuclei', 'dirbuster', 'gobuster', 'wfuzz', 'ffuf',
@@ -108,9 +105,9 @@ const ALLOWED_BOTS = [
 function checkUserAgent(request: NextRequest): { blocked: boolean; reason?: string } {
   const ua = (request.headers.get('user-agent') || '').toLowerCase();
 
-  // User-Agentが空の場合（ツールによるアクセス）
-  if (!ua || ua.length < 5) {
-    return { blocked: true, reason: 'Empty or suspicious User-Agent' };
+  // User-Agentが完全に空の場合のみブロック
+  if (!ua) {
+    return { blocked: true, reason: 'Empty User-Agent' };
   }
 
   // 許可ボットは通す
@@ -261,10 +258,9 @@ export async function middleware(request: NextRequest) {
   // ========================================
   const botCheck = checkUserAgent(request);
   if (botCheck.blocked) {
-    // 公開ページ以外のボットアクセスはブロック
-    if (!pathname.startsWith('/p/')) {
-      markSuspicious(ip);
-      console.warn(`[SECURITY] Bot blocked: ${botCheck.reason} from ${ip}`);
+    // APIルートへの攻撃ツールのみブロック（ページ閲覧は許可）
+    if (pathname.startsWith('/api/')) {
+      console.warn(`[SECURITY] Bot blocked from API: ${botCheck.reason} from ${ip}`);
       return new NextResponse('Forbidden', { status: 403 });
     }
   }
