@@ -1,11 +1,6 @@
 "use client";
 
 import { LucideIcon } from 'lucide-react';
-import { Card, Flex, Typography, theme, ConfigProvider } from 'antd';
-import type { CSSProperties } from 'react';
-
-const { Text } = Typography;
-const { useToken } = theme;
 
 interface StatCardProps {
     title: string;
@@ -16,114 +11,30 @@ interface StatCardProps {
 }
 
 const colorConfig = {
-    blue: { bg: '#eff6ff', text: '#2563eb' },
-    green: { bg: '#ecfdf5', text: '#059669' },
-    purple: { bg: '#faf5ff', text: '#9333ea' },
-    red: { bg: '#fef2f2', text: '#dc2626' },
-    gray: { bg: '#f9fafb', text: '#6b7280' },
-    amber: { bg: '#fffbeb', text: '#d97706' }
+    blue: { bg: 'bg-blue-50', text: 'text-blue-600' },
+    green: { bg: 'bg-emerald-50', text: 'text-emerald-600' },
+    purple: { bg: 'bg-purple-50', text: 'text-purple-600' },
+    red: { bg: 'bg-red-50', text: 'text-red-600' },
+    gray: { bg: 'bg-gray-50', text: 'text-gray-500' },
+    amber: { bg: 'bg-amber-50', text: 'text-amber-600' },
 };
 
 export function StatCard({ title, value, icon: Icon, color, subValue }: StatCardProps) {
-    const { token } = useToken();
-    const colorScheme = colorConfig[color];
+    const c = colorConfig[color];
 
     return (
-        <ConfigProvider
-            theme={{
-                components: {
-                    Card: {
-                        borderRadiusLG: token.borderRadiusLG,
-                    }
-                }
-            }}
-        >
-            <Card
-                bordered
-                hoverable
-                styles={{
-                    body: {
-                        padding: `${token.paddingSM}px`,
-                        minHeight: 140,
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }
-                }}
-            >
-                <Flex vertical gap="small">
-                    <Flex justify="flex-start" align="flex-start">
-                        <ConfigProvider
-                            theme={{
-                                token: {
-                                    borderRadiusLG: token.borderRadiusLG,
-                                    colorBgContainer: colorScheme.bg,
-                                    padding: token.paddingSM
-                                }
-                            }}
-                        >
-                            <Flex
-                                align="center"
-                                justify="center"
-                                style={{
-                                    borderRadius: token.borderRadiusLG,
-                                    backgroundColor: colorScheme.bg,
-                                    padding: token.paddingSM,
-                                    width: 'fit-content'
-                                }}
-                            >
-                                <Icon
-                                    size={20}
-                                    color={colorScheme.text}
-                                />
-                            </Flex>
-                        </ConfigProvider>
-                    </Flex>
+        <div className="border border-gray-200 rounded-lg p-4 min-h-[140px] flex flex-col hover:shadow-sm transition-shadow bg-white">
+            <div className={`${c.bg} rounded-lg p-2 w-fit`}>
+                <Icon size={20} className={c.text} />
+            </div>
 
-                    <Flex vertical gap="none">
-                        <Typography.Title
-                            level={2}
-                            style={{
-                                margin: 0,
-                                fontSize: token.fontSizeHeading3,
-                                fontWeight: 900,
-                                lineHeight: 1.2
-                            }}
-                            ellipsis
-                        >
-                            {value}
-                        </Typography.Title>
-
-                        <Text
-                            type="secondary"
-                            strong
-                            style={{
-                                fontSize: token.fontSizeSM,
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                                display: 'block',
-                                marginTop: token.marginXXS
-                            }}
-                        >
-                            {title}
-                        </Text>
-
-                        {subValue && (
-                            <Text
-                                type="secondary"
-                                style={{
-                                    fontSize: token.fontSizeSM,
-                                    display: 'block',
-                                    marginTop: token.marginXS
-                                }}
-                                ellipsis
-                            >
-                                {subValue}
-                            </Text>
-                        )}
-                    </Flex>
-                </Flex>
-            </Card>
-        </ConfigProvider>
+            <div className="mt-3">
+                <p className="text-2xl font-black leading-tight truncate">{value}</p>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mt-1">{title}</p>
+                {subValue && (
+                    <p className="text-xs text-gray-400 mt-1 truncate">{subValue}</p>
+                )}
+            </div>
+        </div>
     );
 }

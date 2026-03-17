@@ -11,7 +11,7 @@ import { VideoPlayer } from '@/components/public/VideoPlayer';
 import { OverlayElements } from '@/components/public/OverlayElements';
 import { AutoResizeIframe } from '@/components/public/AutoResizeIframe';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60; // 60秒ISRキャッシュ
 
 // SEOデータの型定義
 interface SEOData {

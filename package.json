@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3003",
     "build": "next build",
-    "start": "NODE_OPTIONS='--max-old-space-size=768' next start",
+    "start": "NODE_OPTIONS='--max-old-space-size=1536' next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "fix:red-border": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/remove-red-border.ts",
@@ -36,7 +36,6 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "adm-zip": "^0.5.16",
-    "antd": "^6.2.2",
     "autoprefixer": "^10.4.23",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",

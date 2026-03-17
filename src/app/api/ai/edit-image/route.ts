@@ -302,7 +302,7 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
 
         // 9. レスポンスを処理
         const data = await response.json();
-        const result = await processImageResponse(data, user.id);
+        const result = await processImageResponse(data, user.id, originalWidth, originalHeight);
 
         // 10. 成功時のステータス更新
         const resultJson = await result.json();
@@ -374,7 +374,7 @@ ${prompt ? `追加指示: ${prompt}` : ''}`
     }
 }
 
-async function processImageResponse(data: any, userId: string | null) {
+async function processImageResponse(data: any, userId: string | null, originalWidth?: number, originalHeight?: number) {
     // Extract image from response
     const parts = data.candidates?.[0]?.content?.parts || [];
     let editedImageBase64: string | null = null;

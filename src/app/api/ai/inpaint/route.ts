@@ -567,7 +567,9 @@ User instruction: ${prompt}`;
             data,
             user.id,
             { model: modelUsed, estimatedCost, durationMs },
-            historyData
+            historyData,
+            originalWidth,
+            originalHeight
         );
 
         // ログ記録（成功）- generationConfigにimageSize未設定のためデフォルト1K
@@ -657,7 +659,9 @@ async function processInpaintResponse(
     data: any,
     userId: string | null,
     costInfo?: CostInfo,
-    historyData?: InpaintHistoryData
+    historyData?: InpaintHistoryData,
+    originalWidth?: number,
+    originalHeight?: number
 ) {
     console.log('Gemini Response:', JSON.stringify(data, null, 2));
 
