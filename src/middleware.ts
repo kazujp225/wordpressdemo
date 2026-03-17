@@ -1,158 +1,82 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-// インメモリレート制限（エッジランタイム互換）
+// ========================================
+// セキュリティ方針:
+// - 認証済みユーザーの操作は基本的にブロックしない
+// - 攻撃ツール・脆弱性スキャンのみ遮断
+// - レート制限は「異常な量」のみ対象（普通の操作は通す）
+// - IPブロックは明確な攻撃パターンのみ
+// ========================================
+
+// --- インメモリレート制限 ---
 interface RateLimitEntry {
   count: number;
   resetTime: number;
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
-const MAX_STORE_SIZE = 10000;
 let lastCleanup = Date.now();
-const CLEANUP_INTERVAL = 30 * 1000; // 30秒ごと
 
-// ========================================
-// 自動ブロックリスト（不審IP）
-// ========================================
-const blockedIPs = new Map<string, number>(); // IP → ブロック解除時刻
-const BLOCK_DURATION = 10 * 60 * 1000; // 10分間ブロック
-const suspiciousHitCount = new Map<string, number>(); // IP → 不審ヒット数
-const SUSPICIOUS_THRESHOLD = 5; // 5回不審行動でブロック
-
-function cleanupExpiredEntries() {
+function cleanupExpired() {
   const now = Date.now();
-  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  if (now - lastCleanup < 60_000) return; // 60秒ごと
   lastCleanup = now;
   for (const [key, entry] of rateLimitStore.entries()) {
-    if (now > entry.resetTime) {
-      rateLimitStore.delete(key);
-    }
+    if (now > entry.resetTime) rateLimitStore.delete(key);
   }
-  // ブロックリストのクリーンアップ
-  for (const [ip, expiry] of blockedIPs.entries()) {
-    if (now > expiry) {
-      blockedIPs.delete(ip);
-      suspiciousHitCount.delete(ip);
-    }
-  }
-  // サイズ上限を超えた場合は全クリア（安全弁）
-  if (rateLimitStore.size > MAX_STORE_SIZE) {
-    rateLimitStore.clear();
-  }
+  if (rateLimitStore.size > 10000) rateLimitStore.clear();
 }
 
-function checkRateLimit(
-  identifier: string,
-  maxRequests: number,
-  windowMs: number
-): { allowed: boolean; remaining: number; retryAfterMs?: number } {
-  cleanupExpiredEntries();
-
+function checkRateLimit(key: string, max: number, windowMs: number): boolean {
+  cleanupExpired();
   const now = Date.now();
-  const entry = rateLimitStore.get(identifier);
+  const entry = rateLimitStore.get(key);
 
   if (!entry || now > entry.resetTime) {
-    rateLimitStore.set(identifier, { count: 1, resetTime: now + windowMs });
-    return { allowed: true, remaining: maxRequests - 1 };
+    rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
+    return true;
   }
-
-  if (entry.count >= maxRequests) {
-    return { allowed: false, remaining: 0, retryAfterMs: entry.resetTime - now };
-  }
-
+  if (entry.count >= max) return false;
   entry.count++;
-  return { allowed: true, remaining: maxRequests - entry.count };
+  return true;
 }
 
-// IP取得（プロキシ信頼チェック付き）
+// --- IP取得 ---
 function getClientIP(request: NextRequest): string {
-  const cfConnectingIp = request.headers.get('cf-connecting-ip');
-  if (cfConnectingIp) return cfConnectingIp.trim();
-
-  const xRealIp = request.headers.get('x-real-ip');
-  if (xRealIp) return xRealIp.trim();
-
-  const xForwardedFor = request.headers.get('x-forwarded-for');
-  if (xForwardedFor) {
-    const ips = xForwardedFor.split(',').map(ip => ip.trim()).filter(ip => ip);
-    return ips[ips.length - 1];
-  }
-
-  return 'unknown';
+  return (
+    request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-real-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',').pop()?.trim() ||
+    'unknown'
+  );
 }
 
-// ========================================
-// Bot検出（悪意のあるスクレイパー・攻撃ツール）
-// ========================================
-const BLOCKED_USER_AGENTS = [
-  // 攻撃ツール
+// --- 脆弱性スキャン検出（明らかな攻撃パスのみ） ---
+const ATTACK_PATHS = [
+  '/.env', '/.git', '/wp-admin', '/wp-login', '/phpmyadmin',
+  '/xmlrpc.php', '/.htaccess', '/.htpasswd',
+  '/cgi-bin/', '/../', '/etc/passwd', '/proc/self',
+];
+
+function isAttackPath(pathname: string): boolean {
+  const lower = pathname.toLowerCase();
+  return ATTACK_PATHS.some(p => lower.includes(p));
+}
+
+// --- 攻撃ツール検出（APIのみ適用） ---
+const ATTACK_TOOLS = [
   'nikto', 'sqlmap', 'nmap', 'masscan', 'zgrab',
   'nuclei', 'dirbuster', 'gobuster', 'wfuzz', 'ffuf',
-  // 悪質ボット
-  'semrushbot', 'ahrefsbot', 'dotbot', 'mj12bot',
-  'blexbot', 'seekport', 'petalbot', 'bytespider',
-  'megaindex', 'zoominfobot', 'dataforseo',
 ];
 
-// 正当なボット（許可）
-const ALLOWED_BOTS = [
-  'googlebot', 'bingbot', 'slurp', 'duckduckbot',
-  'facebot', 'twitterbot', 'linkedinbot',
-  'chatgpt-user', 'gptbot', 'claude-web', 'perplexitybot', 'applebot',
-];
-
-function checkUserAgent(request: NextRequest): { blocked: boolean; reason?: string } {
-  const ua = (request.headers.get('user-agent') || '').toLowerCase();
-
-  // User-Agentが完全に空の場合のみブロック
-  if (!ua) {
-    return { blocked: true, reason: 'Empty User-Agent' };
-  }
-
-  // 許可ボットは通す
-  if (ALLOWED_BOTS.some(bot => ua.includes(bot))) {
-    return { blocked: false };
-  }
-
-  // ブロックリストに一致するか
-  for (const blocked of BLOCKED_USER_AGENTS) {
-    if (ua.includes(blocked)) {
-      return { blocked: true, reason: `Blocked bot: ${blocked}` };
-    }
-  }
-
-  return { blocked: false };
+function isAttackTool(ua: string): boolean {
+  if (!ua) return false;
+  const lower = ua.toLowerCase();
+  return ATTACK_TOOLS.some(t => lower.includes(t));
 }
 
-// ========================================
-// パス探索（脆弱性スキャン）検出
-// ========================================
-const SUSPICIOUS_PATHS = [
-  '/.env', '/.git', '/wp-admin', '/wp-login', '/wp-content',
-  '/phpmyadmin', '/admin.php', '/xmlrpc.php', '/wp-json',
-  '/.htaccess', '/.htpasswd', '/config.php', '/database.yml',
-  '/server-status', '/server-info', '/.well-known/security.txt',
-  '/cgi-bin/', '/shell', '/cmd', '/eval',
-  '/../', '/etc/passwd', '/proc/self',
-];
-
-function isSuspiciousPath(pathname: string): boolean {
-  const lower = pathname.toLowerCase();
-  return SUSPICIOUS_PATHS.some(p => lower.includes(p));
-}
-
-// 不審行動をカウントし、閾値超えでブロック
-function markSuspicious(ip: string): void {
-  const count = (suspiciousHitCount.get(ip) || 0) + 1;
-  suspiciousHitCount.set(ip, count);
-  if (count >= SUSPICIOUS_THRESHOLD) {
-    blockedIPs.set(ip, Date.now() + BLOCK_DURATION);
-    console.warn(`[SECURITY] Auto-blocked IP: ${ip} (${count} suspicious hits)`);
-  }
-}
-
-// CSRF検証（エッジランタイム互換・強化版）
+// --- CSRF検証（POSTリクエストのみ） ---
 function validateCSRF(request: NextRequest): boolean {
   if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
     return true;
@@ -160,191 +84,123 @@ function validateCSRF(request: NextRequest): boolean {
 
   const pathname = request.nextUrl.pathname;
 
-  // Webhookはスキップ（署名検証で保護）
-  if (pathname.startsWith('/api/webhooks/')) {
-    return true;
-  }
-
-  // フォーム送信は公開API（レート制限で保護）
-  if (pathname === '/api/form-submissions') {
+  // Webhook・公開フォームはスキップ
+  if (pathname.startsWith('/api/webhooks/') || pathname === '/api/form-submissions') {
     return true;
   }
 
   const origin = request.headers.get('origin');
   const host = request.headers.get('host');
 
-  if (!origin) {
-    const referer = request.headers.get('referer');
-    if (referer) {
-      try {
-        const refererUrl = new URL(referer);
-        if (refererUrl.host === host) return true;
-        const allowedHosts = getAllowedHosts();
-        if (allowedHosts.includes(refererUrl.host)) return true;
-      } catch {
-        return false;
-      }
-    }
-    // Origin/Referer両方なし = 同一オリジンのfetchリクエスト（正常）
-    // ブラウザは同一オリジンのAPIコールでOriginを付けないことがある
-    return true;
-  }
+  // Originがない場合は許可（同一オリジンのfetchではOriginが付かないことがある）
+  if (!origin) return true;
 
   try {
     const originUrl = new URL(origin);
+    // 同一ホスト
     if (originUrl.host === host) return true;
-    const allowedHosts = getAllowedHosts();
-    if (allowedHosts.includes(originUrl.host)) return true;
-    console.warn(`[CSRF] Blocked request from origin: ${origin}`);
-    return false;
+    // 許可リスト
+    const allowed = getAllowedHosts();
+    return allowed.includes(originUrl.host);
   } catch {
     return false;
   }
 }
 
-// 許可ホスト一覧
 function getAllowedHosts(): string[] {
-  const envHosts = process.env.ALLOWED_ORIGINS?.split(',').map(h => h.trim()) || [];
-  const defaultHosts = ['lpnavix.com', 'www.lpnavix.com'];
+  const hosts = ['lpnavix.com', 'www.lpnavix.com'];
 
   if (process.env.NODE_ENV === 'development') {
-    defaultHosts.push('localhost:3000', 'localhost:3002', 'localhost:3003', '127.0.0.1:3000', '127.0.0.1:3002', '127.0.0.1:3003');
+    hosts.push(
+      'localhost:3000', 'localhost:3002', 'localhost:3003',
+      '127.0.0.1:3000', '127.0.0.1:3002', '127.0.0.1:3003',
+    );
   }
 
-  // Renderデプロイ先のホスト名を自動許可
+  // Renderホスト自動追加
   const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
-  if (renderHost) {
-    defaultHosts.push(renderHost);
-  }
+  if (renderHost) hosts.push(renderHost);
 
-  return [...defaultHosts, ...envHosts];
+  // 環境変数からの追加ホスト
+  const envHosts = process.env.ALLOWED_ORIGINS?.split(',').map(h => h.trim()).filter(Boolean);
+  if (envHosts) hosts.push(...envHosts);
+
+  return hosts;
 }
 
-// セキュリティヘッダーを追加
-function addSecurityHeaders(response: NextResponse, pathname?: string): NextResponse {
-  // 公開ページにはキャッシュ設定（スクレイピング負荷軽減）
-  if (pathname?.startsWith('/p/')) {
+// --- セキュリティヘッダー ---
+function addHeaders(response: NextResponse, pathname: string): NextResponse {
+  if (pathname.startsWith('/p/')) {
     response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-  } else if (!response.headers.has('Cache-Control')) {
-    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   }
   return response;
 }
 
+// ========================================
+// メイン処理
+// ========================================
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const ip = getClientIP(request);
 
-  // ========================================
-  // 1. IPブロックリストチェック（開発環境のlocalhostは除外）
-  // ========================================
-  const isLocalDev = process.env.NODE_ENV === 'development' && (ip === '::1' || ip === '127.0.0.1' || ip === 'localhost');
-  const blockExpiry = blockedIPs.get(ip);
-  if (blockExpiry && Date.now() < blockExpiry && !isLocalDev) {
-    return new NextResponse('Access Denied', { status: 403 });
-  }
-
-  // ========================================
-  // 2. 脆弱性スキャン検出（全ルート）
-  // ========================================
-  if (isSuspiciousPath(pathname)) {
-    markSuspicious(ip);
-    console.warn(`[SECURITY] Suspicious path access: ${pathname} from ${ip}`);
+  // 1. 攻撃パス検出 → 404（/.env, /.git, /wp-admin 等）
+  if (isAttackPath(pathname)) {
     return new NextResponse('Not Found', { status: 404 });
   }
 
-  // ========================================
-  // 3. Bot検出（全ルート）
-  // ========================================
-  const botCheck = checkUserAgent(request);
-  if (botCheck.blocked) {
-    // APIルートへの攻撃ツールのみブロック（ページ閲覧は許可）
-    if (pathname.startsWith('/api/')) {
-      console.warn(`[SECURITY] Bot blocked from API: ${botCheck.reason} from ${ip}`);
-      return new NextResponse('Forbidden', { status: 403 });
-    }
-  }
-
-  // ========================================
-  // 4. 公開ページのスクレイピング防御
-  // ========================================
-  if (pathname.startsWith('/p/')) {
-    const pageRateKey = `page:${ip}`;
-    // 公開ページ: 1分間に30リクエスト（通常ユーザーは十分、スクレイパーはブロック）
-    const pageRate = checkRateLimit(pageRateKey, 30, 60 * 1000);
-    if (!pageRate.allowed) {
-      markSuspicious(ip);
-      return new NextResponse('Too Many Requests', {
-        status: 429,
-        headers: { 'Retry-After': '60' },
-      });
-    }
-  }
-
-  // ========================================
-  // 5. リクエストボディサイズチェック（DoS防止）
-  // ========================================
-  const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
-  const MAX_BODY_SIZE = pathname.startsWith('/api/upload') ? 52_428_800 : 10_485_760; // upload=50MB, その他=10MB
-  if (contentLength > MAX_BODY_SIZE) {
-    return new NextResponse(
-      JSON.stringify({ error: 'リクエストが大きすぎます' }),
-      { status: 413, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // ========================================
-  // 6. APIルートのセキュリティ処理
-  // ========================================
+  // 2. APIルートのセキュリティ
   if (pathname.startsWith('/api/')) {
-    // エンドポイント別のレート制限設定
-    let maxRequests = 120;
-    const windowMs = 60 * 1000;
+    const ua = request.headers.get('user-agent') || '';
 
-    if (pathname.startsWith('/api/ai/')) {
-      maxRequests = 40;
-    } else if (pathname.startsWith('/api/auth/')) {
-      maxRequests = 10;
-    } else if (pathname === '/api/form-submissions') {
-      maxRequests = 5;
-    } else if (pathname.startsWith('/api/upload')) {
-      maxRequests = 30;
-    } else if (pathname.startsWith('/api/admin/')) {
-      maxRequests = 60;
-    }
-
-    const rateLimitKey = `${pathname}:${ip}`;
-    const rateLimit = checkRateLimit(rateLimitKey, maxRequests, windowMs);
-
-    if (!rateLimit.allowed) {
-      return addSecurityHeaders(new NextResponse(
-        JSON.stringify({ error: 'リクエスト数が上限を超えました。しばらくしてから再試行してください。' }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': String(Math.ceil((rateLimit.retryAfterMs || 60000) / 1000)),
-            'X-RateLimit-Remaining': '0',
-          },
-        }
-      ), pathname);
+    // 攻撃ツール → ブロック
+    if (isAttackTool(ua)) {
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     // CSRF検証
     if (!validateCSRF(request)) {
-      return addSecurityHeaders(new NextResponse(
-        JSON.stringify({ error: '不正なリクエスト元です' }),
-        {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      ), pathname);
+      return NextResponse.json({ error: '不正なリクエスト元です' }, { status: 403 });
+    }
+
+    // レート制限（IPベース、エンドポイントグループ単位）
+    let max = 200; // デフォルト: 1分200回（余裕あり）
+    if (pathname.startsWith('/api/auth/'))           max = 15;
+    else if (pathname === '/api/form-submissions')   max = 5;
+    else if (pathname.startsWith('/api/ai/'))         max = 60;
+    else if (pathname.startsWith('/api/upload'))      max = 40;
+
+    // エンドポイント個別ではなくグループ単位でカウント
+    const group = pathname.startsWith('/api/ai/') ? '/api/ai'
+                : pathname.startsWith('/api/auth/') ? '/api/auth'
+                : pathname.startsWith('/api/upload') ? '/api/upload'
+                : pathname.startsWith('/api/admin/') ? '/api/admin'
+                : '/api/other';
+
+    if (!checkRateLimit(`${group}:${ip}`, max, 60_000)) {
+      return NextResponse.json(
+        { error: 'リクエスト数が上限を超えました。少し待ってから再試行してください。' },
+        { status: 429, headers: { 'Retry-After': '30' } }
+      );
+    }
+
+    // ボディサイズチェック
+    const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
+    const maxBody = pathname.startsWith('/api/upload') ? 52_428_800 : 10_485_760;
+    if (contentLength > maxBody) {
+      return NextResponse.json({ error: 'リクエストが大きすぎます' }, { status: 413 });
     }
   }
 
-  // 既存の認証・セッション処理
+  // 3. 公開ページの過剰アクセス防止
+  if (pathname.startsWith('/p/')) {
+    if (!checkRateLimit(`page:${ip}`, 60, 60_000)) {
+      return new NextResponse('Too Many Requests', { status: 429, headers: { 'Retry-After': '30' } });
+    }
+  }
+
+  // 4. セッション管理（Supabase Auth）
   const response = await updateSession(request);
-  return addSecurityHeaders(response, pathname);
+  return addHeaders(response, pathname);
 }
 
 export const config = {
