@@ -1,37 +1,40 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SortableItem } from '@/components/admin/SortableItem';
-import { ImageInpaintEditor } from '@/components/lp-builder/ImageInpaintEditor';
-import { DualImportModal } from '@/components/admin/DualImportModal';
-import { BoundaryDesignModal } from '@/components/admin/BoundaryDesignModal';
-import { RestoreModal } from '@/components/admin/RestoreModal';
-import { DesignUnifyModal } from '@/components/admin/DesignUnifyModal';
-import { BackgroundUnifyModal } from '@/components/admin/BackgroundUnifyModal';
-import { AssetLibrary } from '@/components/admin/AssetLibrary';
-import CopyEditModal from '@/components/admin/CopyEditModal';
-import CTAManagementModal from '@/components/admin/CTAManagementModal';
-import ColorPaletteModal from '@/components/admin/ColorPaletteModal';
-import MobileOptimizeModal from '@/components/admin/MobileOptimizeModal';
-import VideoInsertModal from '@/components/admin/VideoInsertModal';
-import TutorialModal from '@/components/admin/TutorialModal';
-import LPCompareModal from '@/components/admin/LPCompareModal';
-import LPComparePanel from '@/components/admin/LPComparePanel';
-import SectionInsertModal from '@/components/admin/SectionInsertModal';
-import SectionCropModal from '@/components/admin/SectionCropModal';
-import OverlayEditorModal from '@/components/admin/OverlayEditorModal';
 import { CTA_TEMPLATES, getTemplateStyle } from '@/lib/cta-templates';
-import ThumbnailTransformModal from '@/components/admin/ThumbnailTransformModal';
-import MobileThumbnailEditor from '@/components/admin/MobileThumbnailEditor';
-import DocumentTransformModal from '@/components/admin/DocumentTransformModal';
-import ClaudeCodeGeneratorModal from '@/components/admin/ClaudeCodeGeneratorModal';
-import HtmlCodeEditModal from '@/components/admin/HtmlCodeEditModal';
-import PageDeployModal from '@/components/admin/PageDeployModal';
-import { ImageResizeModal } from '@/components/admin/ImageResizeModal';
-import { SEOLLMOOptimizer } from '@/components/lp-builder/SEOLLMOOptimizer';
+
+// 重いモーダル/エディタは動的インポート（使うときだけ読み込み）
+const ImageInpaintEditor = dynamic(() => import('@/components/lp-builder/ImageInpaintEditor').then(m => m.ImageInpaintEditor), { ssr: false });
+const DualImportModal = dynamic(() => import('@/components/admin/DualImportModal').then(m => m.DualImportModal), { ssr: false });
+const BoundaryDesignModal = dynamic(() => import('@/components/admin/BoundaryDesignModal').then(m => m.BoundaryDesignModal), { ssr: false });
+const RestoreModal = dynamic(() => import('@/components/admin/RestoreModal').then(m => m.RestoreModal), { ssr: false });
+const DesignUnifyModal = dynamic(() => import('@/components/admin/DesignUnifyModal').then(m => m.DesignUnifyModal), { ssr: false });
+const BackgroundUnifyModal = dynamic(() => import('@/components/admin/BackgroundUnifyModal').then(m => m.BackgroundUnifyModal), { ssr: false });
+const AssetLibrary = dynamic(() => import('@/components/admin/AssetLibrary').then(m => m.AssetLibrary), { ssr: false });
+const CopyEditModal = dynamic(() => import('@/components/admin/CopyEditModal'), { ssr: false });
+const CTAManagementModal = dynamic(() => import('@/components/admin/CTAManagementModal'), { ssr: false });
+const ColorPaletteModal = dynamic(() => import('@/components/admin/ColorPaletteModal'), { ssr: false });
+const MobileOptimizeModal = dynamic(() => import('@/components/admin/MobileOptimizeModal'), { ssr: false });
+const VideoInsertModal = dynamic(() => import('@/components/admin/VideoInsertModal'), { ssr: false });
+const TutorialModal = dynamic(() => import('@/components/admin/TutorialModal'), { ssr: false });
+const LPCompareModal = dynamic(() => import('@/components/admin/LPCompareModal'), { ssr: false });
+const LPComparePanel = dynamic(() => import('@/components/admin/LPComparePanel'), { ssr: false });
+const SectionInsertModal = dynamic(() => import('@/components/admin/SectionInsertModal'), { ssr: false });
+const SectionCropModal = dynamic(() => import('@/components/admin/SectionCropModal'), { ssr: false });
+const OverlayEditorModal = dynamic(() => import('@/components/admin/OverlayEditorModal'), { ssr: false });
+const ThumbnailTransformModal = dynamic(() => import('@/components/admin/ThumbnailTransformModal'), { ssr: false });
+const MobileThumbnailEditor = dynamic(() => import('@/components/admin/MobileThumbnailEditor'), { ssr: false });
+const DocumentTransformModal = dynamic(() => import('@/components/admin/DocumentTransformModal'), { ssr: false });
+const ClaudeCodeGeneratorModal = dynamic(() => import('@/components/admin/ClaudeCodeGeneratorModal'), { ssr: false });
+const HtmlCodeEditModal = dynamic(() => import('@/components/admin/HtmlCodeEditModal'), { ssr: false });
+const PageDeployModal = dynamic(() => import('@/components/admin/PageDeployModal'), { ssr: false });
+const ImageResizeModal = dynamic(() => import('@/components/admin/ImageResizeModal').then(m => m.ImageResizeModal), { ssr: false });
+const SEOLLMOOptimizer = dynamic(() => import('@/components/lp-builder/SEOLLMOOptimizer').then(m => m.SEOLLMOOptimizer), { ssr: false });
 import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight, Search, TrendingUp, Maximize2, Settings2 } from 'lucide-react';
 import {
     EditorMenuSection,
@@ -986,11 +989,12 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
             }
         };
 
-        fetchApiCost();
+        // 初回は5秒後に遅延実行（初期描画を優先）
+        const timer = setTimeout(fetchApiCost, 5000);
 
-        // 30秒ごとに更新
-        const interval = setInterval(fetchApiCost, 30000);
-        return () => clearInterval(interval);
+        // 120秒ごとに更新
+        const interval = setInterval(fetchApiCost, 120000);
+        return () => { clearTimeout(timer); clearInterval(interval); };
     }, []);
 
     const handleDesignImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
