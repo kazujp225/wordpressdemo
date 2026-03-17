@@ -57,6 +57,227 @@ function getStorageKey(templateType?: string, pageSlug?: string): string {
   return `html-edit-chat:${pageSlug || 'default'}:${templateType || 'none'}`;
 }
 
+// --- Interactive Preview: iframe注入スクリプト ---
+function buildInteractivePreviewInjection(): string {
+  return `
+<style>
+.lp-editor-highlight {
+  border: 2px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 4px;
+  transition: all 0.2s;
+  pointer-events: none;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+.lp-editor-editable {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px;
+  border-radius: 2px;
+  background: rgba(59, 130, 246, 0.05) !important;
+  cursor: text !important;
+}
+@keyframes lp-editor-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.2); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+.lp-editor-changed {
+  outline: 2px solid #22c55e !important;
+  outline-offset: 2px;
+  border-radius: 2px;
+  animation: lp-editor-pulse 0.8s ease-in-out 3;
+}
+</style>
+<script>
+(function(){
+  function getSelector(el){
+    if(!el||el===document.body||el===document.documentElement)return 'body';
+    var parts=[];
+    var cur=el;
+    while(cur&&cur!==document.body&&cur!==document.documentElement){
+      var tag=cur.tagName.toLowerCase();
+      if(cur.id){parts.unshift('#'+cur.id);break;}
+      var siblings=cur.parentElement?Array.from(cur.parentElement.children):[];
+      if(siblings.length>1){
+        var idx=siblings.indexOf(cur)+1;
+        tag+=':nth-child('+idx+')';
+      }
+      parts.unshift(tag);
+      cur=cur.parentElement;
+    }
+    return parts.join(' > ');
+  }
+
+  function getLabel(el){
+    var tag=el.tagName.toLowerCase();
+    var text=(el.textContent||'').trim().slice(0,20);
+    var map={
+      button:'このボタン',a:'このリンク',h1:'この見出し',h2:'この見出し',
+      h3:'この見出し',h4:'この見出し',h5:'この見出し',h6:'この見出し',
+      p:'このテキスト',img:'この画像',input:'この入力欄',form:'このフォーム',
+      nav:'このナビゲーション',header:'このヘッダー',footer:'このフッター',
+      section:'このセクション',ul:'このリスト',ol:'このリスト',li:'この項目',
+      table:'このテーブル',video:'この動画',span:'このテキスト',div:'このエリア'
+    };
+    var label=map[tag]||'この要素';
+    return text?label+'「'+text+'」':label;
+  }
+
+  var highlightEl=null;
+  var currentEditEl=null;
+  var originalText='';
+
+  // シングルクリック → 要素選択
+  document.addEventListener('click',function(e){
+    if(currentEditEl)return;
+    e.preventDefault();
+    e.stopPropagation();
+    var el=e.target;
+    if(!el||el.className==='lp-editor-highlight')return;
+    // 前のハイライトを消す
+    if(highlightEl)highlightEl.remove();
+    // ハイライトオーバーレイ
+    var rect=el.getBoundingClientRect();
+    highlightEl=document.createElement('div');
+    highlightEl.className='lp-editor-highlight';
+    highlightEl.style.cssText='position:absolute;pointer-events:none;z-index:99999;'+
+      'top:'+(rect.top+window.scrollY)+'px;left:'+(rect.left+window.scrollX)+'px;'+
+      'width:'+rect.width+'px;height:'+rect.height+'px;';
+    document.body.appendChild(highlightEl);
+    parent.postMessage({
+      type:'element-clicked',
+      tag:el.tagName.toLowerCase(),
+      text:(el.textContent||'').trim().slice(0,50),
+      selector:getSelector(el),
+      label:getLabel(el)
+    },'*');
+  },true);
+
+  // ダブルクリック → インライン編集
+  var editTags=['h1','h2','h3','h4','h5','h6','p','span','a','li','button','td','th','label','strong','em'];
+  document.addEventListener('dblclick',function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    var el=e.target;
+    if(!el||!editTags.includes(el.tagName.toLowerCase()))return;
+    if(currentEditEl)finishEdit();
+    currentEditEl=el;
+    originalText=el.textContent||'';
+    el.contentEditable='true';
+    el.classList.add('lp-editor-editable');
+    el.focus();
+    // テキスト全選択
+    var range=document.createRange();
+    range.selectNodeContents(el);
+    var sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    // ハイライト消す
+    if(highlightEl){highlightEl.remove();highlightEl=null;}
+    el.addEventListener('blur',finishEdit);
+    el.addEventListener('keydown',handleEditKey);
+  },true);
+
+  function finishEdit(){
+    if(!currentEditEl)return;
+    var el=currentEditEl;
+    currentEditEl=null;
+    el.contentEditable='false';
+    el.classList.remove('lp-editor-editable');
+    el.removeEventListener('blur',finishEdit);
+    el.removeEventListener('keydown',handleEditKey);
+    var newText=el.textContent||'';
+    if(newText!==originalText){
+      parent.postMessage({
+        type:'inline-edit',
+        oldText:originalText,
+        newText:newText
+      },'*');
+    }
+  }
+  function handleEditKey(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();finishEdit();}
+    if(e.key==='Escape'){currentEditEl.textContent=originalText;finishEdit();}
+  }
+
+  // 変更ハイライト受信
+  window.addEventListener('message',function(e){
+    if(e.data&&e.data.type==='highlight-changes'&&Array.isArray(e.data.selectors)){
+      e.data.selectors.forEach(function(sel){
+        try{
+          var el=document.querySelector(sel);
+          if(el){
+            el.classList.add('lp-editor-changed');
+            setTimeout(function(){el.classList.remove('lp-editor-changed');},3000);
+          }
+        }catch(err){}
+      });
+    }
+  });
+})();
+</script>`;
+}
+
+// iframe srcDocにインタラクティブスクリプトを注入
+function injectInteractiveScript(html: string): string {
+  const injection = buildInteractivePreviewInjection();
+  if (html.includes('</body>')) return html.replace('</body>', injection + '</body>');
+  if (html.includes('</html>')) return html.replace('</html>', injection + '</html>');
+  return html + injection;
+}
+
+// 2つのHTMLを比較して変更された要素のセレクタを返す
+function diffHtmlSelectors(oldHtml: string, newHtml: string): string[] {
+  try {
+    const parser = new DOMParser();
+    const oldDoc = parser.parseFromString(oldHtml, 'text/html');
+    const newDoc = parser.parseFromString(newHtml, 'text/html');
+    const changed: string[] = [];
+    const semanticTags = new Set(['H1','H2','H3','H4','H5','H6','P','BUTTON','A','LI','SPAN','TD','TH','LABEL','IMG','INPUT','STRONG','EM']);
+
+    function buildSel(el: Element, doc: Document): string {
+      const parts: string[] = [];
+      let cur: Element | null = el;
+      while (cur && cur !== doc.body && cur !== doc.documentElement) {
+        let tag = cur.tagName.toLowerCase();
+        if (cur.id) { parts.unshift('#' + cur.id); break; }
+        const siblings = cur.parentElement ? Array.from(cur.parentElement.children) : [];
+        if (siblings.length > 1) {
+          const idx = siblings.indexOf(cur) + 1;
+          tag += ':nth-child(' + idx + ')';
+        }
+        parts.unshift(tag);
+        cur = cur.parentElement;
+      }
+      return parts.join(' > ');
+    }
+
+    function walk(oldEl: Element, newEl: Element) {
+      if (semanticTags.has(newEl.tagName)) {
+        if (oldEl.innerHTML !== newEl.innerHTML) {
+          changed.push(buildSel(newEl, newDoc));
+        }
+        return;
+      }
+      const oldC = Array.from(oldEl.children);
+      const newC = Array.from(newEl.children);
+      const len = Math.max(oldC.length, newC.length);
+      for (let i = 0; i < len; i++) {
+        if (!oldC[i] && newC[i]) {
+          changed.push(buildSel(newC[i], newDoc));
+        } else if (oldC[i] && newC[i]) {
+          walk(oldC[i], newC[i]);
+        }
+      }
+    }
+
+    walk(oldDoc.body, newDoc.body);
+    return changed.slice(0, 30);
+  } catch {
+    return [];
+  }
+}
+
 // HTML構文ハイライト（簡易版）
 function colorizeHtml(line: string): React.ReactNode {
   // タグ、属性、文字列、コメントを色分け
@@ -173,6 +394,11 @@ export default function HtmlCodeEditModal({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // インタラクティブプレビュー
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [selectedElement, setSelectedElement] = useState<{ tag: string; text: string; label: string } | null>(null);
+  const [changedSelectors, setChangedSelectors] = useState<string[]>([]);
+
   // currentHtml propが後から更新された場合（バックグラウンドフェッチ完了時）にmodifiedHtmlを同期
   const userHasEditedRef = useRef(false);
   const prevCurrentHtmlRef = useRef(currentHtml);
@@ -213,6 +439,39 @@ export default function HtmlCodeEditModal({
       localStorage.setItem(key, JSON.stringify(messages));
     } catch {}
   }, [messages, templateType, pageSlug]);
+
+  // --- インタラクティブプレビュー: iframeからのメッセージ受信 ---
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const { data } = event;
+      if (!data?.type) return;
+
+      if (data.type === 'element-clicked') {
+        // 要素クリック → チャット入力に自動セット
+        setSelectedElement({ tag: data.tag, text: data.text, label: data.label });
+        setInputText(data.label + 'を');
+        setTimeout(() => inputRef.current?.focus(), 50);
+      } else if (data.type === 'inline-edit') {
+        // ダブルクリック直接編集 → HTMLを更新
+        if (data.oldText && data.newText && data.oldText !== data.newText) {
+          setModifiedHtml(prev => {
+            const updated = prev.replace(data.oldText, data.newText);
+            if (updated !== prev) {
+              setHtmlHistory(h => [...h.slice(0, historyIndex + 1), updated]);
+              setHistoryIndex(i => i + 1);
+              setHasChanges(true);
+              // 自動保存
+              try { const r = onSave(updated); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch {}
+              toast.success('テキストを更新しました');
+            }
+            return updated;
+          });
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [historyIndex, onSave]);
 
   const pushHtmlHistory = useCallback((newHtml: string) => {
     setHtmlHistory(prev => {
@@ -295,8 +554,12 @@ export default function HtmlCodeEditModal({
         if (res.ok) {
           const data = await res.json();
           if (data.html) {
+            const prevHtml = modifiedHtml;
             pushHtmlHistory(data.html);
             try { const r = onSave(data.html); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch {}
+            // 変更箇所ハイライト
+            const diffs = diffHtmlSelectors(prevHtml, data.html);
+            if (diffs.length > 0) { setChangedSelectors(diffs); setTimeout(() => setChangedSelectors([]), 4000); }
             setAgentStatus('done');
             setTimeout(() => setAgentStatus('idle'), 2000);
             setMessages(prev => [...prev, {
@@ -416,9 +679,13 @@ export default function HtmlCodeEditModal({
               setAgentStatus('updating');
 
               if (data.html) {
+                const prevHtml = modifiedHtml;
                 pushHtmlHistory(data.html);
                 // AI変更後に自動保存
                 try { const r = onSave(data.html); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch {}
+                // 変更箇所ハイライト
+                const diffs = diffHtmlSelectors(prevHtml, data.html);
+                if (diffs.length > 0) { setChangedSelectors(diffs); setTimeout(() => setChangedSelectors([]), 4000); }
               }
 
               setTimeout(() => {
@@ -765,7 +1032,12 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
       const data = await response.json();
       if (!response.ok) { toast.error(data.message || 'フォーム有効化に失敗しました'); setAgentStatus('idle'); return; }
       setAgentStatus('updating');
-      if (data.html) { pushHtmlHistory(data.html); try { const r = onSave(data.html); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch {} }
+      if (data.html) {
+        const prevHtml = modifiedHtml;
+        pushHtmlHistory(data.html); try { const r = onSave(data.html); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch {}
+        const diffs = diffHtmlSelectors(prevHtml, data.html);
+        if (diffs.length > 0) { setChangedSelectors(diffs); setTimeout(() => setChangedSelectors([]), 4000); }
+      }
       setTimeout(() => { setAgentStatus('done'); setTimeout(() => setAgentStatus('idle'), 2000); }, 500);
       toast.success('フォームを有効化しました');
       setMessages(prev => [...prev, {
@@ -1095,6 +1367,22 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
 
         {/* Input Area */}
         <div className="p-4 border-t border-gray-100">
+          {/* 選択された要素の表示 */}
+          {selectedElement && (
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-[12px] text-blue-700 font-medium">
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
+                {selectedElement.label}
+                <button
+                  onClick={() => { setSelectedElement(null); setInputText(''); }}
+                  className="ml-1 p-0.5 hover:bg-blue-100 rounded transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+              <span className="text-[11px] text-gray-400">← プレビューで選択中</span>
+            </div>
+          )}
           <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden focus-within:border-gray-300 focus-within:bg-white transition-all">
             <textarea
               ref={inputRef}
@@ -1252,11 +1540,19 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
               style={{ minHeight: 'calc(100vh - 80px)' }}
             >
               <iframe
-                srcDoc={modifiedHtml}
+                ref={iframeRef}
+                srcDoc={injectInteractiveScript(modifiedHtml)}
                 className="w-full border-0"
                 style={{ height: 'calc(100vh - 80px)' }}
                 sandbox="allow-scripts allow-forms"
                 title="Preview"
+                onLoad={() => {
+                  if (changedSelectors.length > 0) {
+                    iframeRef.current?.contentWindow?.postMessage(
+                      { type: 'highlight-changes', selectors: changedSelectors }, '*'
+                    );
+                  }
+                }}
               />
             </div>
           )}

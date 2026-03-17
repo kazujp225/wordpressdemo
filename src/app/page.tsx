@@ -412,7 +412,7 @@ export default function LoginPage() {
       <footer className="border-t border-gray-100 mt-16">
         <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col items-center gap-2">
           <p className="text-sm text-muted-foreground">
-            © 2024 OTASUKE！なんでも修正くん All rights reserved.
+            © {new Date().getFullYear()} OTASUKE！なんでも修正くん All rights reserved.
           </p>
         </div>
       </footer>

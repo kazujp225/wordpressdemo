@@ -38,11 +38,11 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
-          // HTTPSの強制（HSTS）
-          {
+          // HTTPSの強制（HSTS） - 開発環境では無効
+          ...(process.env.NODE_ENV === 'production' ? [{
             key: 'Strict-Transport-Security',
             value: 'max-age=31536000; includeSubDomains; preload',
-          },
+          }] : []),
           // Permissions-Policy（旧Feature-Policy）
           {
             key: 'Permissions-Policy',
@@ -78,8 +78,8 @@ const nextConfig = {
               "form-action 'self' https://*.stripe.com",
               // frame-ancestors（クリックジャッキング対策）
               "frame-ancestors 'self'",
-              // upgrade-insecure-requests（HTTP→HTTPS自動アップグレード）
-              "upgrade-insecure-requests",
+              // upgrade-insecure-requests（HTTP→HTTPS自動アップグレード） - 開発環境では無効
+              ...(process.env.NODE_ENV === 'production' ? ["upgrade-insecure-requests"] : []),
             ].join('; '),
           },
         ],
