@@ -86,14 +86,19 @@ export async function GET(
   const escapeHtml = (str: string) =>
     str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
-  // html-embedセクションが完全なHTMLドキュメントを含む場合、それを直接使用
-  // （LP制作エージェントが編集した完全なページHTML）
+  // html-embedセクションにhtmlContentがあれば、それを優先して使用
+  // （LP制作エージェントが編集したページHTML）
   for (const section of page.sections) {
     if (section.role === 'html-embed') {
       let config: any = {};
       try { if (section.config) config = JSON.parse(section.config); } catch {}
-      if (config.htmlContent && /<!DOCTYPE|<html[\s>]/i.test(config.htmlContent)) {
-        return NextResponse.json({ html: sanitizeHtmlContent(config.htmlContent), title: page.title });
+      if (config.htmlContent && config.htmlContent.length > 100) {
+        let html = config.htmlContent;
+        // 完全なHTMLドキュメントでない場合、ラップする
+        if (!/<!DOCTYPE|<html[\s>]/i.test(html)) {
+          html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${escapeHtml(page.title)}</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet"><style>body{margin:0;font-family:'Noto Sans JP',sans-serif;}</style></head><body>${html}</body></html>`;
+        }
+        return NextResponse.json({ html: sanitizeHtmlContent(html), title: page.title });
       }
     }
   }

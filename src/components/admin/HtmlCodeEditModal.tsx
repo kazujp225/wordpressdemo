@@ -866,17 +866,8 @@ export default function HtmlCodeEditModal({
     setDeployError('');
 
     try {
-      // ページ全体のHTMLを取得（画像LP＋AI生成コード含む）
-      let deployHtml = modifiedHtml;
-      if (pageId) {
-        try {
-          const fullPageRes = await fetch(`/api/pages/${pageId}/deploy-html`);
-          if (fullPageRes.ok) {
-            const fullPageData = await fullPageRes.json();
-            if (fullPageData?.html) deployHtml = fullPageData.html;
-          }
-        } catch {}
-      }
+      // エディタのHTMLをそのままデプロイ（WYSIWYG）
+      const deployHtml = modifiedHtml;
 
       const deployRes = await fetch('/api/deploy/render', {
         method: 'POST',
@@ -1225,52 +1216,17 @@ formタグにJavaScriptでフォーム送信処理を追加。送信先は /api/
                 </>
               )}
 
-              {/* 空ページ — Manus風の案内 + クイックアクション */}
+              {/* 空ページ — シンプルな案内 */}
               {!isDiagnosing && !diagnosisText && (
-                <div className="w-full flex flex-col py-8 px-2">
-                  <div className="text-center mb-6">
-                    <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center mx-auto mb-3">
-                      <Sparkles className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="text-[15px] font-bold text-gray-900 mb-1">LP制作エージェント</h3>
-                    <p className="text-[12px] text-gray-400 leading-relaxed">
-                      プロ品質のLPを自律的に作成・編集します
-                    </p>
+                <div className="w-full flex flex-col items-center justify-center py-16 px-4">
+                  <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center mb-3">
+                    <Sparkles className="h-6 w-6 text-white" />
                   </div>
-
-                  <div className="space-y-1.5">
-                    {suggestions.slice(0, 4).map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSuggestionClick(s.prompt)}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 hover:bg-gray-50 text-left transition-all group"
-                      >
-                        <span className="text-base flex-shrink-0">{s.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-[13px] font-medium text-gray-700 group-hover:text-gray-900 block">{s.label}</span>
-                          <span className="text-[11px] text-gray-400 block">{s.description}</span>
-                        </div>
-                        <ArrowRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" />
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {suggestions.slice(4).map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSuggestionClick(s.prompt)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100 hover:border-gray-300 text-[11px] text-gray-500 hover:text-gray-700 transition-all"
-                      >
-                        <span>{s.icon}</span>
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 px-2">
-                    <p className="text-[11px] text-gray-300 text-center">URLを入力するとページを取り込めます</p>
-                  </div>
+                  <h3 className="text-[15px] font-bold text-gray-900 mb-1">LP制作エージェント</h3>
+                  <p className="text-[12px] text-gray-400 leading-relaxed text-center">
+                    作りたいページを言葉で伝えてください
+                  </p>
+                  <p className="text-[11px] text-gray-300 mt-4">URLを入力するとページを取り込めます</p>
                 </div>
               )}
             </div>

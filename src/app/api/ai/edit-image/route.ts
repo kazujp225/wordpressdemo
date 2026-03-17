@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         }
 
         // リクエストボディをパース
-        const { imageBase64, imageUrl, prompt, productInfo } = await request.json();
+        const { imageBase64, imageUrl, prompt, productInfo, originalWidth, originalHeight } = await request.json();
 
         if (!prompt && !productInfo) {
             return NextResponse.json({ error: 'Prompt or productInfo is required' }, { status: 400 });
@@ -111,6 +111,10 @@ export async function POST(request: NextRequest) {
         }
 
         // 4. GenerationRun を processing 状態で作成
+        const sizeInstruction = originalWidth && originalHeight
+            ? `出力画像は元画像と同じサイズ（${originalWidth}px × ${originalHeight}px）を維持してください。`
+            : '元画像と同じサイズ・アスペクト比を維持してください。';
+
         editPrompt = productInfo
             ? `この画像のレイアウトと構成を維持しながら、以下の商材/サービス用にリブランディングしてください:
 
@@ -121,10 +125,10 @@ ${productInfo}
 - テキスト部分を新しい商材に合わせて変更
 - 色味やスタイルは新商材に適したものに調整
 - プロフェッショナルなLP画像として仕上げてください
-- 縦長の画像（ポートレート、アスペクト比 9:16 または 3:4）で出力すること
+- ${sizeInstruction}
 
 ${prompt ? `追加指示: ${prompt}` : ''}`
-            : `${prompt}\n\n【重要】縦長の画像（ポートレート形式）で出力してください。`;
+            : `${prompt}\n\n【重要】${sizeInstruction}`;
 
         const { run, isExisting } = await createOrGetGenerationRun(user.id, requestId, {
             type: 'edit-image',
@@ -418,14 +422,14 @@ async function processImageResponse(data: any, userId: string | null) {
         .from('images')
         .getPublicUrl(filename);
 
-    // Create DB record (縦長画像: 9:16比率)
+    // Create DB record
     const media = await prisma.mediaImage.create({
         data: {
             userId,
             filePath: publicUrl,
             mime: 'image/png',
-            width: 768,
-            height: 1366,
+            width: originalWidth || 0,
+            height: originalHeight || 0,
         },
     });
 

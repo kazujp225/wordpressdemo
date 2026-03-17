@@ -549,6 +549,8 @@ export function BannerEditor({ banner }: BannerEditorProps) {
                         imageUrl: generatedImageUrl,
                         prompt: editPrompt,
                         productInfo,
+                        originalWidth: canvasImage?.width || width,
+                        originalHeight: canvasImage?.height || height,
                     }),
                 });
             }

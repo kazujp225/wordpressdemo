@@ -232,10 +232,11 @@ export async function middleware(request: NextRequest) {
   const ip = getClientIP(request);
 
   // ========================================
-  // 1. IPブロックリストチェック
+  // 1. IPブロックリストチェック（開発環境のlocalhostは除外）
   // ========================================
+  const isLocalDev = process.env.NODE_ENV === 'development' && (ip === '::1' || ip === '127.0.0.1' || ip === 'localhost');
   const blockExpiry = blockedIPs.get(ip);
-  if (blockExpiry && Date.now() < blockExpiry) {
+  if (blockExpiry && Date.now() < blockExpiry && !isLocalDev) {
     return new NextResponse('Access Denied', { status: 403 });
   }
 

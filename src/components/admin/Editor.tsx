@@ -1481,7 +1481,9 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
                 body: JSON.stringify({
                     imageUrl: section.image.filePath,
                     prompt: editImagePrompt,
-                    productInfo: aiProductInfo
+                    productInfo: aiProductInfo,
+                    originalWidth: section.image.width || undefined,
+                    originalHeight: section.image.height || undefined,
                 })
             });
 

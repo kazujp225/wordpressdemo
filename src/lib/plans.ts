@@ -107,10 +107,11 @@ export const PLANS: Record<PlanType, Plan> = {
       freeBannerEditLimit: FREE_BANNER_EDIT_LIMIT,
     },
     features: [
-      '最大3ページ',
-      '画像アップロード・編集',
-      'エクスポート機能',
-      `バナーAI編集 ${FREE_BANNER_EDIT_LIMIT}回無料`,
+      '最大3ページ / 500MB',
+      '画像アップロード・手動編集',
+      'HTML・PDFエクスポート',
+      `バナーAI編集 ${FREE_BANNER_EDIT_LIMIT}回まで`,
+      'ページ公開（Render）',
     ],
   },
 
@@ -139,10 +140,14 @@ export const PLANS: Record<PlanType, Plan> = {
       freeBannerEditLimit: 0,
     },
     features: [
-      '最大10ページ',
+      '最大10ページ / 5GB',
       '月25,000クレジット',
-      '画像生成',
-      'インペイント編集',
+      'AI画像生成・インペイント編集',
+      'AIページ自動作成',
+      'AIチャット編集（Claude）',
+      'バナー自動作成（無制限）',
+      'SEO / LLMO分析',
+      'HTML・PDFエクスポート',
     ],
   },
 
@@ -172,10 +177,11 @@ export const PLANS: Record<PlanType, Plan> = {
       freeBannerEditLimit: 0,
     },
     features: [
-      '最大30ページ',
+      '最大30ページ / 10GB',
       '月75,000クレジット',
+      'Starterの全機能',
       '4Kアップスケール',
-      'リスタイル機能',
+      'リスタイル（デザイン一括変換）',
     ],
   },
 
@@ -204,10 +210,10 @@ export const PLANS: Record<PlanType, Plan> = {
       freeBannerEditLimit: 0,
     },
     features: [
-      '最大50ページ',
+      '最大50ページ / 20GB',
       '月125,000クレジット',
-      '動画生成',
-      '全機能利用可能',
+      'Proの全機能',
+      'AI動画生成',
     ],
   },
 
@@ -236,10 +242,9 @@ export const PLANS: Record<PlanType, Plan> = {
       freeBannerEditLimit: 0,
     },
     features: [
-      '無制限ページ',
+      'ページ数・ストレージ無制限',
       '月250,000クレジット',
-      '動画生成',
-      '全機能利用可能',
+      'Businessの全機能',
     ],
   },
 
@@ -268,10 +273,10 @@ export const PLANS: Record<PlanType, Plan> = {
       freeBannerEditLimit: 0,
     },
     features: [
-      '無制限ページ',
+      'ページ数・ストレージ無制限',
       '月1,250,000クレジット',
-      '動画生成',
-      '全機能利用可能',
+      'Enterpriseの全機能',
+      '大量運用向け',
     ],
   },
 };

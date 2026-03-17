@@ -113,13 +113,18 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             )}>
                 <div className="flex h-16 items-center justify-between px-6 border-b border-border">
                     <div className="flex items-center gap-3">
-                        <Image
-                            src="/lp-builder-logo.png"
-                            alt="Logo"
-                            width={24}
-                            height={24}
-                            className="h-6 w-6 object-contain"
-                        />
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 flex-shrink-0">
+                            <rect width="24" height="24" rx="6" fill="url(#logo-grad)" />
+                            <path d="M7 13l3 3 7-7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M16.5 5.5l2 2" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+                            <circle cx="17.5" cy="4.5" r="1" fill="#fbbf24" />
+                            <defs>
+                                <linearGradient id="logo-grad" x1="0" y1="0" x2="24" y2="24">
+                                    <stop stopColor="#3b82f6" />
+                                    <stop offset="1" stopColor="#8b5cf6" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
                         <span className="text-lg font-bold tracking-tight text-primary">OTASUKE！なんでも修正くん</span>
                     </div>
                     {/* モバイル用閉じるボタン */}

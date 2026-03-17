@@ -716,8 +716,8 @@ async function processInpaintResponse(
             userId,
             filePath: publicUrl,
             mime: 'image/png',
-            width: 0,  // 元画像サイズを維持
-            height: 0,
+            width: originalWidth || 0,
+            height: originalHeight || 0,
         },
     });
 

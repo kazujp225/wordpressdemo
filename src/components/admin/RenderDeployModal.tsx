@@ -27,6 +27,8 @@ export default function RenderDeployModal({ onClose, html, templateType, prompt 
   const [currentDeployment, setCurrentDeployment] = useState<Deployment | null>(null);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [copied, setCopied] = useState(false);
+  const existingNames = deployments.map(d => d.serviceName.toLowerCase());
+  const isDuplicate = serviceName.trim() !== '' && existingNames.includes(serviceName.trim().toLowerCase());
 
   useEffect(() => {
     fetchDeployments();
@@ -157,6 +159,14 @@ export default function RenderDeployModal({ onClose, html, templateType, prompt 
               <p className="text-[10px] font-mono text-gray-700 mt-2">
                 alphanumeric + hyphens | used in render URL
               </p>
+              {isDuplicate && (
+                <div className="mt-2 flex items-start gap-2 p-2.5 bg-yellow-500/10 border border-yellow-500/20">
+                  <span className="text-yellow-400 text-sm leading-none mt-0.5">!</span>
+                  <p className="text-[10px] font-mono text-yellow-400/90 leading-relaxed">
+                    同じ名前のデプロイが既に存在します。このまま実行すると以前のデプロイが上書きされます。別の名前に変更することをおすすめします。
+                  </p>
+                </div>
+              )}
               <button
                 onClick={handleDeploy}
                 disabled={deploying || !serviceName.trim()}
