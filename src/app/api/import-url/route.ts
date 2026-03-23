@@ -586,6 +586,57 @@ export async function POST(request: NextRequest) {
         // JSリダイレクトが完了するまで少し待機
         await new Promise(resolve => setTimeout(resolve, isDev ? 500 : 300));
 
+        // Webフォント読み込み待ち + 日本語フォールバック注入
+        log.info('Waiting for web fonts to load...');
+        try {
+            await page.evaluate(async () => {
+                // document.fonts.ready でWebフォントの読み込み完了を待つ
+                await document.fonts.ready;
+            });
+            log.success('Web fonts loaded');
+        } catch (fontError: any) {
+            log.info(`Font loading wait skipped: ${fontError.message}`);
+        }
+
+        // 日本語フォールバックフォント注入（□□□豆腐化防止）
+        // サイトのWebフォントが読み込めなかった場合に日本語が表示されるようにする
+        try {
+            // 1. Noto Sans JP をGoogle Fontsから読み込む
+            await page.addStyleTag({
+                content: `@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;900&display=swap');`
+            });
+            // 2. 各要素のfont-familyの末尾に日本語フォントをフォールバックとして追加
+            //    既存フォントが読み込めた場合はそのまま、失敗時にNoto Sans JPで表示される
+            await page.evaluate(() => {
+                const japaneseFallback = '"Noto Sans JP", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif';
+                const allElements = document.querySelectorAll('*');
+                allElements.forEach(el => {
+                    const element = el as HTMLElement;
+                    try {
+                        const computed = window.getComputedStyle(element);
+                        const currentFont = computed.fontFamily;
+                        if (currentFont &&
+                            !currentFont.includes('Noto Sans JP') &&
+                            !currentFont.includes('Hiragino') &&
+                            !currentFont.includes('Meiryo')) {
+                            element.style.setProperty('font-family', `${currentFont}, ${japaneseFallback}`, 'important');
+                        }
+                    } catch (e) { /* skip */ }
+                });
+            });
+            log.info('Japanese fallback font appended to all elements');
+            // フォールバックフォントの読み込みを待つ
+            await page.evaluate(async () => {
+                await document.fonts.ready;
+            });
+            log.success('Fallback fonts loaded');
+        } catch (fallbackError: any) {
+            log.info(`Fallback font injection skipped: ${fallbackError.message}`);
+        }
+
+        // フォント読み込み後に追加の待ち時間（レンダリング反映のため）
+        await new Promise(resolve => setTimeout(resolve, isDev ? 1000 : 500));
+
         // 本番環境でモバイル時：CSS注入でアニメーション停止（処理高速化）
         if (!isDev && device === 'mobile') {
             await page.addStyleTag({
