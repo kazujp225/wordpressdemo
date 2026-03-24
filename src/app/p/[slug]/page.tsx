@@ -383,14 +383,28 @@ export default async function PublicPage({ params }: { params: { slug: string } 
                                             )}
                                         </>
                                     ) : section.image ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={section.image.filePath}
-                                            alt={section.role}
-                                            className="block w-full h-auto transition-all duration-500"
-                                            style={imgStyle}
-                                            loading="lazy"
-                                        />
+                                        <>
+                                            {/* デスクトップ画像 */}
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={section.image.filePath}
+                                                alt={section.role}
+                                                className={`w-full h-auto transition-all duration-500 ${section.mobileImage ? 'hidden md:block' : 'block'}`}
+                                                style={imgStyle}
+                                                loading="lazy"
+                                            />
+                                            {/* モバイル画像 */}
+                                            {section.mobileImage && (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img
+                                                    src={section.mobileImage.filePath}
+                                                    alt={section.role}
+                                                    className="block md:hidden w-full h-auto transition-all duration-500"
+                                                    style={imgStyle}
+                                                    loading="lazy"
+                                                />
+                                            )}
+                                        </>
                                     ) : (
                                         <div className="flex h-48 items-center justify-center bg-gray-100 text-gray-400">
                                             {section.role === 'html-embed' ? 'コンテンツを読み込み中...' : `セクション: ${section.role}`}
