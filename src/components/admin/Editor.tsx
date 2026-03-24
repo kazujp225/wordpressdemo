@@ -116,6 +116,99 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         if (!initialHeaderConfig) return base;
         return { ...base, ...initialHeaderConfig, navItems: initialHeaderConfig.navItems || base.navItems };
     });
+    // AIが生成したHTMLの種類を自動判定するヘルパー
+    const detectHtmlType = useCallback((html: string): 'header' | 'footer' | 'form' | 'section' => {
+        const lower = html.toLowerCase();
+        // ヘッダー判定: nav要素、ロゴ+CTAボタンの組み合わせ
+        if (
+            (lower.includes('<nav') || lower.includes('<header')) &&
+            (lower.includes('logo') || lower.includes('ロゴ')) &&
+            html.length < 5000  // ヘッダーは通常小さい
+        ) {
+            return 'header';
+        }
+        // フッター判定
+        if (lower.includes('<footer') && (lower.includes('copyright') || lower.includes('©'))) {
+            return 'footer';
+        }
+        // フォーム判定: form要素 + input要素
+        if (lower.includes('<form') && lower.includes('<input')) {
+            return 'form';
+        }
+        return 'section';
+    }, []);
+
+    // HTMLの種類に応じて正しい場所に保存
+    const insertHtmlSmart = useCallback(async (html: string, meta?: { templateType?: string; prompt?: string; mobileHtmlContent?: string }) => {
+        const type = detectHtmlType(html);
+
+        if (type === 'header') {
+            // ヘッダーはheaderConfigを更新（セクションに追加しない）
+            // HTMLからロゴテキストとCTAを抽出
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // ロゴテキスト抽出（最初のリンクや見出しのテキスト）
+            const logoEl = doc.querySelector('a, h1, .logo, [class*="logo"]');
+            const logoText = logoEl?.textContent?.trim() || headerConfig.logoText;
+
+            // CTAボタン抽出
+            const ctaEl = doc.querySelector('a[href*="contact"], a[href*="#"], button, .cta, [class*="cta"]');
+            const ctaText = ctaEl?.textContent?.trim() || headerConfig.ctaText;
+            const ctaLink = (ctaEl as HTMLAnchorElement)?.href || headerConfig.ctaLink;
+
+            setHeaderConfig((prev: any) => ({
+                ...prev,
+                logoText,
+                ctaText,
+                ctaLink: ctaLink.includes('#') ? ctaLink.substring(ctaLink.indexOf('#')) : ctaLink,
+                headerHtml: html,  // 生HTMLも保持
+            }));
+            toast.success('ヘッダーを更新しました');
+            return;
+        }
+
+        // フォーム・フッターは末尾、通常セクションは最後の画像セクションの後に挿入
+        let insertOrder: number;
+        if (type === 'form' || type === 'footer') {
+            insertOrder = sections.length;
+        } else {
+            // 最後の画像セクション（html-embed以外）の後に挿入
+            const lastImageIdx = sections.reduce((last, s, i) =>
+                s.role !== 'html-embed' ? i : last, -1);
+            insertOrder = lastImageIdx >= 0 ? lastImageIdx + 1 : sections.length;
+        }
+
+        const newSection = {
+            id: `temp-${Date.now()}`,
+            role: 'html-embed',
+            imageId: null,
+            image: null,
+            mobileImageId: null,
+            mobileImage: null,
+            order: insertOrder,
+            config: {
+                htmlContent: html,
+                mobileHtmlContent: meta?.mobileHtmlContent || null,
+                templateType: meta?.templateType || 'custom',
+                prompt: meta?.prompt || '',
+            }
+        };
+
+        const newSections = [...sections];
+        // 挿入位置以降のorderをずらす
+        for (let i = 0; i < newSections.length; i++) {
+            if (newSections[i].order >= insertOrder) {
+                newSections[i] = { ...newSections[i], order: newSections[i].order + 1 };
+            }
+        }
+        newSections.push(newSection);
+        const sorted = newSections.sort((a, b) => a.order - b.order);
+        setSections(sorted);
+        await handleSave(sorted);
+        toast.success(`${type === 'form' ? 'フォーム' : 'セクション'}を追加しました`);
+    }, [sections, headerConfig, detectHtmlType]);
+
     const [isSaving, setIsSaving] = useState(false);
     const [aiProductInfo, setAiProductInfo] = useState('');
     const [aiTaste, setAiTaste] = useState('professional');
@@ -7216,31 +7309,8 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
                             toast.error('生成されたHTMLが空です');
                             return;
                         }
-                        const newSection = {
-                            id: `temp-${Date.now()}`,
-                            role: 'html-embed',
-                            imageId: null,
-                            image: null,
-                            mobileImageId: null,
-                            mobileImage: null,
-                            order: insertIndex,
-                            config: {
-                                htmlContent: html,
-                                mobileHtmlContent: meta.mobileHtmlContent || null,
-                                templateType: meta.templateType,
-                                prompt: meta.prompt,
-                            }
-                        };
-                        const newSections = [...sections];
-                        for (let i = 0; i < newSections.length; i++) {
-                            if (newSections[i].order >= insertIndex) {
-                                newSections[i] = { ...newSections[i], order: newSections[i].order + 1 };
-                            }
-                        }
-                        newSections.push(newSection);
-                        const sorted = newSections.sort((a, b) => a.order - b.order);
-                        setSections(sorted);
-                        await handleSave(sorted);
+                        // AIが生成したHTMLの種類を自動判定して正しい場所に保存
+                        await insertHtmlSmart(html, meta);
                     }}
                 />
             )}
@@ -7287,19 +7357,8 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
                                 setSections(updatedSections);
                                 await handleSave(updatedSections);
                             } else {
-                                // 新しいhtml-embedセクションを追加
-                                const newSection = {
-                                    id: `temp-${Date.now()}`,
-                                    role: 'html-embed',
-                                    order: sections.length,
-                                    config: {
-                                        htmlContent: newHtml,
-                                        templateType: 'custom',
-                                    },
-                                };
-                                const updatedSections = [...sections, newSection];
-                                setSections(updatedSections);
-                                await handleSave(updatedSections);
+                                // 新規：AIが生成したHTMLの種類を自動判定して正しい場所に保存
+                                await insertHtmlSmart(newHtml);
                             }
                         }}
                     />
