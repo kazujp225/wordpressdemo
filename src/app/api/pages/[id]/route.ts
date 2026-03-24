@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const validation = validateRequest(pageSectionsUpdateSchema, body);
     if (!validation.success) {
         console.error('[PUT /api/pages] Validation failed:', JSON.stringify(validation.details, null, 2));
-        console.error('[PUT /api/pages] Request body sections sample:', JSON.stringify(body.sections?.slice(0, 2), null, 2));
+        console.error('[PUT /api/pages] Request body sections count:', body.sections?.length);
         return NextResponse.json({
             error: validation.error,
             details: validation.details
@@ -113,8 +113,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     const { sections, headerConfig, status, designDefinition } = validation.data;
 
-    // セクション数上限チェック
-    const MAX_SECTIONS = 20;
+    // セクション数上限チェック（長いLPのfaithfulインポート対応）
+    const MAX_SECTIONS = 50;
     if (sections && sections.length > MAX_SECTIONS) {
         return NextResponse.json(
             { error: `セクション数が上限(${MAX_SECTIONS})を超えています` },

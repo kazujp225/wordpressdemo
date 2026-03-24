@@ -1035,31 +1035,27 @@ export async function POST(request: NextRequest) {
             }));
             log.info(`Using custom sections: ${customSections.length} segments from user`);
         } else {
-            // 従来の均等分割
-            const baseSegmentHeight = 800;
-            const segmentHeight = baseSegmentHeight * deviceConfig.deviceScaleFactor;
-            const rawNumSegments = Math.ceil(height / segmentHeight);
-            const numSegments = Math.min(rawNumSegments, 20);
-            if (rawNumSegments > 20) {
-                log.info(`Limiting segments from ${rawNumSegments} to 20`);
-            }
+            // ページ全体を最大20セグメントに収まるよう動的にセグメント高さを調整
+            const maxSegments = importMode === 'faithful' ? 20 : 10;
+            const minSegmentHeight = 800 * deviceConfig.deviceScaleFactor;  // 最小800px
+            const dynamicSegmentHeight = Math.max(
+                minSegmentHeight,
+                Math.ceil(height / maxSegments)
+            );
+            const rawNumSegments = Math.ceil(height / dynamicSegmentHeight);
+            const numSegments = Math.min(rawNumSegments, maxSegments);
+
+            log.info(`Segment height: ${dynamicSegmentHeight}px (dynamic, based on page height ${height}px, max ${maxSegments} segments)`);
 
             segments = Array.from({ length: numSegments }, (_, i) => {
-                const top = i * segmentHeight;
-                const segHeight = Math.min(segmentHeight, height - top);
+                const top = i * dynamicSegmentHeight;
+                const segHeight = Math.min(dynamicSegmentHeight, height - top);
                 return {
                     top,
                     height: segHeight,
                     label: i === 0 ? 'ヘッダー・ヒーロー' : i === numSegments - 1 ? 'フッター' : `セクション ${i + 1}`
                 };
             });
-        }
-
-        // セグメント数の上限（faithfulモードは20、AI処理は10）
-        const maxSegments = importMode === 'faithful' ? 20 : 10;
-        if (segments.length > maxSegments) {
-            log.info(`Limiting segments from ${segments.length} to ${maxSegments}`);
-            segments = segments.slice(0, maxSegments);
         }
 
         const numSegments = segments.length;
