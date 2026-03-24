@@ -2460,7 +2460,13 @@ ${mobileMediaQuery}
                 for (const result of successResults) {
                     updated = updated.map(s => {
                         if (String(s.id) !== String(result.sectionId)) return s;
-                        const patch: any = { imageId: result.data.newImageId, image: result.data.media };
+                        const patch: any = {};
+                        // PC再生成した場合のみPC画像を更新
+                        if (batchRegenerateTarget !== 'mobile' && result.data.newImageId) {
+                            patch.imageId = result.data.newImageId;
+                            patch.image = result.data.media;
+                        }
+                        // スマホ再生成した場合のみスマホ画像を更新
                         if (result.data.mobileImageId) {
                             patch.mobileImageId = result.data.mobileImageId;
                             patch.mobileImage = result.data.mobileMedia;
