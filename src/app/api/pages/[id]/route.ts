@@ -113,8 +113,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     const { sections, headerConfig, status, designDefinition } = validation.data;
 
-    // セクション数上限チェック（長いLPのfaithfulインポート対応）
-    const MAX_SECTIONS = 50;
+    // セクション数上限チェック
+    const MAX_SECTIONS = 100;
     if (sections && sections.length > MAX_SECTIONS) {
         return NextResponse.json(
             { error: `セクション数が上限(${MAX_SECTIONS})を超えています` },

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -492,9 +492,9 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
         setFetchMoreProgress('取得を開始しています...');
 
         try {
-            // 既存セクション数の続きから取得
-            const startFrom = sections.length;
-            console.log(`[FetchMore] Starting from section ${startFrom} for ${device} (existing sections: ${sections.length})`);
+            // 全ページを最初から取得（startFrom: 0）して既存セクションに追加
+            const startFrom = 0;
+            console.log(`[FetchMore] Fetching full page for ${device} (existing sections: ${sections.length})`);
 
             const res = await fetch('/api/import-url', {
                 method: 'POST',
@@ -608,8 +608,6 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
         setFetchMoreProgress('モバイル画像を取得中...');
 
         try {
-            const startFrom = sections.length - pendingDesktopSections.length;
-
             const res = await fetch('/api/import-url', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -617,7 +615,7 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
                     url: sourceUrl,
                     device: 'mobile',
                     importMode: 'faithful',
-                    startFrom,
+                    startFrom: 0,
                 })
             });
 
@@ -1998,6 +1996,61 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
 
         return () => clearTimeout(autoSaveTimer);
     }, [sections, headerConfig, status, designDefinition, isAutoSaveEnabled, pageId, isSaving, isGenerating, isRegenerating, isBatchRegenerating]);
+
+    // ページ離脱時に自動保存（データロスト防止）
+    const sectionsRef = useRef(sections);
+    const headerConfigRef = useRef(headerConfig);
+    const statusRef = useRef(status);
+    const designDefinitionRef = useRef(designDefinition);
+    sectionsRef.current = sections;
+    headerConfigRef.current = headerConfig;
+    statusRef.current = status;
+    designDefinitionRef.current = designDefinition;
+
+    useEffect(() => {
+        if (pageId === 'new') return;
+
+        const saveNow = () => {
+            const currentSections = sectionsRef.current;
+            if (currentSections.length === 0) return;
+            try {
+                fetch(`/api/pages/${pageId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sections: currentSections.map((s, i) => ({
+                            ...s, order: i, config: s.config || {}
+                        })),
+                        headerConfig: headerConfigRef.current,
+                        status: statusRef.current,
+                        designDefinition: designDefinitionRef.current
+                    }),
+                    keepalive: true,  // ページ離脱後も送信を継続
+                });
+            } catch (e) {
+                console.error('Save on leave failed:', e);
+            }
+        };
+
+        // タブ非表示時に保存
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                saveNow();
+            }
+        };
+
+        // ブラウザ閉じる/離脱時に保存
+        const handleBeforeUnload = () => {
+            saveNow();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [pageId]);
 
     // セグメント個別再生成モーダルを開く
     const handleOpenRegenerate = (sectionId: string) => {
