@@ -17,6 +17,17 @@ function escapeHtml(str: string): string {
 function safeColor(val: string): string { return val?.replace(/[^a-zA-Z0-9#(),.\s%]/g, '') || ''; }
 function safeNum(val: number): number { return Math.max(0, Math.min(200, Number(val) || 0)); }
 
+// サーバーサイドHTMLサニタイズ（XSS防止）
+function sanitizeHtmlContent(html: string): string {
+    return html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+        .replace(/javascript\s*:/gi, 'blocked:')
+        .replace(/vbscript\s*:/gi, 'blocked:')
+        .replace(/data\s*:\s*text\/html/gi, 'blocked:text/html')
+        .replace(/<iframe\b[^>]*\bsrc\s*=\s*["']?\s*(?:javascript|data|vbscript)\s*:/gi, '<iframe src="blocked:');
+}
+
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     try {
         // 認証チェック
@@ -95,6 +106,15 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                 }
             } catch (e) {
                 console.error('Failed to parse section config:', e);
+            }
+
+            // html-embedセクション（スクリプト・イベントハンドラを除去）
+            if (section.role === 'html-embed' && (config as any).htmlContent) {
+                if ((config as any).mobileHtmlContent) {
+                    return `<div class="desktop-only">${sanitizeHtmlContent((config as any).htmlContent)}</div>
+                <div class="mobile-only">${sanitizeHtmlContent((config as any).mobileHtmlContent)}</div>`;
+                }
+                return sanitizeHtmlContent((config as any).htmlContent);
             }
 
             const positionClasses = {
@@ -178,6 +198,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     <title>${escapeHtml(page.title)}</title>
     <link rel="stylesheet" href="./style.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+    .desktop-only { display: block; }
+    .mobile-only { display: none; }
+    @media (max-width: 768px) {
+        .desktop-only { display: none !important; }
+        .mobile-only { display: block !important; }
+    }
+    </style>
 </head>
 <body class="min-h-screen bg-gray-50 flex flex-col">
     <header class="${headerConfig.sticky ? 'sticky top-0' : 'relative'} z-50 flex h-16 items-center justify-between bg-white/90 px-4 shadow-sm backdrop-blur-md md:px-8">

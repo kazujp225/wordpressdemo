@@ -372,7 +372,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
     const [batchRegeneratePrompt, setBatchRegeneratePrompt] = useState('');
     const [batchReferenceSection, setBatchReferenceSection] = useState<string | null>(null); // 参照セクション（スタイルの元）
     const [regenerateReferenceAlso, setRegenerateReferenceAlso] = useState(false); // 参照セクションも再生成するかどうか
-    const [includeMobileInBatch, setIncludeMobileInBatch] = useState(true); // モバイル画像も同時に再生成するか
+    const [batchRegenerateTarget, setBatchRegenerateTarget] = useState<'both' | 'desktop' | 'mobile'>('both');
+    const [batchRegenerateAspectRatio, setBatchRegenerateAspectRatio] = useState<'keep' | '9:16' | '16:9' | '1:1' | '4:5'>('keep');
 
     // セクション復元モーダル
     const [showRestoreModal, setShowRestoreModal] = useState(false);
@@ -560,6 +561,9 @@ ${mobileMediaQuery}
     const [isDraggingAsset, setIsDraggingAsset] = useState(false);
     const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
     const [isProcessingAssetDrop, setIsProcessingAssetDrop] = useState(false);
+
+    // HTMLエディタを開いた時のビューモード記録
+    const [htmlEditOpenViewMode, setHtmlEditOpenViewMode] = useState<'desktop' | 'mobile'>('desktop');
 
     // 自動保存機能
     const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false);
@@ -2112,17 +2116,30 @@ ${mobileMediaQuery}
     const headerConfigRef = useRef(headerConfig);
     const statusRef = useRef(status);
     const designDefinitionRef = useRef(designDefinition);
+    const isBusyRef = useRef(false);
     sectionsRef.current = sections;
     headerConfigRef.current = headerConfig;
     statusRef.current = status;
     designDefinitionRef.current = designDefinition;
+    isBusyRef.current = isSaving || isGenerating || isRegenerating || isBatchRegenerating;
 
     useEffect(() => {
         if (pageId === 'new') return;
 
         const saveNow = () => {
+            // 生成中・再生成中は保存しない（中途半端な状態で上書きされるのを防ぐ）
+            if (isBusyRef.current) return;
+
             const currentSections = sectionsRef.current;
             if (currentSections.length === 0) return;
+
+            // 画像IDがnullのセクションが多い場合は壊れたstateなので保存しない
+            const nullImageCount = currentSections.filter(s => s.role !== 'html-embed' && !s.imageId).length;
+            if (nullImageCount > currentSections.length * 0.5) {
+                console.warn('Save on leave skipped: too many sections without images, likely corrupted state');
+                return;
+            }
+
             try {
                 fetch(`/api/pages/${pageId}`, {
                     method: 'PUT',
@@ -2135,21 +2152,19 @@ ${mobileMediaQuery}
                         status: statusRef.current,
                         designDefinition: designDefinitionRef.current
                     }),
-                    keepalive: true,  // ページ離脱後も送信を継続
+                    keepalive: true,
                 });
             } catch (e) {
                 console.error('Save on leave failed:', e);
             }
         };
 
-        // タブ非表示時に保存
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden') {
                 saveNow();
             }
         };
 
-        // ブラウザ閉じる/離脱時に保存
         const handleBeforeUnload = () => {
             saveNow();
         };
@@ -2322,24 +2337,65 @@ ${mobileMediaQuery}
             try {
                 console.log(`[Batch] Starting section ${dbSectionId}...`);
 
-                const response: Response = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        style: batchReferenceSection ? 'sampling' : (batchRegenerateStyle === 'design-definition' ? 'design-definition' : batchRegenerateStyle),
-                        colorScheme: batchRegenerateColorScheme !== 'original' ? batchRegenerateColorScheme : undefined,
-                        customPrompt: batchRegeneratePrompt || undefined,
-                        mode: batchRegenerateGenerationMode,
-                        designDefinition: !batchReferenceSection && batchRegenerateStyle === 'design-definition' ? designDefinition : undefined,
-                        styleReferenceUrl: styleReferenceUrl || undefined,
-                        unifyDesign: !!batchReferenceSection,
-                        boundaryOffsetTop: section.boundaryOffsetTop || undefined,
-                        boundaryOffsetBottom: section.boundaryOffsetBottom || undefined,
-                        copyText: section.config?.text || undefined,
-                    })
-                });
+                const commonBody = {
+                    style: batchReferenceSection ? 'sampling' : (batchRegenerateStyle === 'design-definition' ? 'design-definition' : batchRegenerateStyle),
+                    colorScheme: batchRegenerateColorScheme !== 'original' ? batchRegenerateColorScheme : undefined,
+                    customPrompt: batchRegeneratePrompt || undefined,
+                    mode: batchRegenerateGenerationMode,
+                    designDefinition: !batchReferenceSection && batchRegenerateStyle === 'design-definition' ? designDefinition : undefined,
+                    styleReferenceUrl: styleReferenceUrl || undefined,
+                    unifyDesign: !!batchReferenceSection,
+                    boundaryOffsetTop: section.boundaryOffsetTop || undefined,
+                    boundaryOffsetBottom: section.boundaryOffsetBottom || undefined,
+                    copyText: section.config?.text || undefined,
+                    targetAspectRatio: batchRegenerateAspectRatio !== 'keep' ? batchRegenerateAspectRatio : undefined,
+                };
 
-                const data = await response.json();
+                let data: any = {};
+                let response: Response;
+
+                // PC再生成（「スマホのみ」以外）
+                if (batchRegenerateTarget !== 'mobile') {
+                    response = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(commonBody)
+                    });
+                    data = await response.json();
+                    if (!response.ok) {
+                        completedCount++;
+                        setBatchRegenerateProgress({ current: completedCount, total: sectionIds.length });
+                        setRegeneratingSectionIds(prev => { const next = new Set(prev); next.delete(sectionId); return next; });
+                        console.error(`❌ [Batch] Section ${dbSectionId} failed:`, data.error);
+                        return { sectionId, success: false, error: data.error };
+                    }
+                }
+
+                // スマホ再生成（「PCのみ」以外 & モバイル画像がある場合）
+                if (batchRegenerateTarget !== 'desktop' && section.mobileImage?.filePath) {
+                    const generatedImageUrl = data.media?.filePath || data.newImageUrl;
+                    try {
+                        console.log(`[Batch] Starting mobile for section ${dbSectionId}...`);
+                        const mobileResponse = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...commonBody,
+                                styleReferenceUrl: generatedImageUrl || styleReferenceUrl || undefined,
+                                targetImage: 'mobile',
+                                unifyDesign: true,
+                            })
+                        });
+                        const mobileData = await mobileResponse.json();
+                        if (mobileResponse.ok) {
+                            console.log(`✅ [Batch] Mobile for section ${dbSectionId} completed`);
+                            data.mobileImageId = mobileData.newImageId;
+                            data.mobileMedia = mobileData.media;
+                        }
+                    } catch (mobileError) {
+                        console.warn(`Mobile regenerate error for section ${sectionId}`);
+                    }
+                }
 
                 // 進捗更新
                 completedCount++;
@@ -2352,61 +2408,21 @@ ${mobileMediaQuery}
                     return next;
                 });
 
-                if (response.ok) {
-                    console.log(`✅ [Batch] Section ${dbSectionId} completed (${completedCount}/${sectionIds.length})`);
-                    successCount++;
+                console.log(`✅ [Batch] Section ${dbSectionId} completed (${completedCount}/${sectionIds.length})`);
+                successCount++;
 
-                    // 履歴に追加
-                    if (section.imageId && section.image) {
-                        setEditHistory(prev => ({
-                            ...prev,
-                            [sectionId]: [
-                                { imageId: section.imageId, image: section.image, timestamp: Date.now() },
-                                ...(prev[sectionId] || [])
-                            ].slice(0, 10)
-                        }));
-                    }
-
-                    // NOTE: セクション画像のstate更新はバッチ完了後に一括で行う（並列競合回避）
-
-                    // モバイル画像も再生成（オプションがONの場合）
-                    if (includeMobileInBatch && section.mobileImage?.filePath) {
-                        const generatedImageUrl = data.media?.filePath || data.newImageUrl;
-                        try {
-                            console.log(`[Batch] Starting mobile for section ${dbSectionId}...`);
-                            const mobileResponse = await fetch(`/api/sections/${dbSectionId}/regenerate`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    style: batchReferenceSection ? 'sampling' : (batchRegenerateStyle === 'design-definition' ? 'design-definition' : batchRegenerateStyle),
-                                    colorScheme: batchRegenerateColorScheme !== 'original' ? batchRegenerateColorScheme : undefined,
-                                    customPrompt: batchRegeneratePrompt || undefined,
-                                    mode: batchRegenerateGenerationMode,
-                                    designDefinition: !batchReferenceSection && batchRegenerateStyle === 'design-definition' ? designDefinition : undefined,
-                                    styleReferenceUrl: generatedImageUrl || styleReferenceUrl || undefined,
-                                    targetImage: 'mobile',
-                                    unifyDesign: true,
-                                    boundaryOffsetTop: section.boundaryOffsetTop || undefined,
-                                    boundaryOffsetBottom: section.boundaryOffsetBottom || undefined,
-                                })
-                            });
-                            const mobileData = await mobileResponse.json();
-                            if (mobileResponse.ok) {
-                                console.log(`✅ [Batch] Mobile for section ${dbSectionId} completed`);
-                                // モバイルもresultに含める
-                                data.mobileImageId = mobileData.newImageId;
-                                data.mobileMedia = mobileData.media;
-                            }
-                        } catch (mobileError) {
-                            console.warn(`Mobile regenerate error for section ${sectionId}`);
-                        }
-                    }
-
-                    return { sectionId, success: true, data };
-                } else {
-                    console.error(`❌ [Batch] Section ${dbSectionId} failed:`, data.error);
-                    return { sectionId, success: false, error: data.error };
+                // 履歴に追加
+                if (batchRegenerateTarget !== 'mobile' && section.imageId && section.image) {
+                    setEditHistory(prev => ({
+                        ...prev,
+                        [sectionId]: [
+                            { imageId: section.imageId, image: section.image, timestamp: Date.now() },
+                            ...(prev[sectionId] || [])
+                        ].slice(0, 10)
+                    }));
                 }
+
+                return { sectionId, success: true, data };
             } catch (error: any) {
                 completedCount++;
                 setBatchRegenerateProgress({ current: completedCount, total: sectionIds.length });
@@ -2469,7 +2485,7 @@ ${mobileMediaQuery}
         setBatchRegeneratePrompt('');
         setBatchReferenceSection(null); // 参照セクションもリセット
         setRegenerateReferenceAlso(false); // オプションもリセット
-        const mobileNote = includeMobileInBatch ? '（モバイル含む）' : '';
+        const mobileNote = batchRegenerateTarget === 'both' ? '（モバイル含む）' : '';
         toast.success(`${successCount}/${sectionIds.length}セクションを再生成しました${mobileNote}`);
     };
 
@@ -3643,6 +3659,7 @@ ${mobileMediaQuery}
                                                         <button
                                                             onClick={() => {
                                                                 setHtmlEditSectionId(String(section.id));
+                                                                setHtmlEditOpenViewMode(viewMode);
                                                                 setShowHtmlEditModal(true);
                                                             }}
                                                             className="absolute bottom-3 right-3 z-10 opacity-0 group-hover/embed:opacity-100 transition-opacity bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 hover:bg-white"
@@ -5445,6 +5462,7 @@ ${mobileMediaQuery}
                                                     setHtmlEditSectionId(String(sections[0].id));
                                                 }
                                                 // 事前フェッチ済みなので即座にモーダルを開く
+                                                setHtmlEditOpenViewMode(viewMode);
                                                 setShowHtmlEditModal(true);
                                             }}
                                             variant={planLimits?.canAIGenerate === false ? "default" : "primary"}
@@ -6870,20 +6888,58 @@ ${mobileMediaQuery}
                                         </div>
 
                                         {/* モバイル同時再生成 */}
-                                        <label className="flex items-center gap-2 cursor-pointer bg-gray-50 rounded-lg p-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={includeMobileInBatch}
-                                                onChange={(e) => setIncludeMobileInBatch(e.target.checked)}
-                                                className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                                            />
-                                            <div className="flex items-center gap-1.5">
-                                                <Monitor className="h-3.5 w-3.5 text-gray-500" />
-                                                <span className="text-gray-400">+</span>
-                                                <Smartphone className="h-3.5 w-3.5 text-gray-500" />
-                                                <span className="text-xs text-gray-700">モバイル画像も同時に再生成</span>
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-bold text-gray-700">再生成する対象</label>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setBatchRegenerateTarget('both')}
+                                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all ${batchRegenerateTarget === 'both' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                                >
+                                                    <Monitor className="h-3.5 w-3.5" />
+                                                    <span>+</span>
+                                                    <Smartphone className="h-3.5 w-3.5" />
+                                                    <span>両方</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => setBatchRegenerateTarget('desktop')}
+                                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all ${batchRegenerateTarget === 'desktop' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                                >
+                                                    <Monitor className="h-4 w-4" />
+                                                    <span>PCのみ</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => setBatchRegenerateTarget('mobile')}
+                                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all ${batchRegenerateTarget === 'mobile' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                                >
+                                                    <Smartphone className="h-4 w-4" />
+                                                    <span>スマホのみ</span>
+                                                </button>
                                             </div>
-                                        </label>
+                                        </div>
+
+                                        {/* サイズ変換 */}
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-bold text-gray-700">サイズ変換</label>
+                                            <div className="flex gap-2">
+                                                {[
+                                                    { value: 'keep', label: 'そのまま' },
+                                                    { value: '9:16', label: '9:16 縦長' },
+                                                    { value: '16:9', label: '16:9 横長' },
+                                                    { value: '1:1', label: '1:1 正方形' },
+                                                ].map(opt => (
+                                                    <button
+                                                        key={opt.value}
+                                                        onClick={() => setBatchRegenerateAspectRatio(opt.value as any)}
+                                                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${batchRegenerateAspectRatio === opt.value ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {batchRegenerateAspectRatio === '9:16' && batchRegenerateTarget === 'mobile' && (
+                                                <p className="mt-1 text-[10px] text-blue-600">PC画像をスマホ向け縦長に変換して再生成します</p>
+                                            )}
+                                        </div>
 
                                         {/* 追加指示 */}
                                         <div>
@@ -6907,7 +6963,7 @@ ${mobileMediaQuery}
                                     const baseCount = batchReferenceSection
                                         ? selectedSectionsForRegenerate.size - (selectedSectionsForRegenerate.has(batchReferenceSection) && !regenerateReferenceAlso ? 1 : 0)
                                         : selectedSectionsForRegenerate.size;
-                                    const totalImages = includeMobileInBatch ? baseCount * 2 : baseCount;
+                                    const totalImages = batchRegenerateTarget === 'both' ? baseCount * 2 : baseCount;
                                     const tokensPerImage = 1300;
                                     const totalTokens = totalImages * tokensPerImage;
                                     return (
@@ -6918,7 +6974,7 @@ ${mobileMediaQuery}
                                                     消費クレジット: 約{totalTokens.toLocaleString()}クレジット
                                                 </span>
                                                 <p className="text-[10px] text-indigo-600">
-                                                    {baseCount}件{includeMobileInBatch ? ' × 2（PC+モバイル）' : ''} × {tokensPerImage.toLocaleString()}クレジット/枚
+                                                    {baseCount}件{batchRegenerateTarget === 'both' ? ' × 2（PC+モバイル）' : ''} × {tokensPerImage.toLocaleString()}クレジット/枚
                                                 </p>
                                             </div>
                                         </div>
@@ -7324,14 +7380,17 @@ ${mobileMediaQuery}
             {showHtmlEditModal && (() => {
                 // html-embedセクションがある場合はそのHTMLを使用
                 const targetSection = htmlEditSectionId
-                    ? sections.find(s => String(s.id) === htmlEditSectionId && s.role === 'html-embed' && s.config?.htmlContent)
+                    ? sections.find(s => String(s.id) === htmlEditSectionId && s.role === 'html-embed' && (s.config?.htmlContent || s.config?.mobileHtmlContent))
                     : null;
 
                 // 優先順位: 1. html-embedセクションのHTML → 2. クライアント構築HTML → 3. 空テンプレート
                 const builtHtml = buildPreviewHtml();
                 console.log('[HtmlEditModal IIFE] targetSection:', !!targetSection, 'fetchedPageHtml:', !!fetchedPageHtml, 'builtHtml length:', builtHtml?.length);
-                const currentHtml = targetSection?.config?.htmlContent
-                    || fetchedPageHtml
+                const currentHtml = targetSection
+                    ? (htmlEditOpenViewMode === 'mobile' && targetSection.config?.mobileHtmlContent
+                        ? targetSection.config.mobileHtmlContent
+                        : targetSection.config?.htmlContent)
+                    : fetchedPageHtml
                     || builtHtml
                     || '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>ページ</title>\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }\n</style>\n</head>\n<body>\n\n</body>\n</html>';
 
@@ -7353,10 +7412,11 @@ ${mobileMediaQuery}
                         isLoadingHtml={false}
                         onSave={async (newHtml) => {
                             if (targetSection) {
-                                // 既存のhtml-embedセクションを更新
+                                // 既存のhtml-embedセクションを更新（ビューモードに応じてフィールドを切り替え）
+                                const field = htmlEditOpenViewMode === 'mobile' ? 'mobileHtmlContent' : 'htmlContent';
                                 const updatedSections = sections.map(s =>
                                     String(s.id) === htmlEditSectionId
-                                        ? { ...s, config: { ...s.config, htmlContent: newHtml } }
+                                        ? { ...s, config: { ...s.config, [field]: newHtml } }
                                         : s
                                 );
                                 setSections(updatedSections);

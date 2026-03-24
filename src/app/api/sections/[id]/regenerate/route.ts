@@ -49,6 +49,8 @@ const regenerateSchema = z.object({
     copyText: z.string().max(5000).optional(),
     // デザイン統一モード（一括再生成で使用）
     unifyDesign: z.boolean().optional(),
+    // アスペクト比変換（デスクトップ→モバイルサイズ変換等）
+    targetAspectRatio: z.enum(['keep', '9:16', '16:9', '1:1', '4:5']).default('keep'),
 });
 
 // スタイル定義
@@ -92,7 +94,7 @@ export async function POST(
         }, { status: 400 });
     }
 
-    const { style = 'professional', colorScheme, customPrompt, mode, contextStyle, designDefinition, styleReferenceUrl, extractedColors, targetImage, boundaryOffsetTop, boundaryOffsetBottom, copyText } = validation.data;
+    const { style = 'professional', colorScheme, customPrompt, mode, contextStyle, designDefinition, styleReferenceUrl, extractedColors, targetImage, boundaryOffsetTop, boundaryOffsetBottom, copyText, targetAspectRatio } = validation.data;
 
     try {
         log.info(`========== Starting Regenerate for Section ${sectionId} ==========`);
@@ -340,10 +342,21 @@ ${designDefinition.style?.buttonStyle ? `【ボタン】\n${designDefinition.sty
 `
             : '';
 
+        // アスペクト比変換指示
+        const aspectRatioInstruction = targetAspectRatio && targetAspectRatio !== 'keep'
+            ? `【最重要：アスペクト比変換】
+この画像を${targetAspectRatio}の縦横比に変換してください。
+元の画像の内容・テキスト・デザインを維持したまま、${targetAspectRatio}のサイズに最適化してレイアウトし直してください。
+${ targetAspectRatio === '9:16' ? 'スマートフォンの縦長画面に最適化されたレイアウトにしてください。要素を縦に並べ、文字サイズを大きくしてください。' : ''}
+${ targetAspectRatio === '16:9' ? 'デスクトップの横長画面に最適化されたレイアウトにしてください。' : ''}
+
+`
+            : '';
+
         const prompt = mode === 'light'
             ? `あなたはプロのWebデザイナーです。Webページの一部分（セグメント画像）を新しいスタイルに変換してください。
 
-${mobileMatchInstruction}${extractedColorsInstruction}${styleReferenceInstruction}【重要】この画像はページ全体の一部分です。他のセグメントと結合されるため、以下を厳守してください。
+${aspectRatioInstruction}${mobileMatchInstruction}${extractedColorsInstruction}${styleReferenceInstruction}【重要】この画像はページ全体の一部分です。他のセグメントと結合されるため、以下を厳守してください。
 
 【セグメント情報】
 - 位置：${segmentInfo.position}（全${totalSegments}セグメント中）
@@ -351,8 +364,8 @@ ${mobileMatchInstruction}${extractedColorsInstruction}${styleReferenceInstructio
 ${boundaryInfo ? `\n${boundaryInfo}` : ''}
 
 【絶対厳守ルール】
-1. 画像サイズ維持：入力画像と完全に同じ縦横比・解像度で出力する
-2. レイアウト固定：要素の位置、サイズ、間隔は1ピクセルも変えない
+1. ${targetAspectRatio !== 'keep' ? `画像サイズ変換：${targetAspectRatio}の縦横比で出力する` : '画像サイズ維持：入力画像と完全に同じ縦横比・解像度で出力する'}
+2. レイアウト${targetAspectRatio !== 'keep' ? '最適化：新しい縦横比に合わせて要素を再配置する' : '固定：要素の位置、サイズ、間隔は1ピクセルも変えない'}
 3. 上下の端：他セグメントと繋がるため、背景色やパターンが途切れないようにする
 ${contextInfo.length > 0 ? `4. 連続性：${contextInfo.join('。')}` : ''}
 

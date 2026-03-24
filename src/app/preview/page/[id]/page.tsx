@@ -217,10 +217,35 @@ export default function PagePreviewPage() {
 
                         // html-embedセクションはiframeで表示
                         if (section.role === 'html-embed' && parsedConfig.htmlContent) {
+                            const hasMobileHtml = !!parsedConfig.mobileHtmlContent;
+                            const desktopHtml = parsedConfig.htmlContent;
+                            const mobileHtml = parsedConfig.mobileHtmlContent || parsedConfig.htmlContent;
+
+                            if (hasMobileHtml) {
+                                return (
+                                    <div key={section.id} className="relative" style={{ margin: 0, padding: 0 }}>
+                                        <iframe
+                                            srcDoc={desktopHtml}
+                                            className={`w-full border-0 hidden md:block`}
+                                            style={{ minHeight: '400px', height: '800px' }}
+                                            sandbox="allow-scripts"
+                                            title="Embedded content (desktop)"
+                                        />
+                                        <iframe
+                                            srcDoc={mobileHtml}
+                                            className={`w-full border-0 md:hidden`}
+                                            style={{ minHeight: '400px', height: '800px' }}
+                                            sandbox="allow-scripts"
+                                            title="Embedded content (mobile)"
+                                        />
+                                    </div>
+                                );
+                            }
+
                             return (
                                 <div key={section.id} className="relative" style={{ margin: 0, padding: 0 }}>
                                     <iframe
-                                        srcDoc={parsedConfig.htmlContent}
+                                        srcDoc={desktopHtml}
                                         className="w-full border-0"
                                         style={{ minHeight: '400px', height: '800px' }}
                                         sandbox="allow-scripts"

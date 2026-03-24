@@ -118,6 +118,10 @@ export async function GET(
 
     // html-embedセクション（スクリプト・イベントハンドラを除去）
     if (section.role === 'html-embed' && config.htmlContent) {
+      if (config.mobileHtmlContent) {
+        return `<div class="desktop-only">${sanitizeHtmlContent(config.htmlContent)}</div>
+                <div class="mobile-only">${sanitizeHtmlContent(config.mobileHtmlContent)}</div>`;
+      }
       return sanitizeHtmlContent(config.htmlContent);
     }
 
@@ -222,6 +226,12 @@ export async function GET(
   .header-cta:hover { transform:scale(1.05); }
   .main-content { max-width:768px; margin:0 auto; background:#fff; box-shadow:0 25px 50px -12px rgba(0,0,0,0.15); }
   .footer { background:#111827; padding:32px; text-align:center; color:#fff; font-size:0.875rem; opacity:0.7; }
+  .desktop-only { display: block; }
+  .mobile-only { display: none; }
+  @media (max-width: 768px) {
+    .desktop-only { display: none !important; }
+    .mobile-only { display: block !important; }
+  }
   </style>
 </head>
 <body>
