@@ -657,7 +657,24 @@ export async function POST(request: NextRequest) {
             log.info('Animations disabled via CSS injection for mobile');
         }
 
-        // Scroll to trigger lazy loading (本番環境では高速化のため軽量化)
+        // body/html の height制約を先に解除（height:100%でページが切れるサイト対策）
+        log.info('Unlocking body/html height constraints before scroll...');
+        try {
+            await page.evaluate(() => {
+                document.body.style.height = 'auto';
+                document.body.style.maxHeight = 'none';
+                document.body.style.minHeight = '0';
+                document.body.style.overflowY = 'visible';
+                document.documentElement.style.height = 'auto';
+                document.documentElement.style.maxHeight = 'none';
+                document.documentElement.style.minHeight = '0';
+                document.documentElement.style.overflowY = 'visible';
+            });
+        } catch (e: any) {
+            log.info(`Height unlock skipped: ${e.message}`);
+        }
+
+        // Scroll to trigger lazy loading
         send({ type: 'progress', step: 'scroll', message: 'コンテンツを読み込み中...' });
 
         {
@@ -823,13 +840,40 @@ export async function POST(request: NextRequest) {
                 document.head.appendChild(style);
                 console.log('[IMPORT] Injected global CSS to hide fixed elements');
 
-                // Force body/html settings
+                // Force body/html settings - height制約を解除してページ全体を展開
                 document.body.style.overflow = 'visible';
                 document.body.style.overflowX = 'hidden';
+                document.body.style.overflowY = 'visible';
                 document.body.style.position = 'static';
+                document.body.style.height = 'auto';
+                document.body.style.maxHeight = 'none';
+                document.body.style.minHeight = '0';
                 document.documentElement.style.overflow = 'visible';
                 document.documentElement.style.overflowX = 'hidden';
+                document.documentElement.style.overflowY = 'visible';
                 document.documentElement.style.position = 'static';
+                document.documentElement.style.height = 'auto';
+                document.documentElement.style.maxHeight = 'none';
+                document.documentElement.style.minHeight = '0';
+
+                // height: 100% / 100vh で制約されている内部コンテナも解除
+                document.querySelectorAll('*').forEach(el => {
+                    const element = el as HTMLElement;
+                    const computed = window.getComputedStyle(element);
+                    const h = computed.height;
+                    const oy = computed.overflowY;
+                    // ビューポート高さに近い高さでスクロール可能なコンテナを解除
+                    if ((oy === 'scroll' || oy === 'auto') && element !== document.body && element !== document.documentElement) {
+                        const rect = element.getBoundingClientRect();
+                        if (rect.height > 0 && rect.height <= window.innerHeight * 1.1 && element.scrollHeight > rect.height * 1.2) {
+                            console.log(`[IMPORT] Unlocking scroll container: ${element.tagName}.${element.className} (h=${Math.round(rect.height)}, scrollH=${element.scrollHeight})`);
+                            element.style.overflow = 'visible';
+                            element.style.overflowY = 'visible';
+                            element.style.height = 'auto';
+                            element.style.maxHeight = 'none';
+                        }
+                    }
+                });
             });
         } catch (fixedError: any) {
             log.info(`Fixed element removal skipped (navigation detected): ${fixedError.message}`);

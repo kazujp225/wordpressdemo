@@ -147,13 +147,36 @@ async function captureFullPage(
             }
         });
 
+        // height制約を解除してページ全体を展開
         document.body.style.overflow = 'visible';
         document.body.style.overflowX = 'hidden';
+        document.body.style.overflowY = 'visible';
+        document.body.style.height = 'auto';
+        document.body.style.maxHeight = 'none';
         document.documentElement.style.overflow = 'visible';
         document.documentElement.style.overflowX = 'hidden';
+        document.documentElement.style.overflowY = 'visible';
+        document.documentElement.style.height = 'auto';
+        document.documentElement.style.maxHeight = 'none';
+
+        // height: 100% / 100vh で制約されている内部コンテナも解除
+        document.querySelectorAll('*').forEach(el => {
+            const element = el as HTMLElement;
+            const computed = window.getComputedStyle(element);
+            const oy = computed.overflowY;
+            if ((oy === 'scroll' || oy === 'auto') && element !== document.body && element !== document.documentElement) {
+                const rect = element.getBoundingClientRect();
+                if (rect.height > 0 && rect.height <= window.innerHeight * 1.1 && element.scrollHeight > rect.height * 1.2) {
+                    element.style.overflow = 'visible';
+                    element.style.overflowY = 'visible';
+                    element.style.height = 'auto';
+                    element.style.maxHeight = 'none';
+                }
+            }
+        });
     });
 
-    await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from 300ms
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Remove fixed/sticky elements once before capture
     await page.evaluate(() => {

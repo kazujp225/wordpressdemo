@@ -317,6 +317,48 @@ export async function POST(request: NextRequest) {
 
             await new Promise(resolve => setTimeout(resolve, 1000));
 
+            // height制約を解除してページ全体を展開
+            await page.evaluate(() => {
+                // body/html の height: 100% や overflow: scroll を解除
+                document.body.style.overflow = 'visible';
+                document.body.style.overflowY = 'visible';
+                document.body.style.overflowX = 'hidden';
+                document.body.style.height = 'auto';
+                document.body.style.maxHeight = 'none';
+                document.documentElement.style.overflow = 'visible';
+                document.documentElement.style.overflowY = 'visible';
+                document.documentElement.style.overflowX = 'hidden';
+                document.documentElement.style.height = 'auto';
+                document.documentElement.style.maxHeight = 'none';
+
+                // 内部スクロールコンテナも解除
+                document.querySelectorAll('*').forEach(el => {
+                    const element = el as HTMLElement;
+                    const computed = window.getComputedStyle(element);
+                    const oy = computed.overflowY;
+                    if ((oy === 'scroll' || oy === 'auto') && element !== document.body && element !== document.documentElement) {
+                        const rect = element.getBoundingClientRect();
+                        if (rect.height > 0 && rect.height <= window.innerHeight * 1.1 && element.scrollHeight > rect.height * 1.2) {
+                            element.style.overflow = 'visible';
+                            element.style.overflowY = 'visible';
+                            element.style.height = 'auto';
+                            element.style.maxHeight = 'none';
+                        }
+                    }
+                });
+
+                // fixed/sticky要素を除去
+                document.querySelectorAll('*').forEach(el => {
+                    const element = el as HTMLElement;
+                    const position = window.getComputedStyle(element).position;
+                    if (position === 'fixed' || position === 'sticky') {
+                        element.remove();
+                    }
+                });
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 300));
+
             // Get page dimensions
             dimensions = await page.evaluate(() => ({
                 width: document.documentElement.scrollWidth,
