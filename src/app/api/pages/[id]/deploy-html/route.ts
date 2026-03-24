@@ -86,24 +86,22 @@ export async function GET(
   const escapeHtml = (str: string) =>
     str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
-  // html-embedセクションにhtmlContentがあれば、それを優先して使用
-  // （LP制作エージェントが編集したページHTML）
-  for (const section of page.sections) {
-    if (section.role === 'html-embed') {
-      let config: any = {};
-      try { if (section.config) config = JSON.parse(section.config); } catch {}
-      if (config.htmlContent && config.htmlContent.length > 100) {
-        let html = config.htmlContent;
-        // 完全なHTMLドキュメントでない場合、ラップする
-        if (!/<!DOCTYPE|<html[\s>]/i.test(html)) {
-          html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${escapeHtml(page.title)}</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet"><style>body{margin:0;font-family:'Noto Sans JP',sans-serif;}</style></head><body>${html}</body></html>`;
+  // html-embedセクションが唯一のセクションで、完全なHTMLドキュメントの場合のみ
+  // そのHTMLをそのまま使用（画像セクションが1つもない場合のみ）
+  const hasImageSections = page.sections.some(s => s.role !== 'html-embed' && (s.image || s.mobileImage));
+  if (!hasImageSections) {
+    for (const section of page.sections) {
+      if (section.role === 'html-embed') {
+        let config: any = {};
+        try { if (section.config) config = JSON.parse(section.config); } catch {}
+        if (config.htmlContent && config.htmlContent.length > 100 && /<!DOCTYPE|<html[\s>]/i.test(config.htmlContent)) {
+          return NextResponse.json({ html: sanitizeHtmlContent(config.htmlContent), title: page.title });
         }
-        return NextResponse.json({ html: sanitizeHtmlContent(html), title: page.title });
       }
     }
   }
 
-  // セクションHTMLを構築（画像は絶対URL）
+  // セクションHTMLを構築（画像セクション + html-embedセクションを統合）
   const sectionsHtml = page.sections.map((section, index) => {
     let config: any = {
       text: '',
