@@ -550,44 +550,56 @@ body{margin:0;font-family:'Noto Sans JP',sans-serif;background:#f9fafb}
 
             // デスクトップ取得の場合、モバイルへの追加を確認
             if (device === 'desktop' && !skipMobileConfirm) {
-                // デスクトップのみでセクションを追加
-                setSections(prev => {
-                    const newSections = finalData.media.map((m: any, idx: number) => ({
-                        id: `new-${Date.now()}-${idx}`,
-                        role: `section-${prev.length + idx + 1}`,
-                        order: prev.length + idx,
-                        imageId: m.id,
-                        image: m,
-                        mobileImageId: null,
-                        mobileImage: null,
-                        config: {},
-                    }));
-                    return [...prev, ...newSections];
-                });
+                // 全ページ取り直しなので既存セクションを置き換え
+                const newSections = finalData.media.map((m: any, idx: number) => ({
+                    id: `new-${Date.now()}-${idx}`,
+                    role: idx === 0 ? 'hero' : `section-${idx + 1}`,
+                    order: idx,
+                    imageId: m.id,
+                    image: m,
+                    mobileImageId: null,
+                    mobileImage: null,
+                    config: {},
+                }));
+                setSections(newSections);
 
-                toast.success(`${finalData.media.length}セクション（デスクトップ）を追加しました`);
+                toast.success(`${finalData.media.length}セクション（デスクトップ）で置き換えました`);
 
                 // モバイル追加の確認ダイアログを表示
                 setPendingDesktopSections(finalData.media);
                 setShowMobileConfirmDialog(true);
-            } else {
-                // モバイル取得、または確認後の追加
+            } else if (device === 'mobile') {
+                // モバイル取得: 既存セクションのmobileImageを更新
                 setSections(prev => {
-                    const newSections = finalData.media.map((m: any, idx: number) => ({
-                        id: `new-${Date.now()}-${idx}`,
-                        role: `section-${prev.length + idx + 1}`,
-                        order: prev.length + idx,
-                        imageId: device === 'desktop' ? m.id : null,
-                        image: device === 'desktop' ? m : null,
-                        mobileImageId: device === 'mobile' ? m.id : null,
-                        mobileImage: device === 'mobile' ? m : null,
-                        config: {},
-                    }));
-                    return [...prev, ...newSections];
+                    return prev.map((section, idx) => {
+                        const mobileMedia = finalData.media[idx];
+                        if (mobileMedia) {
+                            return {
+                                ...section,
+                                mobileImageId: mobileMedia.id,
+                                mobileImage: mobileMedia,
+                            };
+                        }
+                        return section;
+                    });
                 });
 
-                const deviceName = device === 'mobile' ? 'モバイル' : 'デスクトップ';
-                toast.success(`${finalData.media.length}セクション（${deviceName}）を追加しました${finalData.hasMore ? '（まだ続きがあります）' : ''}`);
+                toast.success(`${finalData.media.length}セクションにモバイル画像を設定しました`);
+            } else {
+                // その他（skipMobileConfirm時）
+                const newSections = finalData.media.map((m: any, idx: number) => ({
+                    id: `new-${Date.now()}-${idx}`,
+                    role: idx === 0 ? 'hero' : `section-${idx + 1}`,
+                    order: idx,
+                    imageId: m.id,
+                    image: m,
+                    mobileImageId: null,
+                    mobileImage: null,
+                    config: {},
+                }));
+                setSections(newSections);
+
+                toast.success(`${finalData.media.length}セクション（デスクトップ）で置き換えました`);
             }
 
         } catch (error: any) {
