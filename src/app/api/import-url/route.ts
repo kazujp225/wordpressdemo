@@ -987,7 +987,8 @@ export async function POST(request: NextRequest) {
                 height: stitchedHeight,
                 channels: 4,
                 background: { r: 255, g: 255, b: 255, alpha: 1 }
-            }
+            },
+            limitInputPixels: false,  // ピクセル上限を無効化（長いLP対応）
         })
             .composite(compositeOperations)
             .png()
@@ -1001,7 +1002,7 @@ export async function POST(request: NextRequest) {
         fs.writeFileSync(path.join(debugDir, `full-${Date.now()}-${device}.png`), fullScreenshot);
 
         // Get metadata
-        const metadata = await sharp(fullScreenshot).metadata();
+        const metadata = await sharp(fullScreenshot, { limitInputPixels: false }).metadata();
         const height = metadata.height || 0;
         const width = metadata.width || 0;
 
@@ -1100,7 +1101,7 @@ export async function POST(request: NextRequest) {
             if (style === 'sampling') {
                 // samplingモード: 元画像からデザイントークンを抽出（元デザインを忠実に維持するため）
                 log.info('Sampling mode: extracting tokens from original image...');
-                const thumbnailBuffer = await sharp(fullScreenshot)
+                const thumbnailBuffer = await sharp(fullScreenshot, { limitInputPixels: false })
                     .resize({ width: 800, height: 800, fit: 'inside' })
                     .png()
                     .toBuffer();
@@ -1165,7 +1166,7 @@ export async function POST(request: NextRequest) {
 
             log.info(`Segment ${i + 1}: extracting top=${top}, height=${currentSegHeight}`);
 
-            let buffer = await sharp(fullScreenshot)
+            let buffer = await sharp(fullScreenshot, { limitInputPixels: false })
                 .extract({ left: 0, top, width, height: currentSegHeight })
                 .png()
                 .toBuffer();

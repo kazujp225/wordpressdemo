@@ -411,14 +411,15 @@ export async function POST(request: NextRequest) {
                 height: fullHeight,
                 channels: 4,
                 background: { r: 255, g: 255, b: 255, alpha: 1 }
-            }
+            },
+            limitInputPixels: false,
         })
             .composite(compositeOperations)
             .png()
             .toBuffer();
 
         // Create preview image for the response (smaller for faster transfer)
-        const previewScreenshot = await sharp(fullScreenshot)
+        const previewScreenshot = await sharp(fullScreenshot, { limitInputPixels: false })
             .resize({ width: 600, withoutEnlargement: true })
             .jpeg({ quality: 85 })
             .toBuffer();
@@ -438,7 +439,7 @@ export async function POST(request: NextRequest) {
                 log.info('Attempting AI-powered section detection...');
 
                 // AI認識用の画像を作成（解像度を調整してAPI制限に収める）
-                const aiScreenshot = await sharp(fullScreenshot)
+                const aiScreenshot = await sharp(fullScreenshot, { limitInputPixels: false })
                     .resize({ width: 1200, withoutEnlargement: true })
                     .jpeg({ quality: 90 })
                     .toBuffer();

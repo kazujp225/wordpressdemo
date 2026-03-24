@@ -238,7 +238,8 @@ async function captureFullPageManual(
             height: stitchedHeight,
             channels: 4,
             background: { r: 255, g: 255, b: 255, alpha: 1 }
-        }
+        },
+        limitInputPixels: false,
     })
         .composite(compositeOperations)
         .png()
