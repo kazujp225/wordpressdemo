@@ -3,8 +3,8 @@ import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { prisma } from '@/lib/db';
 
-// Vercel/Render用のタイムアウト設定（60秒）
-export const maxDuration = 60;
+// Vercel/Render用のタイムアウト設定（120秒 - ページ全体クロール対応）
+export const maxDuration = 120;
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import sharp from 'sharp';
 import fs from 'fs';
@@ -572,7 +572,7 @@ export async function POST(request: NextRequest) {
         send({ type: 'progress', step: 'navigate', message: 'ページを読み込み中...' });
         log.info('Navigating to URL...');
         // 本番環境でもnetworkidle2を使用（domcontentloadedだとJSリダイレクトが完了前に処理が進む）
-        const navigationTimeout = isDev ? 60000 : (device === 'mobile' ? 20000 : 25000);
+        const navigationTimeout = isDev ? 60000 : 30000;
         try {
             await page.goto(url, { waitUntil: 'networkidle2', timeout: navigationTimeout });
         } catch (navError: any) {
@@ -660,56 +660,41 @@ export async function POST(request: NextRequest) {
         // Scroll to trigger lazy loading (本番環境では高速化のため軽量化)
         send({ type: 'progress', step: 'scroll', message: 'コンテンツを読み込み中...' });
 
-        if (isDev) {
-            // 開発環境：しっかりスクロール
-            for (let pass = 0; pass < 3; pass++) {
-                log.info(`Scroll pass ${pass + 1}/3 starting...`);
+        {
+            // 全環境共通：段階的スクロールでlazy loadをトリガー
+            const scrollPasses = isDev ? 3 : 2;
+            for (let pass = 0; pass < scrollPasses; pass++) {
+                log.info(`Scroll pass ${pass + 1}/${scrollPasses} starting...`);
 
-                await page.evaluate(async () => {
-                    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-                    const scrollStep = 800;
+                try {
+                    await page.evaluate(async () => {
+                        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+                        const scrollStep = 600;
 
-                    let maxScroll = Math.max(
-                        document.body.scrollHeight,
-                        document.documentElement.scrollHeight
-                    );
-
-                    for (let y = 0; y < maxScroll; y += scrollStep) {
-                        window.scrollTo(0, y);
-                        await delay(30);
-
-                        const newHeight = Math.max(
+                        let maxScroll = Math.max(
                             document.body.scrollHeight,
                             document.documentElement.scrollHeight
                         );
-                        if (newHeight > maxScroll) maxScroll = newHeight;
-                    }
 
-                    window.scrollTo(0, maxScroll);
-                    await delay(100);
-                });
+                        for (let y = 0; y < maxScroll; y += scrollStep) {
+                            window.scrollTo(0, y);
+                            await delay(50);
 
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-        } else {
-            // 本番環境：高速スクロール（タイムアウト対策）
-            log.info('Quick scroll for production...');
-            try {
-                await page.evaluate(async () => {
-                    const maxScroll = Math.max(
-                        document.body.scrollHeight,
-                        document.documentElement.scrollHeight
-                    );
+                            const newHeight = Math.max(
+                                document.body.scrollHeight,
+                                document.documentElement.scrollHeight
+                            );
+                            if (newHeight > maxScroll) maxScroll = newHeight;
+                        }
 
-                    // 2回だけジャンプしてlazy loadをトリガー（高速化）
-                    window.scrollTo(0, maxScroll * 0.5);
-                    await new Promise(r => setTimeout(r, 30));
-                    window.scrollTo(0, maxScroll);
-                    await new Promise(r => setTimeout(r, 30));
-                    window.scrollTo(0, 0);
-                });
-            } catch (scrollError: any) {
-                log.info(`Scroll skipped due to timeout: ${scrollError.message}`);
+                        window.scrollTo(0, maxScroll);
+                        await delay(200);
+                    });
+                } catch (scrollError: any) {
+                    log.info(`Scroll pass ${pass + 1} skipped: ${scrollError.message}`);
+                }
+
+                await new Promise(resolve => setTimeout(resolve, isDev ? 200 : 100));
             }
         }
 
@@ -721,46 +706,41 @@ export async function POST(request: NextRequest) {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Force load ALL images (including lazy-loaded ones)
-        // モバイルはスキップして高速化
-        if (device !== 'mobile' || isDev) {
-            log.info('Force loading all images...');
-            try {
-                await page.evaluate(async () => {
-                    // 1. Force lazy images to load by removing lazy attributes
-                    const lazyImages = document.querySelectorAll('img[loading="lazy"], img[data-src], img[data-lazy]');
-                    lazyImages.forEach(img => {
-                        const imgEl = img as HTMLImageElement;
-                        if (imgEl.dataset.src) {
-                            imgEl.src = imgEl.dataset.src;
-                        }
-                        if (imgEl.dataset.lazy) {
-                            imgEl.src = imgEl.dataset.lazy;
-                        }
-                        imgEl.removeAttribute('loading');
-                        imgEl.loading = 'eager';
-                    });
-
-                    // 2. Force all images to load (with shorter timeout for production)
-                    const allImages = Array.from(document.querySelectorAll('img'));
-                    const imageTimeout = 1500; // 1.5秒タイムアウト
-
-                    await Promise.all(allImages.slice(0, 20).map(img => { // 最大20枚に制限
-                        if (img.complete && img.naturalHeight > 0) return Promise.resolve();
-                        return new Promise((resolve) => {
-                            img.onload = () => resolve(undefined);
-                            img.onerror = resolve;
-                            setTimeout(resolve, imageTimeout);
-                        });
-                    }));
+        log.info('Force loading all images...');
+        try {
+            await page.evaluate(async () => {
+                // 1. Force lazy images to load by removing lazy attributes
+                const lazyImages = document.querySelectorAll('img[loading="lazy"], img[data-src], img[data-lazy]');
+                lazyImages.forEach(img => {
+                    const imgEl = img as HTMLImageElement;
+                    if (imgEl.dataset.src) {
+                        imgEl.src = imgEl.dataset.src;
+                    }
+                    if (imgEl.dataset.lazy) {
+                        imgEl.src = imgEl.dataset.lazy;
+                    }
+                    imgEl.removeAttribute('loading');
+                    imgEl.loading = 'eager';
                 });
-            } catch (imgError: any) {
-                log.info(`Image loading skipped due to timeout: ${imgError.message}`);
-            }
-            log.info('Images loaded, waiting for render...');
-        } else {
-            log.info('Skipping image force-load for mobile (speed optimization)...');
+
+                // 2. Force all images to load
+                const allImages = Array.from(document.querySelectorAll('img'));
+                const imageTimeout = 2000;
+
+                await Promise.all(allImages.slice(0, 50).map(img => {
+                    if (img.complete && img.naturalHeight > 0) return Promise.resolve();
+                    return new Promise((resolve) => {
+                        img.onload = () => resolve(undefined);
+                        img.onerror = resolve;
+                        setTimeout(resolve, imageTimeout);
+                    });
+                }));
+            });
+        } catch (imgError: any) {
+            log.info(`Image loading skipped due to timeout: ${imgError.message}`);
         }
-        await new Promise(resolve => setTimeout(resolve, isDev ? 2000 : 200)); // 本番は短く
+        log.info('Images loaded, waiting for render...');
+        await new Promise(resolve => setTimeout(resolve, isDev ? 2000 : 500));
 
         // Remove popups - LESS AGGRESSIVE to avoid removing legitimate content
         log.info('Removing popups...');
@@ -876,8 +856,8 @@ export async function POST(request: NextRequest) {
         viewportWidth = deviceConfig.width * deviceConfig.deviceScaleFactor;
         const totalCaptures = Math.ceil(documentHeight / deviceConfig.height);
 
-        // 本番環境では1回あたりの撮影枚数を制限（タイムアウト対策）
-        const maxCapturesPerRequest = isDev ? 100 : (device === 'mobile' ? 10 : 12);
+        // 1回あたりの撮影枚数（ページ全体をカバーできるよう十分な枚数を確保）
+        const maxCapturesPerRequest = isDev ? 100 : (device === 'mobile' ? 20 : 30);
 
         // startFromが指定されている場合は、その位置から取得
         const startIndex = Math.min(startFrom, totalCaptures);
@@ -893,9 +873,8 @@ export async function POST(request: NextRequest) {
 
         viewportBuffers = [];
 
-        // 本番環境では待ち時間を短縮
-        const scrollWait = isDev ? 100 : 30;
-        const captureWait = isDev ? 100 : 30;
+        const scrollWait = isDev ? 100 : 50;
+        const captureWait = isDev ? 100 : 50;
 
         for (let i = 0; i < numCaptures; i++) {
             const actualIndex = startIndex + i;
@@ -1015,9 +994,9 @@ export async function POST(request: NextRequest) {
             const baseSegmentHeight = 800;
             const segmentHeight = baseSegmentHeight * deviceConfig.deviceScaleFactor;
             const rawNumSegments = Math.ceil(height / segmentHeight);
-            const numSegments = Math.min(rawNumSegments, 10);
-            if (rawNumSegments > 10) {
-                log.info(`Limiting segments from ${rawNumSegments} to 10 (AI processing limit)`);
+            const numSegments = Math.min(rawNumSegments, 20);
+            if (rawNumSegments > 20) {
+                log.info(`Limiting segments from ${rawNumSegments} to 20`);
             }
 
             segments = Array.from({ length: numSegments }, (_, i) => {
@@ -1031,10 +1010,11 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // AI処理が重いため、最大10セグメントに制限
-        if (segments.length > 10) {
-            log.info(`Limiting segments from ${segments.length} to 10 (AI processing limit)`);
-            segments = segments.slice(0, 10);
+        // セグメント数の上限（faithfulモードは20、AI処理は10）
+        const maxSegments = importMode === 'faithful' ? 20 : 10;
+        if (segments.length > maxSegments) {
+            log.info(`Limiting segments from ${segments.length} to ${maxSegments}`);
+            segments = segments.slice(0, maxSegments);
         }
 
         const numSegments = segments.length;
