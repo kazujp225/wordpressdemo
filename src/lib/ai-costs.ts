@@ -8,6 +8,9 @@
 // 画像出力解像度の型定義
 export type ImageResolution = '1K' | '2K' | '4K';
 
+// 動画出力解像度の型定義
+export type VideoResolution = '720p' | '1080p';
+
 // ========================================
 // 粗利率マルチプライヤー
 // ========================================
@@ -30,9 +33,15 @@ const IMAGE_COST_BY_RESOLUTION: Record<ImageResolution, number> = {
   '4K': IMAGE_RAW_COST['4K'] * IMAGE_MARGIN_MULTIPLIER,  // $0.201
 };
 
+// 動画API原価（USD/秒）— 解像度別
+const VIDEO_RAW_COST_PER_SECOND: Record<VideoResolution, number> = {
+  '720p': 0.05,
+  '1080p': 0.08,
+};
+
 export const AI_COSTS = {
-  'veo-2.0-generate-001': {
-    perSecond: 0.35,
+  'veo-3.1-lite-generate-preview': {
+    perSecond: VIDEO_RAW_COST_PER_SECOND,
   },
 };
 
@@ -58,9 +67,9 @@ export const GEMINI_PRICING = {
     perImage: IMAGE_COST_BY_RESOLUTION,
     type: 'image' as const
   },
-  // Video Models (per second)
-  'veo-2.0-generate-001': {
-    perSecond: 0.35, // $0.35 per second of video
+  // Video Models (per second) - Veo 3.1 Lite: 720p=$0.05, 1080p=$0.08
+  'veo-3.1-lite-generate-preview': {
+    perSecond: VIDEO_RAW_COST_PER_SECOND,
     type: 'video' as const
   }
 };
@@ -116,11 +125,12 @@ export function estimateImageCost(model: string, imageCount: number, resolution:
   return imageCount * costPerImage;
 }
 
-export function estimateVideoCost(model: string, durationSeconds: number): number {
+export function estimateVideoCost(model: string, durationSeconds: number, resolution: VideoResolution = '720p'): number {
   const pricing = GEMINI_PRICING[model as ModelName];
   if (!pricing || pricing.type !== 'video') return 0;
 
-  return durationSeconds * pricing.perSecond * IMAGE_MARGIN_MULTIPLIER; // 粗利率25%
+  const costPerSecond = pricing.perSecond[resolution] ?? pricing.perSecond['720p'];
+  return durationSeconds * costPerSecond * IMAGE_MARGIN_MULTIPLIER; // 粗利率25%
 }
 
 // Rough token estimation (4 chars = 1 token for English, 2 chars = 1 token for Japanese)
@@ -139,7 +149,7 @@ export function getModelDisplayName(model: string): string {
     'gemini-1.5-flash': 'Gemini 1.5 Flash',
     'gemini-1.5-flash-latest': 'Gemini 1.5 Flash',
     'gemini-3.1-flash-image-preview': 'Gemini 3.1 Flash Image (Nano Banana 2)',
-    'veo-2.0-generate-001': 'Veo 2 Video',
+    'veo-3.1-lite-generate-preview': 'Veo 3.1 Lite Video',
     'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
     'claude-sonnet-4-20250514': 'Claude Sonnet 4',
   };

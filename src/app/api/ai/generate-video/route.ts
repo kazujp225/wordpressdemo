@@ -7,13 +7,16 @@ import { logGeneration, createTimer } from '@/lib/generation-logger';
 import { checkFeatureAccess, checkVideoGenerationLimit, recordApiUsage } from '@/lib/usage';
 import { checkBanStatus } from '@/lib/security';
 
-// Veo 2 API (Gemini API経由)
+// Veo 3.1 Lite API (Gemini API経由)
 // https://ai.google.dev/gemini-api/docs/video
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-const VEO_MODEL = 'veo-2.0-generate-001';
+const VEO_MODEL = 'veo-3.1-lite-generate-preview';
 
-// 動画生成の料金: $0.35/秒
-const COST_PER_SECOND = 0.35;
+// 動画生成の料金 (解像度別)
+const COST_PER_SECOND: Record<string, number> = {
+    '720p': 0.05,
+    '1080p': 0.08,
+};
 
 export async function POST(request: NextRequest) {
     const startTime = createTimer();
@@ -41,10 +44,11 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { prompt, sourceImageUrl, duration = 5 } = body;
+        const { prompt, sourceImageUrl, duration = 4, resolution = '720p' } = body;
+        const validResolution = resolution === '1080p' ? '1080p' : '720p';
 
         // クレジット残高チェック
-        const creditCheck = await checkVideoGenerationLimit(user.id, duration);
+        const creditCheck = await checkVideoGenerationLimit(user.id, duration, validResolution as any);
         if (!creditCheck.allowed) {
             if (creditCheck.needApiKey) {
                 return NextResponse.json({
@@ -85,14 +89,16 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // リクエストボディを構築
+        // リクエストボディを構築 (Veo 3.1 Lite形式)
         const requestBody: any = {
             instances: [{
                 prompt: prompt,
             }],
             parameters: {
                 aspectRatio: "16:9",
-                personGeneration: "allow_adult",
+                durationSeconds: Number(duration),
+                resolution: validResolution,
+                personGeneration: "allow_all",
             }
         };
 
@@ -123,19 +129,23 @@ export async function POST(request: NextRequest) {
 
             if (imageBase64) {
                 requestBody.instances[0].image = {
-                    bytesBase64Encoded: imageBase64,
-                    mimeType: mimeType,
+                    inlineData: {
+                        mimeType: mimeType,
+                        data: imageBase64,
+                    },
                 };
             }
         }
 
-        console.log('[Veo API] Sending request to:', `${BASE_URL}/models/${VEO_MODEL}:predictLongRunning`);
-        console.log('[Veo API] Request:', {
+        console.log('[Veo 3.1 Lite] Sending request to:', `${BASE_URL}/models/${VEO_MODEL}:predictLongRunning`);
+        console.log('[Veo 3.1 Lite] Request:', {
             prompt: prompt.substring(0, 100) + '...',
             hasSourceImage: !!sourceImageUrl,
+            duration,
+            resolution: validResolution,
         });
 
-        // Veo 2 APIを呼び出し (Long Running Operation)
+        // Veo 3.1 Lite APIを呼び出し (Long Running Operation)
         const response = await fetch(`${BASE_URL}/models/${VEO_MODEL}:predictLongRunning`, {
             method: 'POST',
             headers: {
@@ -147,7 +157,7 @@ export async function POST(request: NextRequest) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('[Veo API] Error response:', response.status, errorText);
+            console.error('[Veo 3.1 Lite] Error response:', response.status, errorText);
 
             // エラーログを記録
             await logGeneration({
@@ -176,7 +186,7 @@ export async function POST(request: NextRequest) {
         }
 
         const operationResult = await response.json();
-        console.log('[Veo API] Operation started:', operationResult.name);
+        console.log('[Veo 3.1 Lite] Operation started:', operationResult.name);
 
         // Long-running operationの完了をポーリング
         const operationName = operationResult.name;
@@ -198,7 +208,7 @@ export async function POST(request: NextRequest) {
 
             if (opResponse.ok) {
                 const opResult = await opResponse.json();
-                console.log('[Veo API] Polling attempt', attempts + 1, '- done:', opResult.done);
+                console.log('[Veo 3.1 Lite] Polling attempt', attempts + 1, '- done:', opResult.done);
 
                 if (opResult.done) {
                     if (opResult.error) {
@@ -208,7 +218,7 @@ export async function POST(request: NextRequest) {
                     break;
                 }
             } else {
-                console.error('[Veo API] Polling error:', await opResponse.text());
+                console.error('[Veo 3.1 Lite] Polling error:', await opResponse.text());
             }
 
             attempts++;
@@ -218,14 +228,18 @@ export async function POST(request: NextRequest) {
             throw new Error('動画生成がタイムアウトしました。後でもう一度お試しください。');
         }
 
-        console.log('[Veo API] Video generated:', JSON.stringify(videoData).substring(0, 500));
+        console.log('[Veo 3.1 Lite] Video generated:', JSON.stringify(videoData).substring(0, 500));
 
-        // 動画URLを抽出
+        // 動画URLを抽出 (Veo 3.1 Lite レスポンス形式)
         let videoUrl = '';
         const videoDuration = duration;
 
-        if (videoData.generatedVideos && videoData.generatedVideos[0]) {
-            const generatedVideo = videoData.generatedVideos[0];
+        // Veo 3.1 Lite: generateVideoResponse.generatedSamples 形式
+        const generatedSamples = videoData.generateVideoResponse?.generatedSamples
+            || videoData.generatedVideos; // フォールバック
+
+        if (generatedSamples && generatedSamples[0]) {
+            const generatedVideo = generatedSamples[0];
 
             // 動画はURIとして返される
             if (generatedVideo.video?.uri) {
@@ -233,8 +247,10 @@ export async function POST(request: NextRequest) {
             }
 
             // または、バイナリデータとして返される場合
-            if (generatedVideo.video?.bytesBase64Encoded) {
-                const videoBuffer = Buffer.from(generatedVideo.video.bytesBase64Encoded, 'base64');
+            const base64Data = generatedVideo.video?.bytesBase64Encoded
+                || generatedVideo.video?.inlineData?.data;
+            if (base64Data) {
+                const videoBuffer = Buffer.from(base64Data, 'base64');
                 const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
                 const filename = `veo-generated-${uniqueSuffix}.mp4`;
 
@@ -247,7 +263,7 @@ export async function POST(request: NextRequest) {
                     });
 
                 if (uploadError) {
-                    console.error('[Veo API] Upload error:', uploadError);
+                    console.error('[Veo 3.1 Lite] Upload error:', uploadError);
                     throw new Error('生成された動画のアップロードに失敗しました');
                 }
 
@@ -278,7 +294,7 @@ export async function POST(request: NextRequest) {
         });
 
         // 成功ログを記録
-        const estimatedCost = videoDuration * COST_PER_SECOND;
+        const estimatedCost = videoDuration * (COST_PER_SECOND[validResolution] ?? COST_PER_SECOND['720p']);
         const logResult = await logGeneration({
             userId: user.id,
             type: 'video-generate',
@@ -305,7 +321,7 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error: any) {
-        console.error('[Veo API] Error:', error);
+        console.error('[Veo 3.1 Lite] Error:', error);
 
         // エラーログを記録
         await logGeneration({

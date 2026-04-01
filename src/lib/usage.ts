@@ -11,7 +11,7 @@ import {
   getCurrentBalance,
   InsufficientCreditError,
 } from '@/lib/credits';
-import { AI_COSTS, estimateImageCost, estimateTextCost, estimateVideoCost, type ImageResolution } from '@/lib/ai-costs';
+import { AI_COSTS, estimateImageCost, estimateTextCost, estimateVideoCost, type ImageResolution, type VideoResolution } from '@/lib/ai-costs';
 import { getGoogleApiKeyWithInfo } from '@/lib/apiKeys';
 
 export interface UsageStats {
@@ -257,9 +257,10 @@ export async function checkTextGenerationLimit(
  */
 export async function checkVideoGenerationLimit(
   userId: string,
-  durationSeconds: number = 5
+  durationSeconds: number = 4,
+  resolution: VideoResolution = '720p'
 ): Promise<UsageLimitCheck> {
-  const estimatedCost = estimateVideoCost('veo-2.0-generate-001', durationSeconds);
+  const estimatedCost = estimateVideoCost('veo-3.1-lite-generate-preview', durationSeconds, resolution);
   return checkGenerationLimit(userId, estimatedCost);
 }
 

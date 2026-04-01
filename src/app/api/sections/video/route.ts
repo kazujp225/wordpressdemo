@@ -22,28 +22,43 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        console.log('[Video Insert API] pageId:', pageId, 'sectionId:', sectionId);
+
         // ページの所有権確認
+        const parsedPageId = parseInt(pageId, 10);
+        const parsedSectionId = parseInt(sectionId, 10);
+
+        if (isNaN(parsedPageId) || isNaN(parsedSectionId)) {
+            console.error('[Video Insert API] Invalid IDs - pageId:', pageId, 'sectionId:', sectionId);
+            return NextResponse.json(
+                { error: `Invalid IDs: pageId=${pageId}, sectionId=${sectionId}` },
+                { status: 400 }
+            );
+        }
+
         const page = await prisma.page.findFirst({
             where: {
-                id: parseInt(pageId, 10),
+                id: parsedPageId,
                 userId: user.id,
             },
         });
 
         if (!page) {
-            return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+            console.error('[Video Insert API] Page not found - parsedPageId:', parsedPageId, 'userId:', user.id);
+            return NextResponse.json({ error: `Page not found: id=${parsedPageId}` }, { status: 404 });
         }
 
         // セクションを取得
         const section = await prisma.pageSection.findFirst({
             where: {
-                id: parseInt(sectionId, 10),
-                pageId: parseInt(pageId, 10),
+                id: parsedSectionId,
+                pageId: parsedPageId,
             },
         });
 
         if (!section) {
-            return NextResponse.json({ error: 'Section not found' }, { status: 404 });
+            console.error('[Video Insert API] Section not found - parsedSectionId:', parsedSectionId, 'pageId:', parsedPageId);
+            return NextResponse.json({ error: `Section not found: id=${parsedSectionId}, pageId=${parsedPageId}` }, { status: 404 });
         }
 
         // 既存のconfigをパース

@@ -106,7 +106,7 @@ interface VideoData {
 const VIDEO_SOURCES = [
     { id: 'youtube', label: 'YouTube', icon: Youtube, description: 'YouTube動画を埋め込み' },
     { id: 'upload', label: 'アップロード', icon: Upload, description: '動画ファイルをアップロード' },
-    { id: 'ai-generate', label: '動画生成', icon: Sparkles, description: 'Veo 2で動画を生成' },
+    { id: 'ai-generate', label: '動画生成', icon: Sparkles, description: 'Veo 3.1 Liteで動画を生成' },
 ];
 
 const DISPLAY_MODES = [
@@ -162,9 +162,13 @@ export default function VideoInsertModal({
     // AI生成用
     const [aiPrompt, setAiPrompt] = useState('');
     const [aiSourceImage, setAiSourceImage] = useState<string | null>(null);
-    const [aiDuration, setAiDuration] = useState<5 | 10>(5);
+    const [aiDuration, setAiDuration] = useState<4 | 6 | 8>(4);
+    const [aiResolution, setAiResolution] = useState<'720p' | '1080p'>('720p');
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+
+    // 解像度別クレジット/秒 (API原価 × 10,000)
+    const creditsPerSecond = aiResolution === '1080p' ? 800 : 500;
 
     const extractYouTubeId = (url: string): string | null => {
         const patterns = [
@@ -235,6 +239,7 @@ export default function VideoInsertModal({
                     prompt: aiPrompt,
                     sourceImageUrl: aiSourceImage,
                     duration: aiDuration,
+                    resolution: aiResolution,
                 }),
             });
 
@@ -525,12 +530,27 @@ export default function VideoInsertModal({
                                     <div className="flex items-center gap-2">
                                         <Sparkles className="h-4 w-4 text-indigo-600" />
                                         <span className="text-xs font-bold text-indigo-800">
-                                            消費クレジット: 約{(aiDuration * 3500).toLocaleString()}クレジット
+                                            消費クレジット: 約{(aiDuration * creditsPerSecond).toLocaleString()}クレジット
                                         </span>
                                     </div>
                                     <p className="text-[10px] text-indigo-600 mt-1 ml-6">
-                                        Veo 2: {aiDuration}秒 × 3,500クレジット/秒
+                                        Veo 3.1 Lite ({aiResolution}): {aiDuration}秒 × {creditsPerSecond.toLocaleString()}クレジット/秒
                                     </p>
+                                </div>
+
+                                {/* テキスト生成に関する注意 */}
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <div className="flex items-start gap-2">
+                                        <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <span className="text-xs font-bold text-amber-800">
+                                                日本語を含む文字の生成にご注意ください
+                                            </span>
+                                            <p className="text-[10px] text-amber-700 mt-1 leading-relaxed">
+                                                AI動画生成では、動画内のテキスト（日本語・ロゴ・商品ラベル等）が崩れることがあります。文字やテロップは後から編集ソフトで追加することを推奨します。
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div>
@@ -569,23 +589,44 @@ export default function VideoInsertModal({
                                     <p className="text-xs text-gray-500 mt-1">画像を参照すると、その画像に基づいた動画が生成されます（Image-to-Video）</p>
                                 </div>
 
-                                <div>
-                                    <label className="text-sm font-bold text-gray-900 mb-2 block">動画の長さ</label>
-                                    <div className="flex gap-2">
-                                        {[5, 10].map(d => (
-                                            <button
-                                                key={d}
-                                                onClick={() => setAiDuration(d as 5 | 10)}
-                                                className={clsx(
-                                                    "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                                                    aiDuration === d
-                                                        ? "bg-black text-white"
-                                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                                )}
-                                            >
-                                                {d}秒
-                                            </button>
-                                        ))}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-900 mb-2 block">動画の長さ</label>
+                                        <div className="flex gap-2">
+                                            {[4, 6, 8].map(d => (
+                                                <button
+                                                    key={d}
+                                                    onClick={() => setAiDuration(d as 4 | 6 | 8)}
+                                                    className={clsx(
+                                                        "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                                                        aiDuration === d
+                                                            ? "bg-black text-white"
+                                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                    )}
+                                                >
+                                                    {d}秒
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-900 mb-2 block">解像度</label>
+                                        <div className="flex gap-2">
+                                            {(['720p', '1080p'] as const).map(r => (
+                                                <button
+                                                    key={r}
+                                                    onClick={() => setAiResolution(r)}
+                                                    className={clsx(
+                                                        "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                                                        aiResolution === r
+                                                            ? "bg-black text-white"
+                                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                    )}
+                                                >
+                                                    {r}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
