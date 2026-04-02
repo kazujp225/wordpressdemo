@@ -12,7 +12,7 @@ export async function GET() {
 
     try {
         const report = await getUsageReport(user.id);
-        return NextResponse.json({ ...report, email: user.email });
+        return NextResponse.json(report);
     } catch (error: any) {
         console.error('Failed to get usage report:', error);
         return NextResponse.json({ error: process.env.NODE_ENV === 'production' ? '利用状況の取得に失敗しました' : error.message }, { status: 500 });

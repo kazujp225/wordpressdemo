@@ -21,7 +21,6 @@ const CTAManagementModal = dynamic(() => import('@/components/admin/CTAManagemen
 const ColorPaletteModal = dynamic(() => import('@/components/admin/ColorPaletteModal'), { ssr: false });
 const MobileOptimizeModal = dynamic(() => import('@/components/admin/MobileOptimizeModal'), { ssr: false });
 const VideoInsertModal = dynamic(() => import('@/components/admin/VideoInsertModal'), { ssr: false });
-const VideoEditModal = dynamic(() => import('@/components/admin/VideoEditModal'), { ssr: false });
 const TutorialModal = dynamic(() => import('@/components/admin/TutorialModal'), { ssr: false });
 const LPCompareModal = dynamic(() => import('@/components/admin/LPCompareModal'), { ssr: false });
 const LPComparePanel = dynamic(() => import('@/components/admin/LPComparePanel'), { ssr: false });
@@ -36,8 +35,7 @@ const HtmlCodeEditModal = dynamic(() => import('@/components/admin/HtmlCodeEditM
 const PageDeployModal = dynamic(() => import('@/components/admin/PageDeployModal'), { ssr: false });
 const ImageResizeModal = dynamic(() => import('@/components/admin/ImageResizeModal').then(m => m.ImageResizeModal), { ssr: false });
 const SEOLLMOOptimizer = dynamic(() => import('@/components/lp-builder/SEOLLMOOptimizer').then(m => m.SEOLLMOOptimizer), { ssr: false });
-import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight, Search, TrendingUp, Maximize2, Settings2, Film } from 'lucide-react';
-import { hasBetaAccess } from '@/lib/beta-features';
+import { GripVertical, Trash2, X, Upload, RefreshCw, Sun, Contrast, Droplet, Palette, Save, Eye, Plus, Download, Github, Loader2, MessageCircle, Send, Copy, Check, Pencil, Undo2, RotateCw, DollarSign, Monitor, Smartphone, Link2, Scissors, Expand, Type, MousePointer, Layers, Video, Lock, Crown, Image as ImageIcon, ChevronDown, ChevronRight, Square, PenTool, HelpCircle, FileText, Code2, Sparkles, Globe, Rocket, ArrowRight, Search, TrendingUp, Maximize2, Settings2 } from 'lucide-react';
 import {
     EditorMenuSection,
     EditorMenuItem,
@@ -298,9 +296,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         maxPages: 3,
     });
 
-    const [userEmail, setUserEmail] = useState<string | null>(null);
-    const canVideoEdit = hasBetaAccess(userEmail, 'videoEdit');
-
     // プラン情報を取得
     useEffect(() => {
         fetch('/api/user/usage')
@@ -308,9 +303,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
             .then(data => {
                 if (data.limits) {
                     setPlanLimits(data.limits);
-                }
-                if (data.email) {
-                    setUserEmail(data.email);
                 }
             })
             .catch(err => console.error('Failed to fetch plan limits:', err));
@@ -326,7 +318,6 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
         cta: { title: 'ボタンのリンク先', keywords: ['URL', 'リンク', 'ボタン', 'CTA'] },
         video: { title: '動画を埋め込む', keywords: ['YouTube', '動画', 'ビデオ', 'video'] },
         thumbnail: { title: 'サムネイル用に変換', keywords: ['サムネ', '画像', '変換'] },
-        videoEdit: { title: '動画を編集', keywords: ['動画', '編集', 'トリミング', '速度', 'フィルタ', 'video', 'edit'] },
         document: { title: '資料にする', keywords: ['スライド', 'PDF', '資料', 'ドキュメント'] },
         claude: { title: 'AIコード生成', keywords: ['AI', 'コード', '生成', 'Claude', 'HTML'] },
         htmlEditor: { title: 'AIで高度な編集をする', keywords: ['AI', '高度', 'エディタ', '編集', 'HTML', 'チャット', 'Claude'] },
@@ -418,9 +409,8 @@ export default function Editor({ pageId, initialSections, initialHeaderConfig, i
 
 
 
-    // 動画挿入・編集モーダル
+    // 動画挿入モーダル
     const [showVideoModal, setShowVideoModal] = useState(false);
-    const [showVideoEditModal, setShowVideoEditModal] = useState(false);
     const [showTutorialModal, setShowTutorialModal] = useState(false);
     const [showLPCompareModal, setShowLPCompareModal] = useState(false);
     const [showLPComparePanel, setShowLPComparePanel] = useState(false);
@@ -5377,7 +5367,7 @@ ${mobileMediaQuery}
                     )}
 
                     {/* 別の用途で使う */}
-                    {isSectionVisible(['thumbnail', 'videoEdit', 'document']) && (
+                    {isSectionVisible(['thumbnail', 'document']) && (
                         <EditorMenuSection title="別の用途で使う" color="purple">
                             {/* サムネイル用に変換 */}
                             {isMenuItemVisible('thumbnail') && (
@@ -5399,24 +5389,6 @@ ${mobileMediaQuery}
                                             disabled={planLimits?.canAIGenerate === false}
                                         >
                                             {planLimits?.canAIGenerate === false ? 'アップグレード' : '変換を開始'}
-                                        </EditorActionButton>
-                                    }
-                                />
-                            )}
-
-                            {/* 動画を編集（ベータ） */}
-                            {canVideoEdit && isMenuItemVisible('videoEdit') && (
-                                <EditorMenuItem
-                                    icon={<Film className="h-3.5 w-3.5" />}
-                                    title="動画を編集"
-                                    description="トリミング・速度変更・フィルタ"
-                                    tooltip="動画の簡易編集ツール（ベータ版）"
-                                    badge={<EditorBadge variant="dark">Beta</EditorBadge>}
-                                    action={
-                                        <EditorActionButton
-                                            onClick={() => setShowVideoEditModal(true)}
-                                        >
-                                            編集を開始
                                         </EditorActionButton>
                                     }
                                 />
@@ -7158,15 +7130,6 @@ ${mobileMediaQuery}
                     toast.success('セクションの順序を更新しました');
                 }}
             />
-
-            {/* 動画編集モーダル（ベータ） */}
-            {canVideoEdit && (
-                <VideoEditModal
-                    isOpen={showVideoEditModal}
-                    onClose={() => setShowVideoEditModal(false)}
-                    sections={sections}
-                />
-            )}
 
             {/* チュートリアルモーダル */}
             <TutorialModal
