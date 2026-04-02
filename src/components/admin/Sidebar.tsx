@@ -3,27 +3,29 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle, Presentation, Sparkles, MessageSquare, Image as ImageIcon, Library } from 'lucide-react';
+import { Images, Settings, LogOut, FileText, Crown, History, BarChart3, Menu, X, Shield, Zap, PlayCircle, Presentation, Sparkles, MessageSquare, Image as ImageIcon, Library, Film } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { useUserSettings } from '@/lib/hooks/useAdminData';
 import { createClient } from '@/lib/supabase/client';
 import { PLANS, type PlanType } from '@/lib/plans';
+import { hasBetaAccess } from '@/lib/beta-features';
 
 // ナビゲーションアイテムをコンポーネント外で定義（再生成防止）
 const navItems = [
-    { name: 'LP一覧', href: '/admin/pages', icon: FileText, prefetchUrl: '/api/pages', adminOnly: false },
-    { name: 'バナー編集', href: '/admin/banners', icon: Presentation, prefetchUrl: '/api/banners', adminOnly: false },
-    { name: 'サムネイル編集', href: '/admin/thumbnails', icon: ImageIcon, prefetchUrl: '/api/thumbnails', adminOnly: false },
-    { name: 'メディア', href: '/admin/media', icon: Images, prefetchUrl: '/api/media', adminOnly: false },
-    { name: 'API利用状況', href: '/admin/api-usage', icon: BarChart3, prefetchUrl: '/api/admin/stats?days=30', adminOnly: false },
-    { name: '履歴', href: '/admin/import-history', icon: History, prefetchUrl: null, adminOnly: false },
-    { name: '説明動画', href: '/admin/tutorials', icon: PlayCircle, prefetchUrl: null, adminOnly: false },
-    { name: '設定', href: '/admin/settings', icon: Settings, prefetchUrl: '/api/admin/settings', adminOnly: false },
-    { name: 'LPテンプレート', href: '/admin/templates', icon: Library, prefetchUrl: '/api/admin/templates', adminOnly: true },
-    { name: 'お問い合わせ', href: '/admin/inquiries', icon: MessageSquare, prefetchUrl: null, adminOnly: true },
-    { name: 'ユーザー管理', href: '/admin/users', icon: Shield, prefetchUrl: null, adminOnly: true },
+    { name: 'LP一覧', href: '/admin/pages', icon: FileText, prefetchUrl: '/api/pages', adminOnly: false, betaFeature: null },
+    { name: 'バナー編集', href: '/admin/banners', icon: Presentation, prefetchUrl: '/api/banners', adminOnly: false, betaFeature: null },
+    { name: 'サムネイル編集', href: '/admin/thumbnails', icon: ImageIcon, prefetchUrl: '/api/thumbnails', adminOnly: false, betaFeature: null },
+    { name: '動画編集', href: '/admin/video-edit', icon: Film, prefetchUrl: null, adminOnly: false, betaFeature: 'videoEdit' as const },
+    { name: 'メディア', href: '/admin/media', icon: Images, prefetchUrl: '/api/media', adminOnly: false, betaFeature: null },
+    { name: 'API利用状況', href: '/admin/api-usage', icon: BarChart3, prefetchUrl: '/api/admin/stats?days=30', adminOnly: false, betaFeature: null },
+    { name: '履歴', href: '/admin/import-history', icon: History, prefetchUrl: null, adminOnly: false, betaFeature: null },
+    { name: '説明動画', href: '/admin/tutorials', icon: PlayCircle, prefetchUrl: null, adminOnly: false, betaFeature: null },
+    { name: '設定', href: '/admin/settings', icon: Settings, prefetchUrl: '/api/admin/settings', adminOnly: false, betaFeature: null },
+    { name: 'LPテンプレート', href: '/admin/templates', icon: Library, prefetchUrl: '/api/admin/templates', adminOnly: true, betaFeature: null },
+    { name: 'お問い合わせ', href: '/admin/inquiries', icon: MessageSquare, prefetchUrl: null, adminOnly: true, betaFeature: null },
+    { name: 'ユーザー管理', href: '/admin/users', icon: Shield, prefetchUrl: null, adminOnly: true, betaFeature: null },
 ] as const;
 
 // データプリフェッチ用のキャッシュ
@@ -141,7 +143,11 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto">
                     <div className="mb-4 px-3 text-xs font-bold uppercase tracking-widest text-muted-foreground/70">メニュー</div>
                     {navItems
-                        .filter((item) => !item.adminOnly || isAdmin)
+                        .filter((item) => {
+                            if (item.adminOnly && !isAdmin) return false;
+                            if (item.betaFeature && !hasBetaAccess(user?.email, item.betaFeature)) return false;
+                            return true;
+                        })
                         .map((item) => {
                         const Icon = item.icon;
                         const isActive = activeItem === item.href;
